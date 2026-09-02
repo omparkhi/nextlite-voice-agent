@@ -1,0 +1,27 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1788087692909,
+      "tag": "0000_opposite_baron_strucker",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1788098066846,
+      "tag": "0001_stormy_quicksilver",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788105919283,
+      "tag": "0002_faithful_dracula",
+      "breakpoints": true
+    }
+  ]
+}
