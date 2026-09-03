@@ -11,10 +11,10 @@ vi.mock('../db', () => ({
   },
 }));
 
-import { runtimeAgentConfigService } from '../services/runtimeAgentConfig';
+import { runtimeAgentConfigService, RuntimeConfigError } from '../services/runtimeAgentConfig';
 import { db } from '../db';
 
-describe('RuntimeAgentConfigService', () => {
+describe('RuntimeAgentConfigService (Module A6)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -123,36 +123,50 @@ describe('RuntimeAgentConfigService', () => {
     expect(result.tools.tools[0].name).toBe('Book Appointment');
   });
 
-  it('TEST 2: Wrong tenant -> rejected', async () => {
+  it('TEST 2: Wrong tenant -> rejected with stable RUNTIME_CONFIG_DEPLOYMENT_NOT_FOUND code', async () => {
     (db.query.deployments.findFirst as any).mockResolvedValue(null);
 
-    await expect(
-      runtimeAgentConfigService.resolveRuntimeAgentConfig('wrong-tenant', 'deployment-123')
-    ).rejects.toThrow('Deployment not found for tenant');
+    try {
+      await runtimeAgentConfigService.resolveRuntimeAgentConfig('wrong-tenant', 'deployment-123');
+      expect.fail('Should have thrown RuntimeConfigError');
+    } catch (err: any) {
+      expect(err).toBeInstanceOf(RuntimeConfigError);
+      expect(err.code).toBe('RUNTIME_CONFIG_DEPLOYMENT_NOT_FOUND');
+      expect(err.message).toBe('Deployment not found for tenant');
+    }
   });
 
-  it('TEST 3: Inactive deployment -> rejected', async () => {
+  it('TEST 3: Inactive deployment -> rejected with stable RUNTIME_CONFIG_DEPLOYMENT_INACTIVE code', async () => {
     const inactiveDeployment = {
       ...mockDeploymentV2,
       status: 'INACTIVE',
     };
     (db.query.deployments.findFirst as any).mockResolvedValue(inactiveDeployment);
 
-    await expect(
-      runtimeAgentConfigService.resolveRuntimeAgentConfig('tenant-abc', 'deployment-123')
-    ).rejects.toThrow('Deployment is not active (status: INACTIVE)');
+    try {
+      await runtimeAgentConfigService.resolveRuntimeAgentConfig('tenant-abc', 'deployment-123');
+      expect.fail('Should have thrown RuntimeConfigError');
+    } catch (err: any) {
+      expect(err).toBeInstanceOf(RuntimeConfigError);
+      expect(err.code).toBe('RUNTIME_CONFIG_DEPLOYMENT_INACTIVE');
+      expect(err.message).toContain('Deployment is not active');
+    }
   });
 
-  it('TEST 4: Rolled-back deployment -> rejected', async () => {
+  it('TEST 4: Rolled-back deployment -> rejected with stable RUNTIME_CONFIG_DEPLOYMENT_INACTIVE code', async () => {
     const rolledBackDeployment = {
       ...mockDeploymentV2,
       status: 'ROLLED_BACK',
     };
     (db.query.deployments.findFirst as any).mockResolvedValue(rolledBackDeployment);
 
-    await expect(
-      runtimeAgentConfigService.resolveRuntimeAgentConfig('tenant-abc', 'deployment-123')
-    ).rejects.toThrow('Deployment is not active (status: ROLLED_BACK)');
+    try {
+      await runtimeAgentConfigService.resolveRuntimeAgentConfig('tenant-abc', 'deployment-123');
+      expect.fail('Should have thrown RuntimeConfigError');
+    } catch (err: any) {
+      expect(err).toBeInstanceOf(RuntimeConfigError);
+      expect(err.code).toBe('RUNTIME_CONFIG_DEPLOYMENT_INACTIVE');
+    }
   });
 
   it('TEST 5: Deployment points to Version 2 while Version 3 exists -> resolver returns Version 2 configuration', async () => {
@@ -166,7 +180,7 @@ describe('RuntimeAgentConfigService', () => {
     expect(result.prompt.compiledSystemPrompt).not.toContain('Version 3 draft');
   });
 
-  it('TEST 6: Deployment agent/version relationship is invalid -> rejected', async () => {
+  it('TEST 6: Deployment agent/version relationship is invalid -> rejected with RUNTIME_CONFIG_AGENT_INVALID', async () => {
     const mismatchedDeployment = {
       ...mockDeploymentV2,
       version: {
@@ -179,9 +193,14 @@ describe('RuntimeAgentConfigService', () => {
     };
     (db.query.deployments.findFirst as any).mockResolvedValue(mismatchedDeployment);
 
-    await expect(
-      runtimeAgentConfigService.resolveRuntimeAgentConfig('tenant-abc', 'deployment-123')
-    ).rejects.toThrow('Invalid deployment agent/version relationship');
+    try {
+      await runtimeAgentConfigService.resolveRuntimeAgentConfig('tenant-abc', 'deployment-123');
+      expect.fail('Should have thrown RuntimeConfigError');
+    } catch (err: any) {
+      expect(err).toBeInstanceOf(RuntimeConfigError);
+      expect(err.code).toBe('RUNTIME_CONFIG_AGENT_INVALID');
+      expect(err.message).toBe('Invalid deployment agent/version relationship');
+    }
   });
 
   it('TEST 7: Compiled prompt comes from the deployed version configuration', async () => {

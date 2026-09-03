@@ -5,6 +5,9 @@ import { createChildLogger } from '../lib/logger';
 import { promptCompiler } from './promptCompiler';
 import type { AgentConfiguration } from './template';
 import type { RuntimeAgentConfig } from '@nextlite/shared';
+import { RuntimeConfigError } from '../errors/runtimeConfigError';
+
+export { RuntimeConfigError, type RuntimeConfigErrorCode } from '../errors/runtimeConfigError';
 
 const logger = createChildLogger({ module: 'runtime-agent-config-service' });
 
@@ -24,7 +27,7 @@ export class RuntimeAgentConfigService {
     const deploymentId: string = arg2 ? arg2 : arg1;
 
     if (!deploymentId) {
-      throw new Error('Deployment ID is required');
+      throw new RuntimeConfigError('RUNTIME_CONFIG_CONFIG_INVALID', 'Deployment ID is required');
     }
 
     // 1. Query deployment directly or enforcing tenant constraint
@@ -40,7 +43,10 @@ export class RuntimeAgentConfigService {
 
     if (!deployment) {
       logger.warn({ tenantIdConstraint, deploymentId }, 'Deployment not found');
-      throw new Error(tenantIdConstraint ? 'Deployment not found for tenant' : 'Deployment not found');
+      throw new RuntimeConfigError(
+        'RUNTIME_CONFIG_DEPLOYMENT_NOT_FOUND',
+        tenantIdConstraint ? 'Deployment not found for tenant' : 'Deployment not found',
+      );
     }
 
     const tenantId = deployment.tenantId;
@@ -51,7 +57,10 @@ export class RuntimeAgentConfigService {
         { tenantId, deploymentId, status: deployment.status },
         'Deployment is not active',
       );
-      throw new Error(`Deployment is not active (status: ${deployment.status})`);
+      throw new RuntimeConfigError(
+        'RUNTIME_CONFIG_DEPLOYMENT_INACTIVE',
+        `Deployment is not active (status: ${deployment.status})`,
+      );
     }
 
     const agent = deployment.agent;
@@ -59,7 +68,10 @@ export class RuntimeAgentConfigService {
 
     if (!agent || !version) {
       logger.error({ tenantId, deploymentId }, 'Deployment missing agent or version relation');
-      throw new Error('Invalid deployment: missing agent or version record');
+      throw new RuntimeConfigError(
+        'RUNTIME_CONFIG_AGENT_INVALID',
+        'Invalid deployment: missing agent or version record',
+      );
     }
 
     // 3. Invariant checks for tenant/agent/version consistency
@@ -78,25 +90,37 @@ export class RuntimeAgentConfigService {
         },
         'Mismatched deployment agent/version relationship',
       );
-      throw new Error('Invalid deployment agent/version relationship');
+      throw new RuntimeConfigError(
+        'RUNTIME_CONFIG_AGENT_INVALID',
+        'Invalid deployment agent/version relationship',
+      );
     }
 
     if (agent.tenantId !== tenantId) {
       logger.error({ agentTenantId: agent.tenantId, tenantId }, 'Tenant mismatch on agent record');
-      throw new Error('Tenant mismatch on agent record');
+      throw new RuntimeConfigError(
+        'RUNTIME_CONFIG_AGENT_INVALID',
+        'Tenant mismatch on agent record',
+      );
     }
 
     // 4. Agent Status Validation
     if (agent.status === 'ARCHIVED' || agent.status === 'PAUSED') {
       logger.warn({ agentId: agent.id, agentStatus: agent.status }, 'Agent is not active');
-      throw new Error(`Agent is ${agent.status.toLowerCase()}`);
+      throw new RuntimeConfigError(
+        'RUNTIME_CONFIG_AGENT_INVALID',
+        `Agent is ${agent.status.toLowerCase()}`,
+      );
     }
 
     // 5. Exact Version Configuration JSONB
     const config = version.configuration as AgentConfiguration;
     if (!config) {
       logger.error({ versionId: version.id }, 'Agent version configuration is empty');
-      throw new Error('Invalid agent version configuration');
+      throw new RuntimeConfigError(
+        'RUNTIME_CONFIG_CONFIG_INVALID',
+        'Invalid agent version configuration',
+      );
     }
 
     // 6. Compile System Prompt via PromptCompilerService
