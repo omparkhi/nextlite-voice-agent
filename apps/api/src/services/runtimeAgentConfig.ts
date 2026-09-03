@@ -10,31 +10,28 @@ const logger = createChildLogger({ module: 'runtime-agent-config-service' });
 
 export class RuntimeAgentConfigService {
   /**
-   * Resolves an authoritative RuntimeAgentConfig DTO for a specific deployment and tenant.
+   * Resolves an authoritative RuntimeAgentConfig DTO for a specific deployment.
    *
-   * Resolution flow:
-   * 1. Query deployment enforcing deploymentId AND tenantId (Tenant Isolation)
-   * 2. Validate deployment exists, is ACTIVE, and has associated agent & version records
-   * 3. Validate agent/version consistency (deployment.agentId === agent.id AND deployment.versionId === version.id)
-   * 4. Validate agent status is active (not PAUSED or ARCHIVED)
-   * 5. Extract exact version configuration JSONB (deployment.versionId is authoritative)
-   * 6. Compile system prompt via PromptCompilerService
-   * 7. Map database & configuration objects into RuntimeAgentConfig DTO without provider hardcoding
+   * Overloaded call signatures:
+   * - resolveRuntimeAgentConfig(deploymentId: string) -> resolves tenantId authoritatively from database deployment
+   * - resolveRuntimeAgentConfig(tenantId: string, deploymentId: string) -> validates tenantId matches deployment tenantId
    */
   async resolveRuntimeAgentConfig(
-    tenantId: string,
-    deploymentId: string,
+    arg1: string,
+    arg2?: string,
   ): Promise<RuntimeAgentConfig> {
-    if (!tenantId || !deploymentId) {
-      throw new Error('Tenant ID and Deployment ID are required');
+    let tenantIdConstraint: string | undefined = arg2 ? arg1 : undefined;
+    const deploymentId: string = arg2 ? arg2 : arg1;
+
+    if (!deploymentId) {
+      throw new Error('Deployment ID is required');
     }
 
-    // 1. Query deployment enforcing tenant isolation at DB layer
+    // 1. Query deployment directly or enforcing tenant constraint
     const deployment = await db.query.deployments.findFirst({
-      where: and(
-        eq(deployments.id, deploymentId),
-        eq(deployments.tenantId, tenantId),
-      ),
+      where: tenantIdConstraint
+        ? and(eq(deployments.id, deploymentId), eq(deployments.tenantId, tenantIdConstraint))
+        : eq(deployments.id, deploymentId),
       with: {
         agent: true,
         version: true,
@@ -42,9 +39,11 @@ export class RuntimeAgentConfigService {
     });
 
     if (!deployment) {
-      logger.warn({ tenantId, deploymentId }, 'Deployment not found for tenant');
-      throw new Error('Deployment not found for tenant');
+      logger.warn({ tenantIdConstraint, deploymentId }, 'Deployment not found');
+      throw new Error(tenantIdConstraint ? 'Deployment not found for tenant' : 'Deployment not found');
     }
+
+    const tenantId = deployment.tenantId;
 
     // 2. Validate deployment status
     if (deployment.status !== 'ACTIVE') {

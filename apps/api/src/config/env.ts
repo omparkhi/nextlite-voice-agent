@@ -36,6 +36,9 @@ const envSchema = z.object({
 
   SARVAM_API_KEY: z.string().optional(),
 
+  // LiveKit Agent Worker internal shared secret
+  LIVEKIT_WORKER_SECRET: z.string().default('dev-livekit-worker-secret-v3'),
+
   // Telephony provider
   TELEPHONY_PROVIDER: z.enum(['exotel', 'plivo']).default('exotel'),
 

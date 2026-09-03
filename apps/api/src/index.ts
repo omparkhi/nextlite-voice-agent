@@ -14,6 +14,7 @@ import knowledgeRoutes from './routes/knowledge';
 import testConversationRoutes from './routes/test-conversation';
 import configAssistantRoutes from './routes/config-assistant';
 import clientRoutes from './routes/client';
+import internalRoutes from './routes/internal';
 import voiceRoutes from './voice/routes';
 import { setupVoiceWebSocket } from './voice/server';
 import { logger } from './lib/logger';
@@ -51,6 +52,7 @@ app.use('/api', healthRoutes);
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/internal', internalRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin', agentRoutes);
 app.use('/api/admin', knowledgeRoutes);
