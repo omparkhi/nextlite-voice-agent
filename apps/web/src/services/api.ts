@@ -234,4 +234,14 @@ export const api = {
       items?: Array<{ id: string; role: 'system' | 'user' | 'agent'; speakerName?: string; text: string; turnId?: string; timestamp?: number }>;
       message?: string;
     }>('/api/telephony/transcript/latest'),
+
+  getLiveKitToken: (clientId: string, agentId: string) =>
+    request<{
+      token: string;
+      serverUrl: string;
+      roomName: string;
+      sessionId: string;
+    }>(`/api/admin/clients/${clientId}/agents/${agentId}/livekit-token`, {
+      method: 'POST',
+    }),
 };

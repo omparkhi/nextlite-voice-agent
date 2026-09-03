@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { env } from '../config/env.js';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
@@ -265,6 +266,46 @@ router.get('/clients/:clientId/agents/:agentId/runtime-config', async (req: Requ
   } catch (error) {
     logger.error(error, 'Get runtime config error');
     res.status(500).json({ error: 'Failed to get runtime config' });
+  }
+});
+
+// POST /api/admin/clients/:clientId/agents/:agentId/livekit-token
+router.post('/clients/:clientId/agents/:agentId/livekit-token', async (req: Request, res: Response) => {
+  try {
+    const { clientId, agentId } = req.params;
+    if (!(await verifyClient(clientId))) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+
+    const { AccessToken } = await import('livekit-server-sdk');
+    const roomName = `room_${agentId}_${Date.now()}`;
+    const sessionId = `session_${Date.now()}`;
+
+    const at = new AccessToken(env.LIVEKIT_API_KEY, env.LIVEKIT_API_SECRET, {
+      identity: `user_${Date.now()}`,
+      ttl: '1h',
+    });
+    at.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    const token = await at.toJwt();
+
+    logger.info({ clientId, agentId, roomName, sessionId }, '[VOICE_DEBUG] Generated LiveKit token for web call');
+
+    res.json({
+      token,
+      serverUrl: env.LIVEKIT_URL,
+      roomName,
+      sessionId,
+    });
+  } catch (error: any) {
+    logger.error(error, 'Failed to generate LiveKit token');
+    res.status(500).json({ error: 'Failed to generate LiveKit token' });
   }
 });
 

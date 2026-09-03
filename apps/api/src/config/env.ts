@@ -52,6 +52,15 @@ const envSchema = z.object({
   PLIVO_CALLER_ID: z.string().optional(),
   PLIVO_BASE_URL: z.string().optional(),
   PLIVO_STREAM_HOST: z.string().optional(),
+
+  // Engine migration flag (legacy = V1 VoiceRuntime, livekit = V2 LiveKit engine)
+  VOICE_ENGINE: z.enum(['legacy', 'livekit']).default('legacy'),
+  LIVEKIT_URL: z.string().default('ws://localhost:7880'),
+  LIVEKIT_API_KEY: z.string().default('devkey'),
+  LIVEKIT_API_SECRET: z.string().default('secretsecretsecretsecretsecretsecret'),
+  LIVEKIT_SIP_DOMAIN: z.string().optional(),
+  LIVEKIT_SIP_TRUNK_ID: z.string().optional(),
+  WORKER_API_SECRET: z.string().default('nextlite_internal_worker_secret_2026'),
 });
 
 function validateEnv() {

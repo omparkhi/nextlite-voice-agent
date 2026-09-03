@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import type { Agent, AgentConfiguration, AgentVersion, AgentChecklistResult } from '../../types';
 import KnowledgeManager from './KnowledgeManager';
 import TestConversation from './TestConversation';
-import WebVoiceTest from '../../components/WebVoiceTest';
+import { LiveKitVoiceTest } from '../../components/LiveKitVoiceTest';
 import PhoneCallTest from '../../components/PhoneCallTest';
 import { PhaseBuilder } from '../../components/agent-builder/PhaseBuilder';
 import { GuardrailsEditor } from '../../components/agent-builder/GuardrailsEditor';
@@ -587,7 +587,7 @@ export function AgentDetail() {
                 </div>
 
                 {testMode === 'chat' && <TestConversation clientId={clientId} agentId={agentId} />}
-                {testMode === 'web_voice' && <WebVoiceTest clientId={clientId} agentId={agentId} />}
+                {testMode === 'web_voice' && <LiveKitVoiceTest clientId={clientId} agentId={agentId} agentName={configuration.identity.agentName || 'Assistant'} onClose={() => setTestMode('chat')} />}
                 {testMode === 'phone' && <PhoneCallTest clientId={clientId} agentId={agentId} />}
               </div>
             )}
@@ -610,17 +610,12 @@ export function AgentDetail() {
 
       {/* TEST AGENT MODAL */}
       {showTestModal && clientId && agentId && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-3">
-              <h3 className="font-semibold text-base text-gray-900">📞 Test Agent Environment</h3>
-              <button type="button" onClick={() => setShowTestModal(false)} className="text-gray-400 hover:text-gray-900 text-lg font-bold">
-                ✕
-              </button>
-            </div>
-            <WebVoiceTest clientId={clientId} agentId={agentId} />
-          </div>
-        </div>
+        <LiveKitVoiceTest
+          clientId={clientId}
+          agentId={agentId}
+          agentName={agent?.name || 'Agent'}
+          onClose={() => setShowTestModal(false)}
+        />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import * as plivo from 'plivo';
 import { createChildLogger } from '../../../lib/logger.js';
-import { TelephonyService } from '../../telephony.js';
+
 import { PlivoCallResponse, PlivoRecordingRecord } from './types.js';
 
 const logger = createChildLogger({ module: 'plivo-client' });
@@ -140,7 +140,7 @@ export class PlivoClient {
 /**
  * Adapter bridging PlivoClient to NextLite's TelephonyService interface.
  */
-export class PlivoTelephonyAdapter implements TelephonyService {
+export class PlivoTelephonyAdapter {
   private client: PlivoClient;
 
   constructor(config: PlivoClientConfig) {

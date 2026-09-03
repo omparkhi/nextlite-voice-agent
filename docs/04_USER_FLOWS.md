@@ -6,13 +6,13 @@
 Admin creates client
       |
       v
-System sends onboarding email (Resend)
+System sends onboarding email
       |
       v
 Client verifies account
       |
       v
-Client can log in (custom JWT)
+Client can log in
       |
       v
 Admin continues technical setup
@@ -26,7 +26,7 @@ No payment is required at initial account creation.
 Admin selects client
    |
    v
-Select template
+Select template (Appointment Booking, Lead Generation, Customer Support, Receptionist, etc.)
    |
    v
 Configure identity/role
@@ -71,24 +71,21 @@ Choose plan
    |
    v
 Choose deployment method
-   |---- new number (Plivo)
-   |---- existing number (if supported)
+   |---- new number
+   |---- existing number
    |---- call forwarding
    |
    v
-Checkout (Cashfree order/subscription)
+Checkout
    |
    v
-Cashfree payment page
+Verified payment webhook
    |
    v
-Verified payment webhook (PAYMENT_SUCCESS_WEBHOOK)
+Provision/connect telephony
    |
    v
-Provision/connect telephony (Plivo)
-   |
-   v
-Verify deployment (test call)
+Verify deployment
    |
    v
 Test real call
@@ -118,42 +115,3 @@ Client sees:
 - billing
 
 Technical configuration remains primarily controlled by NextLite Admin.
-
-## F. Outbound call flow
-
-```text
-Admin initiates outbound call
-   |
-   v
-Select agent
-   |
-   v
-Select lead/customer
-   |
-   v
-Pass context (lead info, call purpose)
-   |
-   v
-Plivo Make Call API (from Plivo number to customer number)
-   |
-   v
-Same Voice Runtime as inbound
-   |
-   v
-Agent conversation with lead/customer
-   |
-   v
-Tools execution (appointments, leads, etc.)
-   |
-   v
-Call ends
-   |
-   v
-Transcript saved
-   |
-   v
-Outcome recorded
-   |
-   v
-Usage/cost metered
-```

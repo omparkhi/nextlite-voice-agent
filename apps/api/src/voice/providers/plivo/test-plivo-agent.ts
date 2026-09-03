@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import WebSocket from 'ws';
-import { createTelephonyService } from '../../telephony.js';
+import { createPlivoControlService } from './service.js';
 import { PlivoTelephonyAdapter } from './client.js';
 import { validatePlivoV3Signature } from './security.js';
 
@@ -26,7 +26,7 @@ async function runPlivoVerification() {
 
   // 2. Test Factory & Client Adapter
   console.log('\n2. Testing PlivoTelephonyAdapter Factory...');
-  const service = createTelephonyService('plivo');
+  const service = createPlivoControlService();
   if (service instanceof PlivoTelephonyAdapter) {
     console.log('   ✅ Factory successfully instantiated PlivoTelephonyAdapter');
   } else {

@@ -351,3 +351,17 @@ export const configChangeProposalsRelations = relations(configChangeProposals, (
     references: [users.id],
   }),
 }));
+
+export const callSessions = pgTable('call_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tenantId: uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  agentId: uuid('agent_id').notNull().references(() => agents.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id').notNull().unique(),
+  channel: text('channel').notNull().default('web'),
+  callerPhone: text('caller_phone'),
+  status: text('status').notNull().default('completed'),
+  durationSeconds: integer('duration_seconds').default(0),
+  transcriptJson: text('transcript_json'),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
