@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
   pgTable,
   uuid,
@@ -10,8 +10,27 @@ import {
   pgEnum,
   integer,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { vector } from 'drizzle-orm/pg-core';
+
+export const versionStatusEnum = pgEnum('version_status', [
+  'DRAFT',
+  'PUBLISHED',
+  'ARCHIVED',
+]);
+
+export const deploymentEnvironmentEnum = pgEnum('deployment_environment', [
+  'TEST',
+  'PRODUCTION',
+]);
+
+export const deploymentStatusEnum = pgEnum('deployment_status', [
+  'ACTIVE',
+  'INACTIVE',
+  'ROLLED_BACK',
+]);
+
 
 export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'CLIENT_OWNER', 'CLIENT_VIEWER']);
 
@@ -119,10 +138,31 @@ export const agentVersions = pgTable('agent_versions', {
   agentId: uuid('agent_id').references(() => agents.id).notNull(),
   versionNumber: integer('version_number').notNull(),
   configuration: jsonb('configuration').notNull(),
+  status: versionStatusEnum('status').default('DRAFT').notNull(),
   createdBy: uuid('created_by').references(() => users.id).notNull(),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+export const deployments = pgTable('deployments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  agentId: uuid('agent_id').references(() => agents.id).notNull(),
+  versionId: uuid('version_id').references(() => agentVersions.id).notNull(),
+  environment: deploymentEnvironmentEnum('environment').default('TEST').notNull(),
+  status: deploymentStatusEnum('status').default('ACTIVE').notNull(),
+  createdBy: uuid('created_by').references(() => users.id).notNull(),
+  deployedAt: timestamp('deployed_at').defaultNow().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('deployments_tenant_idx').on(table.tenantId),
+  index('deployments_agent_idx').on(table.agentId),
+  index('deployments_version_idx').on(table.versionId),
+  uniqueIndex('active_deployment_per_agent_env_idx')
+    .on(table.agentId, table.environment)
+    .where(sql`status = 'ACTIVE'`),
+]);
 
 export const agentTools = pgTable('agent_tools', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -216,6 +256,9 @@ export type NewAgent = typeof agents.$inferInsert;
 export type AgentVersion = typeof agentVersions.$inferSelect;
 export type NewAgentVersion = typeof agentVersions.$inferInsert;
 
+export type Deployment = typeof deployments.$inferSelect;
+export type NewDeployment = typeof deployments.$inferInsert;
+
 export type AgentTool = typeof agentTools.$inferSelect;
 export type NewAgentTool = typeof agentTools.$inferInsert;
 
@@ -234,6 +277,7 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   subscriptions: many(subscriptions),
   auditLogs: many(auditLogs),
   agents: many(agents),
+  deployments: many(deployments),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -245,6 +289,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   verificationTokens: many(verificationTokens),
   auditLogs: many(auditLogs),
   createdAgentVersions: many(agentVersions),
+  createdDeployments: many(deployments),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -272,9 +317,10 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   knowledgeSources: many(knowledgeSources),
   knowledgeChunks: many(knowledgeChunks),
   configProposals: many(configChangeProposals),
+  deployments: many(deployments),
 }));
 
-export const agentVersionsRelations = relations(agentVersions, ({ one }) => ({
+export const agentVersionsRelations = relations(agentVersions, ({ one, many }) => ({
   agent: one(agents, {
     fields: [agentVersions.agentId],
     references: [agents.id],
@@ -283,7 +329,28 @@ export const agentVersionsRelations = relations(agentVersions, ({ one }) => ({
     fields: [agentVersions.createdBy],
     references: [users.id],
   }),
+  deployments: many(deployments),
 }));
+
+export const deploymentsRelations = relations(deployments, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [deployments.tenantId],
+    references: [tenants.id],
+  }),
+  agent: one(agents, {
+    fields: [deployments.agentId],
+    references: [agents.id],
+  }),
+  version: one(agentVersions, {
+    fields: [deployments.versionId],
+    references: [agentVersions.id],
+  }),
+  createdByUser: one(users, {
+    fields: [deployments.createdBy],
+    references: [users.id],
+  }),
+}));
+
 
 export const agentToolsRelations = relations(agentTools, ({ one }) => ({
   agent: one(agents, {
