@@ -63,3 +63,6 @@ export function getVoiceRuntime() {
   }
   return _voiceRuntime;
 }
+
+export { RuntimeAgentConfigService, runtimeAgentConfigService } from './runtimeAgentConfig';
+

@@ -1,0 +1,210 @@
+import { db } from '../db';
+import { deployments } from '../db/schema';
+import { eq, and } from 'drizzle-orm';
+import { createChildLogger } from '../lib/logger';
+import { promptCompiler } from './promptCompiler';
+import type { AgentConfiguration } from './template';
+import type { RuntimeAgentConfig } from '@nextlite/shared';
+
+const logger = createChildLogger({ module: 'runtime-agent-config-service' });
+
+export class RuntimeAgentConfigService {
+  /**
+   * Resolves an authoritative RuntimeAgentConfig DTO for a specific deployment and tenant.
+   *
+   * Resolution flow:
+   * 1. Query deployment enforcing deploymentId AND tenantId (Tenant Isolation)
+   * 2. Validate deployment exists, is ACTIVE, and has associated agent & version records
+   * 3. Validate agent/version consistency (deployment.agentId === agent.id AND deployment.versionId === version.id)
+   * 4. Validate agent status is active (not PAUSED or ARCHIVED)
+   * 5. Extract exact version configuration JSONB (deployment.versionId is authoritative)
+   * 6. Compile system prompt via PromptCompilerService
+   * 7. Map database & configuration objects into RuntimeAgentConfig DTO without provider hardcoding
+   */
+  async resolveRuntimeAgentConfig(
+    tenantId: string,
+    deploymentId: string,
+  ): Promise<RuntimeAgentConfig> {
+    if (!tenantId || !deploymentId) {
+      throw new Error('Tenant ID and Deployment ID are required');
+    }
+
+    // 1. Query deployment enforcing tenant isolation at DB layer
+    const deployment = await db.query.deployments.findFirst({
+      where: and(
+        eq(deployments.id, deploymentId),
+        eq(deployments.tenantId, tenantId),
+      ),
+      with: {
+        agent: true,
+        version: true,
+      },
+    });
+
+    if (!deployment) {
+      logger.warn({ tenantId, deploymentId }, 'Deployment not found for tenant');
+      throw new Error('Deployment not found for tenant');
+    }
+
+    // 2. Validate deployment status
+    if (deployment.status !== 'ACTIVE') {
+      logger.warn(
+        { tenantId, deploymentId, status: deployment.status },
+        'Deployment is not active',
+      );
+      throw new Error(`Deployment is not active (status: ${deployment.status})`);
+    }
+
+    const agent = deployment.agent;
+    const version = deployment.version;
+
+    if (!agent || !version) {
+      logger.error({ tenantId, deploymentId }, 'Deployment missing agent or version relation');
+      throw new Error('Invalid deployment: missing agent or version record');
+    }
+
+    // 3. Invariant checks for tenant/agent/version consistency
+    if (
+      deployment.agentId !== agent.id ||
+      deployment.versionId !== version.id ||
+      version.agentId !== agent.id
+    ) {
+      logger.error(
+        {
+          deploymentAgentId: deployment.agentId,
+          agentId: agent.id,
+          versionAgentId: version.agentId,
+          deploymentVersionId: deployment.versionId,
+          versionId: version.id,
+        },
+        'Mismatched deployment agent/version relationship',
+      );
+      throw new Error('Invalid deployment agent/version relationship');
+    }
+
+    if (agent.tenantId !== tenantId) {
+      logger.error({ agentTenantId: agent.tenantId, tenantId }, 'Tenant mismatch on agent record');
+      throw new Error('Tenant mismatch on agent record');
+    }
+
+    // 4. Agent Status Validation
+    if (agent.status === 'ARCHIVED' || agent.status === 'PAUSED') {
+      logger.warn({ agentId: agent.id, agentStatus: agent.status }, 'Agent is not active');
+      throw new Error(`Agent is ${agent.status.toLowerCase()}`);
+    }
+
+    // 5. Exact Version Configuration JSONB
+    const config = version.configuration as AgentConfiguration;
+    if (!config) {
+      logger.error({ versionId: version.id }, 'Agent version configuration is empty');
+      throw new Error('Invalid agent version configuration');
+    }
+
+    // 6. Compile System Prompt via PromptCompilerService
+    const compiledSystemPrompt = promptCompiler.compileAgentPrompt({
+      configuration: config,
+    });
+
+    // 7. Map to RuntimeAgentConfig DTO using stored configuration values
+    const runtimeConfig: RuntimeAgentConfig = {
+      tenant: {
+        tenantId: deployment.tenantId,
+      },
+      agent: {
+        agentId: agent.id,
+        agentName: agent.name,
+        status: agent.status,
+      },
+      deployment: {
+        deploymentId: deployment.id,
+        versionId: version.id,
+        versionNumber: version.versionNumber,
+      },
+      prompt: {
+        compiledSystemPrompt,
+        greeting: config.identity?.greeting,
+      },
+      voice: {
+        provider: config.voice?.provider,
+        sttModel: (config.voice as any)?.sttModel,
+        ttsModel: (config.voice as any)?.ttsModel,
+        voiceId: config.voice?.voiceId,
+        gender: config.voice?.gender,
+        speakingSpeed: config.voice?.speakingSpeed,
+        pitch: config.voice?.pitch,
+      },
+      language: {
+        primary: config.language?.primary,
+        supportedLanguages: config.language?.supported || [],
+        autoDetectEnabled: config.language?.autoDetect,
+        languageSwitchingEnabled: config.language?.languageSwitchEnabled,
+      },
+      runtime: {
+        modelProvider: (config.runtimeSettings as any)?.modelProvider || (config as any)?.modelProvider,
+        llmModel: (config.runtimeSettings as any)?.llmModel || (config as any)?.llmModel,
+        temperature: config.runtimeSettings?.modelTemperature,
+        interruptionMode:
+          config.runtimeSettings?.allowCallerInterruptions !== undefined
+            ? config.runtimeSettings.allowCallerInterruptions
+              ? 'adaptive'
+              : 'disabled'
+            : undefined,
+        preemptiveGenerationEnabled: (config.runtimeSettings as any)?.preemptiveGenerationEnabled,
+        responseEagerness: config.runtimeSettings?.eagernessToRespond,
+        noiseCancellationModel: (config.runtimeSettings as any)?.noiseCancellationModel,
+        expressiveModeEnabled: (config.runtimeSettings as any)?.expressiveModeEnabled,
+        maxCallDurationSeconds: config.runtimeSettings?.maxCallLengthSeconds,
+      },
+      knowledge: {
+        enabled: config.knowledge?.enabled ?? false,
+        retrievalConfig: config.knowledge?.retrievalConfig
+          ? {
+              topK: config.knowledge.retrievalConfig.topK,
+              scoreThreshold: config.knowledge.retrievalConfig.similarityThreshold,
+            }
+          : undefined,
+      },
+      tools: {
+        enabled: config.tools?.enabled ?? false,
+        tools: (config.tools?.bindings || []).map((t) => ({
+          name: t.name || t.toolId,
+          description: t.description || '',
+          parameters: {},
+          enabled: t.enabled ?? true,
+          confirmationRequired: t.confirmationRequired,
+        })),
+      },
+      variables: {
+        inputVariables: (config.variables?.input || []).map((v) => ({
+          key: v.key,
+          label: v.label,
+          type: v.type as any,
+          required: v.required ?? false,
+          defaultValue: v.defaultValue,
+          scope: v.scope as any,
+        })),
+        outputVariables: (config.variables?.output || []).map((v) => ({
+          key: v.key,
+          label: v.label,
+          type: v.type as any,
+          required: v.required ?? false,
+        })),
+      },
+    };
+
+    logger.info(
+      {
+        tenantId,
+        deploymentId: deployment.id,
+        agentId: agent.id,
+        versionId: version.id,
+        versionNumber: version.versionNumber,
+      },
+      'RuntimeAgentConfig resolved successfully',
+    );
+
+    return runtimeConfig;
+  }
+}
+
+export const runtimeAgentConfigService = new RuntimeAgentConfigService();
