@@ -325,26 +325,25 @@ router.post('/clients/:clientId/agents/:agentId/publish', async (req: Request, r
       return;
     }
 
-    const config = await agentService.getCurrentConfig(agentId, clientId);
-    if (!config) {
-      res.status(404).json({ error: 'Agent configuration not found' });
+    const result = await agentService.publishAgent(agentId, clientId, req.user!.userId);
+    res.json({
+      message: 'Agent published successfully',
+      agent: result.agent,
+      checklist: result.checklist,
+      deployment: result.deployment,
+    });
+  } catch (error: any) {
+    if (error?.message === 'Agent not found' || error?.message === 'No agent version available to publish') {
+      res.status(404).json({ error: error.message });
       return;
     }
-
-    const { agentChecklistService } = await import('../services/agentChecklist.js');
-    const checklist = agentChecklistService.evaluateAgent(config as any);
-
-    if (!checklist.canPublish) {
+    if (error?.checklist && !error.checklist.canPublish) {
       res.status(400).json({
-        error: 'Cannot publish agent with critical validation errors',
-        checklist,
+        error: error.message || 'Cannot publish agent with critical validation errors',
+        checklist: error.checklist,
       });
       return;
     }
-
-    const updated = await agentService.updateAgent(agentId, clientId, { status: 'LIVE' });
-    res.json({ message: 'Agent published successfully', agent: updated, checklist });
-  } catch (error) {
     logger.error(error, 'Publish agent error');
     res.status(500).json({ error: 'Failed to publish agent' });
   }

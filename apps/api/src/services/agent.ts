@@ -1,8 +1,9 @@
 import { db } from '../db';
-import { agents, agentVersions, agentTools, agentTemplates } from '../db/schema';
+import { agents, agentVersions, agentTools, agentTemplates, deployments } from '../db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { createChildLogger } from '../lib/logger';
 import { AgentConfiguration, templateService } from './template';
+import { agentChecklistService } from './agentChecklist';
 
 const logger = createChildLogger({ module: 'agent-service' });
 
@@ -50,16 +51,30 @@ export class AgentService {
     }).returning();
 
     const config = template.defaultConfiguration as any;
-    await db.insert(agentVersions).values({
+    const [version] = await db.insert(agentVersions).values({
       agentId: agent.id,
       versionNumber: 1,
       configuration: config,
+      status: 'DRAFT',
       createdBy,
       notes: 'Initial configuration from template',
       createdAt: now,
+    }).returning();
+
+    // Create initial ACTIVE TEST deployment (pointing to draft version 1)
+    await db.insert(deployments).values({
+      tenantId,
+      agentId: agent.id,
+      versionId: version.id,
+      environment: 'TEST',
+      status: 'ACTIVE',
+      createdBy,
+      deployedAt: now,
+      createdAt: now,
+      updatedAt: now,
     });
 
-    logger.info({ agentId: agent.id, tenantId, templateId }, 'Agent created');
+    logger.info({ agentId: agent.id, tenantId, templateId, versionId: version.id }, 'Agent created with initial TEST deployment');
 
     return this.getAgent(agent.id, tenantId);
   }
@@ -97,10 +112,11 @@ export class AgentService {
     const nextVersion = latestVersion ? latestVersion.versionNumber + 1 : 1;
     const now = new Date();
 
-    const [version] = await db.insert(agentVersions).values({
+    const [newVersion] = await db.insert(agentVersions).values({
       agentId,
       versionNumber: nextVersion,
       configuration: configuration as any,
+      status: 'DRAFT',
       createdBy,
       notes: notes || `Configuration version ${nextVersion}`,
       createdAt: now,
@@ -108,9 +124,147 @@ export class AgentService {
 
     await db.update(agents).set({ updatedAt: now }).where(eq(agents.id, agentId));
 
-    logger.info({ agentId, versionNumber: nextVersion }, 'Agent configuration saved');
+    // Update or upsert active TEST deployment to point to the new draft version
+    const existingTestDeployment = await db.query.deployments.findFirst({
+      where: and(
+        eq(deployments.agentId, agentId),
+        eq(deployments.tenantId, tenantId),
+        eq(deployments.environment, 'TEST'),
+        eq(deployments.status, 'ACTIVE'),
+      ),
+    });
 
-    return version;
+    if (existingTestDeployment) {
+      await db
+        .update(deployments)
+        .set({
+          versionId: newVersion.id,
+          deployedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(deployments.id, existingTestDeployment.id));
+    } else {
+      await db.insert(deployments).values({
+        tenantId,
+        agentId,
+        versionId: newVersion.id,
+        environment: 'TEST',
+        status: 'ACTIVE',
+        createdBy,
+        deployedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    logger.info(
+      { agentId, versionNumber: nextVersion, versionId: newVersion.id },
+      'Agent configuration saved and TEST deployment updated',
+    );
+
+    return newVersion;
+  }
+
+  async publishAgent(agentId: string, tenantId: string, publishedBy: string) {
+    const agent = await db.query.agents.findFirst({
+      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+    });
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
+
+    const latestVersion = await db.query.agentVersions.findFirst({
+      where: eq(agentVersions.agentId, agentId),
+      orderBy: (v, { desc }) => [desc(v.versionNumber)],
+    });
+    if (!latestVersion) {
+      throw new Error('No agent version available to publish');
+    }
+
+    // Evaluate checklist
+    const checklist = agentChecklistService.evaluateAgent(latestVersion.configuration as any);
+    if (!checklist.canPublish) {
+      const error: any = new Error('Cannot publish agent with critical validation errors');
+      error.checklist = checklist;
+      throw error;
+    }
+
+    const now = new Date();
+
+    // 1. Mark selected version as PUBLISHED (immutable)
+    await db
+      .update(agentVersions)
+      .set({ status: 'PUBLISHED' })
+      .where(eq(agentVersions.id, latestVersion.id));
+
+    // 2. Set Agent status as LIVE
+    await db
+      .update(agents)
+      .set({ status: 'LIVE', updatedAt: now })
+      .where(eq(agents.id, agentId));
+
+    // 3. Find any existing active PRODUCTION deployment and deactivate it
+    const existingProdDeployment = await db.query.deployments.findFirst({
+      where: and(
+        eq(deployments.agentId, agentId),
+        eq(deployments.tenantId, tenantId),
+        eq(deployments.environment, 'PRODUCTION'),
+        eq(deployments.status, 'ACTIVE'),
+      ),
+    });
+
+    if (existingProdDeployment) {
+      await db
+        .update(deployments)
+        .set({ status: 'INACTIVE', updatedAt: now })
+        .where(eq(deployments.id, existingProdDeployment.id));
+    }
+
+    // 4. Create new active PRODUCTION deployment pointing to the published version
+    const [prodDeployment] = await db.insert(deployments).values({
+      tenantId,
+      agentId,
+      versionId: latestVersion.id,
+      environment: 'PRODUCTION',
+      status: 'ACTIVE',
+      createdBy: publishedBy,
+      deployedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+
+    logger.info(
+      {
+        agentId,
+        tenantId,
+        versionId: latestVersion.id,
+        versionNumber: latestVersion.versionNumber,
+        productionDeploymentId: prodDeployment.id,
+      },
+      'Agent published successfully and PRODUCTION deployment activated',
+    );
+
+    const updatedAgent = await this.getAgent(agentId, tenantId);
+    return {
+      agent: updatedAgent,
+      publishedVersion: { ...latestVersion, status: 'PUBLISHED' },
+      deployment: prodDeployment,
+      checklist,
+    };
+  }
+
+  async getActiveDeployment(agentId: string, tenantId: string, environment: 'TEST' | 'PRODUCTION') {
+    return db.query.deployments.findFirst({
+      where: and(
+        eq(deployments.agentId, agentId),
+        eq(deployments.tenantId, tenantId),
+        eq(deployments.environment, environment),
+        eq(deployments.status, 'ACTIVE'),
+      ),
+      with: {
+        version: true,
+      },
+    });
   }
 
   async getVersions(agentId: string, tenantId: string) {
@@ -201,3 +355,4 @@ export class AgentService {
 }
 
 export const agentService = new AgentService();
+

@@ -8,6 +8,7 @@ vi.mock('../db', () => ({
       agents: { findMany: vi.fn(), findFirst: vi.fn() },
       agentVersions: { findMany: vi.fn(), findFirst: vi.fn() },
       agentTools: { findMany: vi.fn() },
+      deployments: { findMany: vi.fn(), findFirst: vi.fn() },
     },
     insert: vi.fn(() => ({
       values: vi.fn(() => ({
