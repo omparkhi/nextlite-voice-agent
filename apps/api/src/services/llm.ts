@@ -11,11 +11,16 @@ export interface LLMService {
 
 export class SarvamLLMAdapter implements LLMService {
   private apiKey: string;
-  private model = 'sarvam-105b';
+  private model = 'sarvam-105b-conversations';
   private endpoint = 'https://api.sarvam.ai/v1/chat/completions';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+  }
+
+  private sanitizeOutput(text: string): string {
+    if (!text) return '';
+    return text.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '').trim();
   }
 
   async chat(messages: LLMMessage[], options: { temperature?: number; maxTokens?: number } = {}): Promise<string> {
@@ -40,7 +45,8 @@ export class SarvamLLMAdapter implements LLMService {
     }
 
     const data = await response.json() as { choices: { message: { content: string } }[] };
-    return data.choices[0].message.content;
+    const rawContent = data.choices?.[0]?.message?.content ?? '';
+    return this.sanitizeOutput(rawContent);
   }
 
   async *chatStream(
