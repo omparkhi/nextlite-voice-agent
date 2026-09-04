@@ -3,7 +3,12 @@ import * as sarvam from '@livekit/agents-plugin-sarvam';
 import { audioEnhancement } from '@livekit/plugins-ai-coustics';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
-import { createAgent } from './agent.ts';
+import { DEFAULT_SYSTEM_PROMPT, createAgent } from './agent.ts';
+import {
+  ConversationLanguageManager,
+  buildFullInstructions,
+} from './languageManager.ts';
+import { extractDeploymentId, getRuntimeAgentConfig } from './runtimeConfigClient.ts';
 
 // Load environment variables from a local file.
 // Make sure to set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET
@@ -12,24 +17,50 @@ dotenv.config({ path: '.env.local' });
 
 export default defineAgent({
   entry: async (ctx) => {
-    // Set up a voice AI pipeline using AssemblyAI, Fish Audio, and the LiveKit turn detector
+    // 1. Read room metadata
+    const rawMetadata = ctx.room?.metadata || ctx.job?.room?.metadata;
+
+    // 2. Extract deploymentId (fails clearly if missing/malformed, preventing unconfigured agent fallback)
+    const deploymentId = extractDeploymentId(rawMetadata);
+
+    // 3. Resolve authoritative RuntimeAgentConfig from NextLite Control Plane API
+    const runtimeConfig = await getRuntimeAgentConfig(deploymentId);
+
+    const sttModel = runtimeConfig.voice?.sttModel || 'saaras:v3';
+    const ttsModel = runtimeConfig.voice?.ttsModel || 'bulbul:v3';
+    const ttsSpeaker = runtimeConfig.voice?.voiceId || 'priya';
+    const llmModel = runtimeConfig.runtime?.llmModel || 'sarvam-105b-conversations';
+
+    // 4. Initialize ConversationLanguageManager
+    const languageManager = new ConversationLanguageManager(runtimeConfig.language);
+    const initialSttLanguage = languageManager.getSttInitialLanguage();
+    const initialTtsLanguage = languageManager.getTtsCurrentLanguage();
+
+    console.log(
+      `[Worker] Initializing session for deployment=${deploymentId} (agent=${runtimeConfig.agent.agentName}, ` +
+        `sttModel=${sttModel}, sttLang=${initialSttLanguage}, ttsModel=${ttsModel}, ttsSpeaker=${ttsSpeaker}, ttsLang=${initialTtsLanguage}, llmModel=${llmModel}, ` +
+        `autoDetect=${languageManager.autoDetectEnabled}, switching=${languageManager.languageSwitchingEnabled}, supported=[${languageManager.supportedLanguages.join(',')}])`,
+    );
+
+    const stt = new sarvam.STT({
+      model: sttModel as any,
+      languageCode: initialSttLanguage as any,
+      mode: 'transcribe',
+    });
+
+    const tts = new sarvam.TTS({
+      model: ttsModel as any,
+      targetLanguageCode: initialTtsLanguage as any,
+      speaker: ttsSpeaker as any,
+      ...(typeof runtimeConfig.voice?.speakingSpeed === 'number'
+        ? { pace: runtimeConfig.voice.speakingSpeed }
+        : {}),
+    });
+
+    // Set up a voice AI pipeline using Sarvam and LiveKit turn detector
     const session = new voice.AgentSession({
-      // Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
-      // See all available models at https://docs.livekit.io/agents/models/stt/
-      stt: new sarvam.STT({
-        model: 'saaras:v3',
-        languageCode: 'en-IN',
-        mode: 'transcribe',
-      }),
-
-      // Text-to-speech (TTS) is your agent's voice, turning the LLM's text into speech that the user can hear
-      // See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
-      tts: new sarvam.TTS({
-        model: 'bulbul:v3',
-        targetLanguageCode: 'en-IN',
-        speaker: 'priya',
-      }),
-
+      stt,
+      tts,
       turnHandling: {
         // Turn detection determines when the user is speaking and when the agent should respond.
         // The LiveKit audio turn detector is a multimodal model that encodes the user's audio
@@ -46,39 +77,46 @@ export default defineAgent({
 
       // Expressive mode injects the TTS provider's markup guide into the LLM prompt, so the model
       // emits inline delivery tags (emotion, pacing, non-verbal sounds) that the TTS renders and
-      // the transcript never shows. Requires a TTS model that supports markup, such as the Fish
-      // Audio model above.
+      // the transcript never shows.
       expressive: true,
+    });
+
+    const basePrompt = runtimeConfig.prompt?.compiledSystemPrompt?.trim()
+      ? runtimeConfig.prompt.compiledSystemPrompt
+      : DEFAULT_SYSTEM_PROMPT;
+
+    const agent = createAgent(runtimeConfig, languageManager);
+
+    // Dynamic Multilingual Voice: listen to user transcription events and update TTS & LLM when language changes
+    session.on(voice.AgentSessionEventTypes.UserInputTranscribed, async (ev: voice.UserInputTranscribedEvent) => {
+      if (ev.isFinal && ev.transcript) {
+        const turnResult = languageManager.processUserTurn(ev.transcript, ev.language);
+        if (turnResult.switched) {
+          console.log(
+            `[Worker] Dynamic language switch triggered: ${turnResult.previousLanguage} -> ${turnResult.currentLanguage} (reason: ${turnResult.reason})`,
+          );
+          tts.updateOptions({ targetLanguageCode: turnResult.currentLanguage });
+          await agent.updateInstructions(buildFullInstructions(basePrompt, turnResult.currentLanguage));
+        }
+      }
     });
 
     // Start the session, which initializes the voice pipeline and warms up the models
     await session.start({
-      agent: createAgent(),
+      agent,
       room: ctx.room,
-      inputOptions: {
-        // ai-coustics QUAIL audio enhancement for noise cancellation
-        // Works for both WebRTC and telephony (SIP) participants
-        noiseCancellation: audioEnhancement({ model: 'quailVfS' }),
-      },
     });
-
-    // // Add a virtual avatar to the session, if desired
-    // // For other providers, see https://docs.livekit.io/agents/models/avatar/
-    // const avatar = new anam.AvatarSession({
-    //   personaConfig: {
-    //     name: '...',
-    //     avatarId: '...', // See https://docs.livekit.io/agents/models/avatar/plugins/anam
-    //   },
-    // });
-    // // Start the avatar and wait for it to join
-    // await avatar.start(session, ctx.room);
 
     // Join the room and connect to the user
     await ctx.connect();
 
     // Greet the user on joining
+    const greetingInstructions = runtimeConfig.prompt?.greeting?.trim()
+      ? runtimeConfig.prompt.greeting
+      : 'Greet the user in a helpful and friendly manner.';
+
     session.generateReply({
-      instructions: 'Greet the user in a helpful and friendly manner.',
+      instructions: greetingInstructions,
     });
   },
 });
