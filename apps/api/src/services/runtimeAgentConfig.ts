@@ -149,8 +149,8 @@ export class RuntimeAgentConfigService {
       },
       voice: {
         provider: config.voice?.provider,
-        sttModel: (config.voice as any)?.sttModel,
-        ttsModel: (config.voice as any)?.ttsModel,
+        sttModel: config.voice?.sttModel,
+        ttsModel: config.voice?.ttsModel,
         voiceId: config.voice?.voiceId,
         gender: config.voice?.gender,
         speakingSpeed: config.voice?.speakingSpeed,
@@ -163,19 +163,20 @@ export class RuntimeAgentConfigService {
         languageSwitchingEnabled: config.language?.languageSwitchEnabled,
       },
       runtime: {
-        modelProvider: (config.runtimeSettings as any)?.modelProvider || (config as any)?.modelProvider,
-        llmModel: (config.runtimeSettings as any)?.llmModel || (config as any)?.llmModel,
+        modelProvider: config.runtimeSettings?.modelProvider || config.modelProvider,
+        llmModel: config.runtimeSettings?.llmModel || config.llmModel,
         temperature: config.runtimeSettings?.modelTemperature,
         interruptionMode:
-          config.runtimeSettings?.allowCallerInterruptions !== undefined
+          config.runtimeSettings?.interruptionMode ||
+          (config.runtimeSettings?.allowCallerInterruptions !== undefined
             ? config.runtimeSettings.allowCallerInterruptions
               ? 'adaptive'
               : 'disabled'
-            : undefined,
-        preemptiveGenerationEnabled: (config.runtimeSettings as any)?.preemptiveGenerationEnabled,
+            : undefined),
+        preemptiveGenerationEnabled: config.runtimeSettings?.preemptiveGenerationEnabled,
         responseEagerness: config.runtimeSettings?.eagernessToRespond,
-        noiseCancellationModel: (config.runtimeSettings as any)?.noiseCancellationModel,
-        expressiveModeEnabled: (config.runtimeSettings as any)?.expressiveModeEnabled,
+        noiseCancellationModel: config.runtimeSettings?.noiseCancellationModel,
+        expressiveModeEnabled: config.runtimeSettings?.expressiveModeEnabled,
         maxCallDurationSeconds: config.runtimeSettings?.maxCallLengthSeconds,
       },
       knowledge: {
@@ -201,15 +202,15 @@ export class RuntimeAgentConfigService {
         inputVariables: (config.variables?.input || []).map((v) => ({
           key: v.key,
           label: v.label,
-          type: v.type as any,
+          type: v.type,
           required: v.required ?? false,
           defaultValue: v.defaultValue,
-          scope: v.scope as any,
+          scope: v.scope,
         })),
         outputVariables: (config.variables?.output || []).map((v) => ({
           key: v.key,
           label: v.label,
-          type: v.type as any,
+          type: v.type,
           required: v.required ?? false,
         })),
       },

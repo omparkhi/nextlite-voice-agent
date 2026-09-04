@@ -1,14 +1,22 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import dotenv from 'dotenv';
+import { voice, inference, initializeLogger } from '@livekit/agents';
 
 beforeAll(() => {
   dotenv.config({ path: '.env.local' });
   process.env.LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'test-livekit-api-key';
   process.env.LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'test-livekit-api-secret-1234567890';
   process.env.SARVAM_API_KEY = process.env.SARVAM_API_KEY || 'test-sarvam-api-key';
+  initializeLogger({ pretty: true, level: 'warn' });
 });
 
-import { createAgent, DEFAULT_SYSTEM_PROMPT } from './agent.ts';
+import {
+  createAgent,
+  DEFAULT_SYSTEM_PROMPT,
+  resolveInterruptionOptions,
+  resolvePreemptiveGenerationOptions,
+  resolveExpressiveOption,
+} from './agent.ts';
 import * as sarvam from '@livekit/agents-plugin-sarvam';
 import type { RuntimeAgentConfig } from '@nextlite/shared';
 
@@ -254,4 +262,101 @@ describe('LiveKit Worker RuntimeAgentConfig Mapping (Module 3)', () => {
       expect(greetingInstructions).toBe('Greet the user in a helpful and friendly manner.');
     });
   });
+
+  describe('5. Dynamic Interruption Mode Resolution (Module 3.2)', () => {
+    it('resolives adaptive interruption mode when interruptionMode is "adaptive"', () => {
+      const interruption = resolveInterruptionOptions('adaptive');
+      expect(interruption).toEqual({ mode: 'adaptive' });
+    });
+
+    it('resolves disabled interruption mode when interruptionMode is "disabled"', () => {
+      const interruption = resolveInterruptionOptions('disabled');
+      expect(interruption).toEqual({ enabled: false });
+    });
+
+    it('resolves always interruption mode using VAD when interruptionMode is "always"', () => {
+      const interruption = resolveInterruptionOptions('always');
+      expect(interruption).toEqual({ enabled: true, mode: 'vad' });
+    });
+
+    it('preserves adaptive default when interruptionMode is undefined', () => {
+      const interruption = resolveInterruptionOptions(undefined);
+      expect(interruption).toEqual({ mode: 'adaptive' });
+    });
+  });
+
+  describe('6. Dynamic Preemptive Generation Resolution (Module 3.2)', () => {
+    it('enables preemptive generation when preemptiveGenerationEnabled is true', () => {
+      const preemptive = resolvePreemptiveGenerationOptions(true);
+      expect(preemptive).toEqual({ enabled: true });
+    });
+
+    it('disables preemptive generation when preemptiveGenerationEnabled is false', () => {
+      const preemptive = resolvePreemptiveGenerationOptions(false);
+      expect(preemptive).toEqual({ enabled: false });
+    });
+
+    it('preserves default enabled: true when preemptiveGenerationEnabled is undefined', () => {
+      const preemptive = resolvePreemptiveGenerationOptions(undefined);
+      expect(preemptive).toEqual({ enabled: true });
+    });
+  });
+
+  describe('7. Dynamic Expressive Mode Resolution (Module 3.2)', () => {
+    it('enables expressive mode when expressiveModeEnabled is true', () => {
+      const expressive = resolveExpressiveOption(true);
+      expect(expressive).toBe(true);
+    });
+
+    it('disables expressive mode when expressiveModeEnabled is false', () => {
+      const expressive = resolveExpressiveOption(false);
+      expect(expressive).toBe(false);
+    });
+
+    it('preserves default true when expressiveModeEnabled is undefined', () => {
+      const expressive = resolveExpressiveOption(undefined);
+      expect(expressive).toBe(true);
+    });
+  });
+
+  describe('8. LiveKit AgentSession Construction with Dynamic Options (Module 3.2)', () => {
+    it('instantiates AgentSession with disabled interruption and disabled preemptive generation', () => {
+      const stt = new sarvam.STT({ model: 'saaras:v3' as any, languageCode: 'en-IN' as any });
+      const tts = new sarvam.TTS({ model: 'bulbul:v3' as any, targetLanguageCode: 'en-IN' as any });
+
+      const session = new voice.AgentSession({
+        stt,
+        tts,
+        maxToolSteps: 2,
+        turnHandling: {
+          turnDetection: new inference.TurnDetector(),
+          interruption: resolveInterruptionOptions('disabled'),
+          preemptiveGeneration: resolvePreemptiveGenerationOptions(false),
+        },
+        expressive: resolveExpressiveOption(false),
+      });
+
+      expect(session).toBeDefined();
+    });
+
+    it('instantiates AgentSession with always interruption mode and enabled expressive mode', () => {
+      const stt = new sarvam.STT({ model: 'saaras:v3' as any, languageCode: 'en-IN' as any });
+      const tts = new sarvam.TTS({ model: 'bulbul:v3' as any, targetLanguageCode: 'en-IN' as any });
+
+      const session = new voice.AgentSession({
+        stt,
+        tts,
+        maxToolSteps: 2,
+        turnHandling: {
+          turnDetection: new inference.TurnDetector(),
+          interruption: resolveInterruptionOptions('always'),
+          preemptiveGeneration: resolvePreemptiveGenerationOptions(true),
+        },
+        expressive: resolveExpressiveOption(true),
+      });
+
+      expect(session).toBeDefined();
+    });
+  });
 });
+

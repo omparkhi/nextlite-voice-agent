@@ -49,6 +49,10 @@ describe('RuntimeAgentConfigService (Module A6)', () => {
       llmModel: 'custom-llm-model-v2',
       modelTemperature: 0.7,
       allowCallerInterruptions: true,
+      interruptionMode: 'adaptive',
+      preemptiveGenerationEnabled: false,
+      noiseCancellationModel: 'quailVfS',
+      expressiveModeEnabled: false,
       eagernessToRespond: 'medium',
       maxCallLengthSeconds: 300,
     },
@@ -119,6 +123,10 @@ describe('RuntimeAgentConfigService (Module A6)', () => {
     expect(result.language.primary).toBe('hi-IN');
     expect(result.runtime.modelProvider).toBe('custom-llm-provider');
     expect(result.runtime.llmModel).toBe('custom-llm-model-v2');
+    expect(result.runtime.interruptionMode).toBe('adaptive');
+    expect(result.runtime.preemptiveGenerationEnabled).toBe(false);
+    expect(result.runtime.noiseCancellationModel).toBe('quailVfS');
+    expect(result.runtime.expressiveModeEnabled).toBe(false);
     expect(result.tools.tools).toHaveLength(1);
     expect(result.tools.tools[0].name).toBe('Book Appointment');
   });
@@ -212,4 +220,60 @@ describe('RuntimeAgentConfigService (Module A6)', () => {
     expect(result.prompt.compiledSystemPrompt).toContain('Aarav (V2)');
     expect(result.prompt.compiledSystemPrompt).toContain('Apex Health Clinic');
   });
+
+  it('TEST 8: Side-by-side isolation: TEST deployment (v3 draft) and PRODUCTION deployment (v2 published) resolve their respective versions independently', async () => {
+    const sampleConfigV3Draft = {
+      ...sampleConfigV2,
+      identity: {
+        agentName: 'Aarav (V3 Draft)',
+        greeting: 'Hello, this is Version 3 DRAFT of Aarav.',
+        businessName: 'Apex Health Clinic',
+      },
+      systemInstructions: 'You are Aarav Version 3 DRAFT.',
+    };
+
+    const mockTestDeploymentV3 = {
+      id: 'deployment-test-v3',
+      tenantId: 'tenant-abc',
+      agentId: 'agent-456',
+      versionId: 'version-v3',
+      environment: 'TEST',
+      status: 'ACTIVE',
+      createdBy: 'user-789',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      agent: {
+        id: 'agent-456',
+        tenantId: 'tenant-abc',
+        name: 'Aarav Assistant',
+        status: 'LIVE',
+      },
+      version: {
+        id: 'version-v3',
+        agentId: 'agent-456',
+        versionNumber: 3,
+        configuration: sampleConfigV3Draft,
+        status: 'DRAFT',
+      },
+    };
+
+    // 1. Resolve TEST deployment
+    (db.query.deployments.findFirst as any).mockResolvedValue(mockTestDeploymentV3);
+    const testResult = await runtimeAgentConfigService.resolveRuntimeAgentConfig('tenant-abc', 'deployment-test-v3');
+
+    expect(testResult.deployment.deploymentId).toBe('deployment-test-v3');
+    expect(testResult.deployment.versionId).toBe('version-v3');
+    expect(testResult.deployment.versionNumber).toBe(3);
+    expect(testResult.prompt.greeting).toBe('Hello, this is Version 3 DRAFT of Aarav.');
+
+    // 2. Resolve PRODUCTION deployment
+    (db.query.deployments.findFirst as any).mockResolvedValue(mockDeploymentV2);
+    const prodResult = await runtimeAgentConfigService.resolveRuntimeAgentConfig('tenant-abc', 'deployment-123');
+
+    expect(prodResult.deployment.deploymentId).toBe('deployment-123');
+    expect(prodResult.deployment.versionId).toBe('version-v2');
+    expect(prodResult.deployment.versionNumber).toBe(2);
+    expect(prodResult.prompt.greeting).toBe('Hello, this is Version 2 of Aarav.');
+  });
 });
+

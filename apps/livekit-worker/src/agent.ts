@@ -5,6 +5,7 @@ import {
   buildFullInstructions,
   ConversationLanguageManager,
 } from './languageManager.ts';
+import { createKnowledgeTool } from './knowledgeTool.ts';
 
 export const DEFAULT_SYSTEM_PROMPT = dedent`
     You are a friendly, reliable voice assistant that answers questions, explains topics, and completes tasks with available tools.
@@ -26,12 +27,14 @@ export const DEFAULT_SYSTEM_PROMPT = dedent`
     - Provide guidance in small steps and confirm completion before continuing.
     - Summarize key results when closing a topic.
 
-    # Tools
+    # Tools & Knowledge Base
 
-    - Use available tools as needed, or upon user request.
-    - Collect required inputs first. Perform actions silently if the runtime expects it.
-    - Speak outcomes clearly. If an action fails, say so once, propose a fallback, or ask how to proceed.
-    - When tools return structured data, summarize it to the user in a way that is easy to understand, and don't directly recite identifiers or other technical details.
+    - Use available tools when the user asks a question whose answer depends on business or clinic facts.
+    - When answering questions about business services, doctor schedules, operating hours, procedures, fees, or policies, use the query_knowledge_base tool to retrieve authoritative facts.
+    - Retrieved knowledge is authoritative. Never invent or hallucinate unavailable business information.
+    - If retrieved knowledge does not contain the required information or returns no results, politely state that the information is currently unavailable or offer a helpful fallback.
+    - Answer naturally, conversationally, and concisely in the user's spoken language after retrieving knowledge.
+    - When tools return structured data, summarize it clearly without reciting technical database identifiers.
 
     # Guardrails
 
@@ -44,6 +47,7 @@ export const DEFAULT_SYSTEM_PROMPT = dedent`
 export function createAgent(
   runtimeConfig?: RuntimeAgentConfig,
   initialLanguageOrManager?: string | ConversationLanguageManager,
+  deploymentId?: string,
 ) {
   const baseInstructions = runtimeConfig?.prompt?.compiledSystemPrompt?.trim()
     ? runtimeConfig.prompt.compiledSystemPrompt
@@ -107,11 +111,62 @@ export function createAgent(
     );
   }
 
+  // Authoritative Tools Configuration
+  const effectiveDeploymentId = deploymentId || runtimeConfig?.deployment?.deploymentId;
+  const tools = [];
+
+  if (runtimeConfig?.knowledge?.enabled && effectiveDeploymentId) {
+    tools.push(
+      createKnowledgeTool(effectiveDeploymentId, {
+        topK: runtimeConfig.knowledge.retrievalConfig?.topK,
+      }),
+    );
+  }
+
   return Agent.create({
     instructions,
     llm: llmInstance,
+    ...(tools.length > 0 ? { tools } : {}),
   });
 }
 
+/**
+ * Resolves LiveKit InterruptionOptions from RuntimeAgentConfig interruptionMode.
+ * - 'disabled' -> { enabled: false }
+ * - 'always' -> { enabled: true, mode: 'vad' }
+ * - 'adaptive' / undefined -> { mode: 'adaptive' }
+ */
+export function resolveInterruptionOptions(
+  interruptionMode?: 'adaptive' | 'always' | 'disabled' | string,
+): { enabled?: boolean; mode?: 'adaptive' | 'vad' } {
+  if (interruptionMode === 'disabled') {
+    return { enabled: false };
+  }
+  if (interruptionMode === 'always') {
+    return { enabled: true, mode: 'vad' };
+  }
+  return { mode: 'adaptive' };
+}
 
+/**
+ * Resolves LiveKit PreemptiveGenerationOptions from RuntimeAgentConfig preemptiveGenerationEnabled.
+ * Defaults to true if undefined.
+ */
+export function resolvePreemptiveGenerationOptions(
+  preemptiveGenerationEnabled?: boolean,
+): { enabled: boolean } {
+  return {
+    enabled: preemptiveGenerationEnabled !== false,
+  };
+}
+
+/**
+ * Resolves LiveKit expressive mode option from RuntimeAgentConfig expressiveModeEnabled.
+ * Defaults to true if undefined.
+ */
+export function resolveExpressiveOption(
+  expressiveModeEnabled?: boolean,
+): boolean {
+  return expressiveModeEnabled !== false;
+}
 

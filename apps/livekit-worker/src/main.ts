@@ -3,7 +3,13 @@ import * as sarvam from '@livekit/agents-plugin-sarvam';
 import { audioEnhancement } from '@livekit/plugins-ai-coustics';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_SYSTEM_PROMPT, createAgent } from './agent.ts';
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  createAgent,
+  resolveInterruptionOptions,
+  resolvePreemptiveGenerationOptions,
+  resolveExpressiveOption,
+} from './agent.ts';
 import {
   ConversationLanguageManager,
   buildFullInstructions,
@@ -61,6 +67,7 @@ export default defineAgent({
     const session = new voice.AgentSession({
       stt,
       tts,
+      maxToolSteps: 2,
       turnHandling: {
         // Turn detection determines when the user is speaking and when the agent should respond.
         // The LiveKit audio turn detector is a multimodal model that encodes the user's audio
@@ -68,24 +75,23 @@ export default defineAgent({
         // AgentSession supplies the required VAD automatically.
         // See more at https://docs.livekit.io/agents/logic/turns/turn-detector/
         turnDetection: new inference.TurnDetector(),
-        // Adaptive interruptions use the turn detector to tell a real interruption from a
-        // backchannel like "mhm" or "right", so the agent keeps talking through the latter.
-        interruption: { mode: 'adaptive' },
-        // Allow the LLM to generate a response while waiting for the end of turn
-        preemptiveGeneration: { enabled: true },
+        // Interruption mode configured dynamically from RuntimeAgentConfig ('adaptive' | 'always' | 'disabled')
+        interruption: resolveInterruptionOptions(runtimeConfig.runtime?.interruptionMode),
+        // Preemptive generation configured dynamically from RuntimeAgentConfig (defaults to enabled)
+        preemptiveGeneration: resolvePreemptiveGenerationOptions(
+          runtimeConfig.runtime?.preemptiveGenerationEnabled,
+        ),
       },
 
-      // Expressive mode injects the TTS provider's markup guide into the LLM prompt, so the model
-      // emits inline delivery tags (emotion, pacing, non-verbal sounds) that the TTS renders and
-      // the transcript never shows.
-      expressive: true,
+      // Expressive mode configured dynamically from RuntimeAgentConfig (defaults to enabled)
+      expressive: resolveExpressiveOption(runtimeConfig.runtime?.expressiveModeEnabled),
     });
 
     const basePrompt = runtimeConfig.prompt?.compiledSystemPrompt?.trim()
       ? runtimeConfig.prompt.compiledSystemPrompt
       : DEFAULT_SYSTEM_PROMPT;
 
-    const agent = createAgent(runtimeConfig, languageManager);
+    const agent = createAgent(runtimeConfig, languageManager, deploymentId);
 
     // Dynamic Multilingual Voice: listen to user transcription events and update TTS & LLM when language changes
     session.on(voice.AgentSessionEventTypes.UserInputTranscribed, async (ev: voice.UserInputTranscribedEvent) => {
