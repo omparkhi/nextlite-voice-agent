@@ -22,8 +22,9 @@ export class AgentChecklistService {
     const items: ChecklistItem[] = [];
 
     // 1. Identity Check
-    if (config.identity?.displayName || config.identity?.agentName) {
-      items.push({ id: 'identity-name', category: 'Identity', label: 'Agent Identity', status: 'PASSED', message: `Agent named "${config.identity.agentName || config.identity.displayName}".` });
+    const agentName = config.identity?.displayName || config.identity?.agentName || (config.identity as any)?.name;
+    if (agentName) {
+      items.push({ id: 'identity-name', category: 'Identity', label: 'Agent Identity', status: 'PASSED', message: `Agent named "${agentName}".` });
     } else {
       items.push({ id: 'identity-name', category: 'Identity', label: 'Agent Identity', status: 'FAILED', message: 'Agent display name or agent name is missing.' });
     }
@@ -36,14 +37,16 @@ export class AgentChecklistService {
     }
 
     // 3. Persona Check
-    if (config.persona?.role) {
-      items.push({ id: 'persona-role', category: 'Persona', label: 'Persona & Role', status: 'PASSED', message: `Role defined as "${config.persona.role}".` });
+    const role = config.persona?.role || (config as any)?.role?.description;
+    if (role) {
+      items.push({ id: 'persona-role', category: 'Persona', label: 'Persona & Role', status: 'PASSED', message: `Role defined as "${role}".` });
     } else {
       items.push({ id: 'persona-role', category: 'Persona', label: 'Persona & Role', status: 'WARNING', message: 'Persona role is not explicitly specified.' });
     }
 
     // 4. Objective Check
-    if (config.objective?.primaryObjective) {
+    const primaryObjective = config.objective?.primaryObjective || (config as any)?.goal?.primaryObjective;
+    if (primaryObjective) {
       items.push({ id: 'objective-primary', category: 'Objectives', label: 'Primary Objective', status: 'PASSED', message: 'Primary objective configured.' });
     } else {
       items.push({ id: 'objective-primary', category: 'Objectives', label: 'Primary Objective', status: 'FAILED', message: 'Primary objective is required.' });

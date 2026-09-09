@@ -296,9 +296,9 @@ describe('LiveKit Worker RuntimeAgentConfig Mapping (Module 3)', () => {
       expect(preemptive).toEqual({ enabled: false });
     });
 
-    it('preserves default enabled: true when preemptiveGenerationEnabled is undefined', () => {
+    it('defaults to enabled: false when preemptiveGenerationEnabled is undefined', () => {
       const preemptive = resolvePreemptiveGenerationOptions(undefined);
-      expect(preemptive).toEqual({ enabled: true });
+      expect(preemptive).toEqual({ enabled: false });
     });
   });
 

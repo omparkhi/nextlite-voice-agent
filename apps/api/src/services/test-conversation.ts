@@ -1,6 +1,7 @@
 import type { LLMService, LLMMessage } from './llm';
 import type { KnowledgeService } from './knowledge';
 import type { AgentConfiguration } from './template';
+import { promptCompiler } from './promptCompiler';
 
 export interface TestMessage {
   role: 'user' | 'assistant';
@@ -29,8 +30,7 @@ export class TestConversationServiceImpl implements TestConversationService {
     config: AgentConfiguration,
   ): Promise<{ response: string; knowledgeUsed: { content: string; score: number; sourceId: string }[] }> {
     const knowledgeResults = await this.knowledge.retrieveRelevant(tenantId, agentId, message, 5);
-
-    const systemPrompt = this.buildSystemPrompt(config, knowledgeResults);
+    const systemPrompt = promptCompiler.compileSystemPrompt(config, knowledgeResults);
 
     const messages: LLMMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -44,65 +44,6 @@ export class TestConversationServiceImpl implements TestConversationService {
       response,
       knowledgeUsed: knowledgeResults,
     };
-  }
-
-  private buildSystemPrompt(config: AgentConfiguration, knowledge: { content: string; score: number }[]): string {
-    let prompt = '';
-
-    if (config.identity?.name) {
-      prompt += `You are ${config.identity.name}.\n\n`;
-    }
-    if (config.identity?.greeting) {
-      prompt += `Greeting: ${config.identity.greeting}\n\n`;
-    }
-    if (config.role?.description) {
-      prompt += `Role: ${config.role.description}\n\n`;
-    }
-    if (config.goal?.primaryObjective) {
-      prompt += `Goal: ${config.goal.primaryObjective}\n\n`;
-    }
-    if (config.personality?.tone) {
-      prompt += `Tone: ${config.personality.tone}\n`;
-    }
-    if (config.personality?.style) {
-      prompt += `Style: ${config.personality.style}\n`;
-    }
-    if (config.personality?.formality) {
-      prompt += `Formality: ${config.personality.formality}\n\n`;
-    }
-    if (config.businessInformation?.businessName) {
-      prompt += `Business: ${config.businessInformation.businessName}\n`;
-    }
-    if (config.businessInformation?.description) {
-      prompt += `Business Description: ${config.businessInformation.description}\n`;
-    }
-    if (config.businessInformation?.hours) {
-      prompt += `Hours: ${config.businessInformation.hours}\n`;
-    }
-    if (config.businessInformation?.location) {
-      prompt += `Location: ${config.businessInformation.location}\n\n`;
-    }
-
-    if (knowledge.length > 0) {
-      prompt += 'Relevant knowledge:\n';
-      knowledge.forEach((k, i) => {
-        prompt += `${i + 1}. ${k.content}\n`;
-      });
-      prompt += '\n';
-    }
-
-    if (config.systemInstructions) {
-      prompt += `Instructions:\n${config.systemInstructions}\n`;
-    }
-
-    prompt += '\nSafety rules:\n';
-    prompt += '- Never give medical advice or health opinions\n';
-    prompt += '- Never comment on a patient\'s age, appearance, or health\n';
-    prompt += '- Never make assumptions about a patient\'s condition\n';
-    prompt += '- Stay focused on the task (appointment booking, inquiries)\n';
-    prompt += '- If you lack information, ask — do not invent\n';
-
-    return prompt;
   }
 }
 

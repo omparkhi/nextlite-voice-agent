@@ -1,2 +1,2 @@
-export * from './types';
-export * from './runtimeConfig';
+export * from './types.ts';
+export * from './runtimeConfig.ts';

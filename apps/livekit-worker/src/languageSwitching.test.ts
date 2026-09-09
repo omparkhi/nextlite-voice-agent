@@ -15,6 +15,7 @@ import {
   normalizeLanguageCode,
   buildLanguageInstruction,
   buildFullInstructions,
+  isReliableAutomaticSwitch,
 } from './languageManager.ts';
 import { createAgent, DEFAULT_SYSTEM_PROMPT } from './agent.ts';
 import type { RuntimeAgentConfig } from '@nextlite/shared';
@@ -393,6 +394,225 @@ describe('Dynamic Multilingual Voice & Sarvam Language Switching', () => {
       expect(detectExplicitLanguageRequest('What are the doctor clinic timings?')).toBeNull();
       expect(detectExplicitLanguageRequest('मुझे दांत में दर्द हो रहा है')).toBeNull();
       expect(detectExplicitLanguageRequest('मला दातदुखीचा त्रास होत आहे')).toBeNull();
+    });
+  });
+
+  describe('8. Module 3.4 Production Language Policy, Anti-Oscillation & Filter Rules', () => {
+    it('1. primary language starts active at call start', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'],
+      });
+      expect(manager.currentLanguage).toBe('hi-IN');
+      expect(manager.primaryLanguage).toBe('hi-IN');
+    });
+
+    it('2. supported detected language can switch when utterance is reliable', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'],
+      });
+
+      const result = manager.processUserTurn('I would like to know the clinic operating hours please', 'en-IN');
+      expect(result.switched).toBe(true);
+      expect(result.currentLanguage).toBe('en-IN');
+      expect(result.reason).toBe('auto_detect');
+    });
+
+    it('3. unsupported detected language does NOT switch and stays in active language', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'], // Tamil & Kannada not supported
+      });
+
+      const resultTamil = manager.processUserTurn('வணக்கம் எப்படி இருக்கிறீர்கள்', 'ta-IN');
+      expect(resultTamil.switched).toBe(false);
+      expect(resultTamil.currentLanguage).toBe('hi-IN');
+
+      const resultKannada = manager.processUserTurn('ಹಲೋ ಹೇಗಿದ್ದೀರಾ', 'kn-IN');
+      expect(resultKannada.switched).toBe(false);
+      expect(resultKannada.currentLanguage).toBe('hi-IN');
+    });
+
+    it('4. one isolated English word ("Okay") does NOT switch Hindi -> English', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'],
+      });
+
+      const result = manager.processUserTurn('Okay', 'en-IN');
+      expect(result.switched).toBe(false);
+      expect(result.currentLanguage).toBe('hi-IN');
+    });
+
+    it('5. isolated noise / short detection ("मत्ते", "ம்.") does NOT switch language', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN', 'kn-IN'],
+      });
+
+      // Isolated short Kannada detection
+      const resultKannada = manager.processUserTurn('ಮತ್ತೆ', 'kn-IN');
+      expect(resultKannada.switched).toBe(false);
+      expect(resultKannada.currentLanguage).toBe('hi-IN');
+
+      // Isolated short Tamil noise
+      const resultTamil = manager.processUserTurn('ம்.', 'ta-IN');
+      expect(resultTamil.switched).toBe(false);
+      expect(resultTamil.currentLanguage).toBe('hi-IN');
+    });
+
+    it('6. explicit "English mein baat karo" and "English mein batao" switches to en-IN', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'],
+      });
+
+      const res1 = manager.processUserTurn('English mein baat karo', 'hi-IN');
+      expect(res1.switched).toBe(true);
+      expect(res1.currentLanguage).toBe('en-IN');
+      expect(res1.reason).toBe('explicit');
+
+      const manager2 = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN'],
+      });
+      const res2 = manager2.processUserTurn('English mein batao', 'hi-IN');
+      expect(res2.switched).toBe(true);
+      expect(res2.currentLanguage).toBe('en-IN');
+      expect(res2.reason).toBe('explicit');
+    });
+
+    it('7. explicit "मराठीत बोला" and "मराठीत सांगा" switches to mr-IN', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'],
+      });
+
+      const res1 = manager.processUserTurn('मराठीत बोला', 'hi-IN');
+      expect(res1.switched).toBe(true);
+      expect(res1.currentLanguage).toBe('mr-IN');
+      expect(res1.reason).toBe('explicit');
+
+      const manager2 = new ConversationLanguageManager({
+        primary: 'en-IN',
+        supportedLanguages: ['en-IN', 'mr-IN'],
+      });
+      const res2 = manager2.processUserTurn('मराठीत सांगा', 'en-IN');
+      expect(res2.switched).toBe(true);
+      expect(res2.currentLanguage).toBe('mr-IN');
+      expect(res2.reason).toBe('explicit');
+    });
+
+    it('8. current language persists after switching without oscillating on mixed follow-ups', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'],
+      });
+
+      // User switches to English
+      const turn1 = manager.processUserTurn('I want to continue in English', 'en-IN');
+      expect(turn1.switched).toBe(true);
+      expect(turn1.currentLanguage).toBe('en-IN');
+
+      // Next turn: user asks mixed question with doctor timing
+      const turn2 = manager.processUserTurn('Okay, doctor ka timing kya hai?', 'en-IN');
+      expect(turn2.switched).toBe(false);
+      expect(turn2.currentLanguage).toBe('en-IN');
+    });
+
+    it('9. Hindi + English mixed sentence (Hinglish) stays Hindi and does NOT switch to English', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'],
+      });
+
+      // STT often detects en-IN on Latin/mixed transcripts
+      const turn = manager.processUserTurn('Doctor ka appointment tomorrow ke liye chahiye', 'en-IN');
+      expect(turn.switched).toBe(false);
+      expect(turn.currentLanguage).toBe('hi-IN');
+    });
+
+    it('10. Marathi + English mixed sentence (Minglish) stays Marathi and does NOT switch to English', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'mr-IN',
+        supportedLanguages: ['mr-IN', 'en-IN', 'hi-IN'],
+      });
+
+      const turn = manager.processUserTurn('Doctor Rohan Sharma yancha OPD Monday te Friday ahe', 'en-IN');
+      expect(turn.switched).toBe(false);
+      expect(turn.currentLanguage).toBe('mr-IN');
+    });
+
+    it('11. short "नहीं नहीं" or "हाँ" does NOT cause language switching', () => {
+      const manager = new ConversationLanguageManager({
+        primary: 'hi-IN',
+        supportedLanguages: ['hi-IN', 'en-IN', 'mr-IN'],
+      });
+
+      const turn1 = manager.processUserTurn('नहीं नहीं', 'en-IN');
+      expect(turn1.switched).toBe(false);
+      expect(turn1.currentLanguage).toBe('hi-IN');
+
+      const turn2 = manager.processUserTurn('हाँ भाई', 'hi-IN');
+      expect(turn2.switched).toBe(false);
+      expect(turn2.currentLanguage).toBe('hi-IN');
+    });
+
+    it('12. isReliableAutomaticSwitch helper accurately identifies valid vs invalid automatic switches', () => {
+      // Noise / too short
+      expect(isReliableAutomaticSwitch('Ok', 'en-IN', 'hi-IN')).toBe(false);
+      expect(isReliableAutomaticSwitch('मत्ते', 'kn-IN', 'hi-IN')).toBe(false);
+      expect(isReliableAutomaticSwitch('ம்.', 'ta-IN', 'hi-IN')).toBe(false);
+      expect(isReliableAutomaticSwitch('नहीं नहीं', 'en-IN', 'hi-IN')).toBe(false);
+
+      // Hinglish containing Hindi postpositions should NOT trigger switch to English
+      expect(isReliableAutomaticSwitch('Doctor ka appointment tomorrow chahiye', 'en-IN', 'hi-IN')).toBe(false);
+      expect(isReliableAutomaticSwitch('Cardiology OPD kitne baje khulta hai', 'en-IN', 'hi-IN')).toBe(false);
+
+      // Minglish containing Marathi postpositions should NOT trigger switch to English
+      expect(isReliableAutomaticSwitch('Doctor yanchi vel kadhi ahe', 'en-IN', 'mr-IN')).toBe(false);
+
+      // Genuine English sentence SHOULD trigger switch to English
+      expect(isReliableAutomaticSwitch('What are the cardiology OPD timings and doctor consultation fees?', 'en-IN', 'hi-IN')).toBe(true);
+    });
+  });
+
+  describe('9. Module 3.4 Conversational Policy & Language Instruction Directives', () => {
+    it('includes LATEST USER INTENT, SHORT UTTERANCES, and PHONE NUMBER SEMANTICS in language directive', () => {
+      const instruction = buildLanguageInstruction('hi-IN');
+
+      expect(instruction).toContain('ACTIVE CONVERSATION LANGUAGE POLICY');
+      expect(instruction).toContain('Active Conversation Language: Hindi (hi-IN)');
+      expect(instruction).toContain('Respond in Hindi (conversational Hinglish)');
+      expect(instruction).toContain('Speak natural conversational Hinglish');
+      expect(instruction).toContain('Keep standard business/everyday terms in English naturally');
+      expect(instruction).toContain('DO NOT switch the entire conversation to English merely because the caller uses English words');
+      expect(instruction).toContain('LATEST USER INTENT: Always prioritize answering the user\'s latest question directly first');
+      expect(instruction).toContain('SHORT UTTERANCES: Interpret short utterances');
+      expect(instruction).toContain('PHONE NUMBER SEMANTICS: If the caller says "यही नंबर है"');
+    });
+
+    it('includes Minglish guidance for Marathi', () => {
+      const instruction = buildLanguageInstruction('mr-IN');
+
+      expect(instruction).toContain('Active Conversation Language: Marathi (mr-IN)');
+      expect(instruction).toContain('Respond in Marathi (conversational Minglish)');
+      expect(instruction).toContain('Speak natural conversational Minglish');
+      expect(instruction).toContain('Keep standard business/everyday terms in English naturally');
+    });
+
+    it('buildFullInstructions seamlessly updates instruction policy block on language change', () => {
+      const basePrompt = 'You are an AI receptionist for Medicare Clinic.';
+      const hiPrompt = buildFullInstructions(basePrompt, 'hi-IN');
+      expect(hiPrompt).toContain(basePrompt);
+      expect(hiPrompt).toContain('Hindi (hi-IN)');
+
+      // Switch to English
+      const enPrompt = buildFullInstructions(hiPrompt, 'en-IN');
+      expect(enPrompt).toContain(basePrompt);
+      expect(enPrompt).toContain('English (en-IN)');
+      expect(enPrompt).not.toContain('Hindi (hi-IN)');
     });
   });
 });

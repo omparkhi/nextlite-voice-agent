@@ -1,6 +1,6 @@
 import { db } from '../db';
-import { agents, agentVersions, agentTools, agentTemplates, deployments } from '../db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { agents, agentVersions, agentTools, deployments } from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { createChildLogger } from '../lib/logger';
 import { AgentConfiguration, templateService } from './template';
 import { agentChecklistService } from './agentChecklist';
@@ -10,7 +10,7 @@ const logger = createChildLogger({ module: 'agent-service' });
 export class AgentService {
   async listAgents(tenantId: string) {
     return db.query.agents.findMany({
-      where: eq(agents.tenantId, tenantId),
+      where: (a, { eq }) => eq(a.tenantId, tenantId),
       with: {
         template: { columns: { id: true, name: true, industry: true } },
         versions: { columns: { versionNumber: true, createdAt: true }, orderBy: (v, { desc }) => [desc(v.versionNumber)], limit: 1 },
@@ -21,7 +21,7 @@ export class AgentService {
 
   async getAgent(agentId: string, tenantId: string) {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+      where: (a, { eq, and }) => and(eq(a.id, agentId), eq(a.tenantId, tenantId)),
       with: {
         template: { columns: { id: true, name: true, industry: true, description: true } },
         versions: {
@@ -50,11 +50,25 @@ export class AgentService {
       updatedAt: now,
     }).returning();
 
-    const config = template.defaultConfiguration as any;
+    // Deep clone configuration snapshot to ensure complete independence from template
+    const rawConfig = template.defaultConfiguration as AgentConfiguration;
+    const config: AgentConfiguration = JSON.parse(JSON.stringify(rawConfig || {}));
+
+    // Legacy tool shape normalization: if older template stored tools.tools instead of tools.bindings
+    if (config.tools && !config.tools.bindings && Array.isArray((config.tools as any).tools)) {
+      config.tools.bindings = ((config.tools as any).tools as any[]).map((t) => ({
+        toolId: t.toolId || t.name,
+        name: t.name || t.toolId,
+        description: t.description || '',
+        enabled: typeof t.enabled === 'boolean' ? t.enabled : true,
+        confirmationRequired: t.confirmationRequired,
+      }));
+    }
+
     const [version] = await db.insert(agentVersions).values({
       agentId: agent.id,
       versionNumber: 1,
-      configuration: config,
+      configuration: config as any,
       status: 'DRAFT',
       createdBy,
       notes: 'Initial configuration from template',
@@ -81,7 +95,7 @@ export class AgentService {
 
   async updateAgent(agentId: string, tenantId: string, updates: { name?: string; status?: string }) {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+      where: (a, { eq, and }) => and(eq(a.id, agentId), eq(a.tenantId, tenantId)),
     });
     if (!agent) {
       throw new Error('Agent not found');
@@ -98,24 +112,35 @@ export class AgentService {
 
   async saveConfiguration(agentId: string, tenantId: string, configuration: AgentConfiguration, createdBy: string, notes?: string) {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+      where: (a, { eq, and }) => and(eq(a.id, agentId), eq(a.tenantId, tenantId)),
     });
     if (!agent) {
       throw new Error('Agent not found');
     }
 
     const latestVersion = await db.query.agentVersions.findFirst({
-      where: eq(agentVersions.agentId, agentId),
+      where: (v, { eq }) => eq(v.agentId, agentId),
       orderBy: (v, { desc }) => [desc(v.versionNumber)],
     });
 
     const nextVersion = latestVersion ? latestVersion.versionNumber + 1 : 1;
     const now = new Date();
 
+    const configToSave: AgentConfiguration = JSON.parse(JSON.stringify(configuration || {}));
+    if (configToSave.tools && !configToSave.tools.bindings && Array.isArray((configToSave.tools as any).tools)) {
+      configToSave.tools.bindings = ((configToSave.tools as any).tools as any[]).map((t) => ({
+        toolId: t.toolId || t.name,
+        name: t.name || t.toolId,
+        description: t.description || '',
+        enabled: typeof t.enabled === 'boolean' ? t.enabled : true,
+        confirmationRequired: t.confirmationRequired,
+      }));
+    }
+
     const [newVersion] = await db.insert(agentVersions).values({
       agentId,
       versionNumber: nextVersion,
-      configuration: configuration as any,
+      configuration: configToSave as any,
       status: 'DRAFT',
       createdBy,
       notes: notes || `Configuration version ${nextVersion}`,
@@ -126,12 +151,13 @@ export class AgentService {
 
     // Update or upsert active TEST deployment to point to the new draft version
     const existingTestDeployment = await db.query.deployments.findFirst({
-      where: and(
-        eq(deployments.agentId, agentId),
-        eq(deployments.tenantId, tenantId),
-        eq(deployments.environment, 'TEST'),
-        eq(deployments.status, 'ACTIVE'),
-      ),
+      where: (d, { eq, and }) =>
+        and(
+          eq(d.agentId, agentId),
+          eq(d.tenantId, tenantId),
+          eq(d.environment, 'TEST'),
+          eq(d.status, 'ACTIVE'),
+        ),
     });
 
     if (existingTestDeployment) {
@@ -167,14 +193,14 @@ export class AgentService {
 
   async publishAgent(agentId: string, tenantId: string, publishedBy: string) {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+      where: (a, { eq, and }) => and(eq(a.id, agentId), eq(a.tenantId, tenantId)),
     });
     if (!agent) {
       throw new Error('Agent not found');
     }
 
     const latestVersion = await db.query.agentVersions.findFirst({
-      where: eq(agentVersions.agentId, agentId),
+      where: (v, { eq }) => eq(v.agentId, agentId),
       orderBy: (v, { desc }) => [desc(v.versionNumber)],
     });
     if (!latestVersion) {
@@ -205,12 +231,13 @@ export class AgentService {
 
     // 3. Find any existing active PRODUCTION deployment and deactivate it
     const existingProdDeployment = await db.query.deployments.findFirst({
-      where: and(
-        eq(deployments.agentId, agentId),
-        eq(deployments.tenantId, tenantId),
-        eq(deployments.environment, 'PRODUCTION'),
-        eq(deployments.status, 'ACTIVE'),
-      ),
+      where: (d, { eq, and }) =>
+        and(
+          eq(d.agentId, agentId),
+          eq(d.tenantId, tenantId),
+          eq(d.environment, 'PRODUCTION'),
+          eq(d.status, 'ACTIVE'),
+        ),
     });
 
     if (existingProdDeployment) {
@@ -255,12 +282,13 @@ export class AgentService {
 
   async getActiveDeployment(agentId: string, tenantId: string, environment: 'TEST' | 'PRODUCTION') {
     return db.query.deployments.findFirst({
-      where: and(
-        eq(deployments.agentId, agentId),
-        eq(deployments.tenantId, tenantId),
-        eq(deployments.environment, environment),
-        eq(deployments.status, 'ACTIVE'),
-      ),
+      where: (d, { eq, and }) =>
+        and(
+          eq(d.agentId, agentId),
+          eq(d.tenantId, tenantId),
+          eq(d.environment, environment),
+          eq(d.status, 'ACTIVE'),
+        ),
       with: {
         version: true,
       },
@@ -269,14 +297,14 @@ export class AgentService {
 
   async getVersions(agentId: string, tenantId: string) {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+      where: (a, { eq, and }) => and(eq(a.id, agentId), eq(a.tenantId, tenantId)),
     });
     if (!agent) {
       throw new Error('Agent not found');
     }
 
     return db.query.agentVersions.findMany({
-      where: eq(agentVersions.agentId, agentId),
+      where: (v, { eq }) => eq(v.agentId, agentId),
       orderBy: (v, { desc }) => [desc(v.versionNumber)],
       with: { createdByUser: { columns: { id: true, email: true } } },
     });
@@ -284,37 +312,47 @@ export class AgentService {
 
   async getVersion(versionId: string, agentId: string, tenantId: string) {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+      where: (a, { eq, and }) => and(eq(a.id, agentId), eq(a.tenantId, tenantId)),
     });
     if (!agent) {
       throw new Error('Agent not found');
     }
 
     return db.query.agentVersions.findFirst({
-      where: and(eq(agentVersions.id, versionId), eq(agentVersions.agentId, agentId)),
+      where: (v, { eq, and }) => and(eq(v.id, versionId), eq(v.agentId, agentId)),
       with: { createdByUser: { columns: { id: true, email: true } } },
     });
   }
 
   async getCurrentConfig(agentId: string, tenantId: string) {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+      where: (a, { eq, and }) => and(eq(a.id, agentId), eq(a.tenantId, tenantId)),
     });
     if (!agent) {
       throw new Error('Agent not found');
     }
 
     const latestVersion = await db.query.agentVersions.findFirst({
-      where: eq(agentVersions.agentId, agentId),
+      where: (v, { eq }) => eq(v.agentId, agentId),
       orderBy: (v, { desc }) => [desc(v.versionNumber)],
     });
 
-    return latestVersion?.configuration as AgentConfiguration | null;
+    return (latestVersion?.configuration as AgentConfiguration) || null;
   }
 
+  /**
+   * @deprecated Legacy V1/V2 configuration builder.
+   *
+   * Retained strictly for backward compatibility with the legacy admin route
+   * (GET /api/admin/clients/:clientId/agents/:agentId/runtime-config).
+   *
+   * NOT authoritative for the V3 voice runtime. Production V3 worker execution uses
+   * `RuntimeAgentConfigService.resolveRuntimeAgentConfig(deploymentId)` via the
+   * internal control plane endpoint (GET /api/internal/runtime-config/:deploymentId).
+   */
   async generateRuntimeConfig(agentId: string, tenantId: string) {
     const agent = await db.query.agents.findFirst({
-      where: and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)),
+      where: (a, { eq, and }) => and(eq(a.id, agentId), eq(a.tenantId, tenantId)),
       with: { template: true },
     });
     if (!agent) {
@@ -327,7 +365,7 @@ export class AgentService {
     }
 
     const tools = await db.query.agentTools.findMany({
-      where: eq(agentTools.agentId, agentId),
+      where: (t, { eq }) => eq(t.agentId, agentId),
     });
 
     const systemPrompt = this.buildSystemPrompt(config);
@@ -355,4 +393,3 @@ export class AgentService {
 }
 
 export const agentService = new AgentService();
-

@@ -25,6 +25,7 @@
     // parameter properties) that Node cannot strip without transformation.
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "types": ["node"]
   }
 }

@@ -46,9 +46,13 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   return response.json();
 }
 
-import type { Agent, AgentTemplate, AgentVersion, AgentConfiguration, RuntimeConfig, KnowledgeSource, TestConversationResponse, ConfigProposal, ConfigAssistantResponse } from '../types';
+import type { Agent, AgentTemplate, AgentVersion, AgentConfiguration, KnowledgeSource, TestConversationResponse, ConfigProposal, ConfigAssistantResponse, ToolCatalogItem } from '../types';
 
 export const api = {
+  // Admin - Platform Tools
+  getToolCatalog: () =>
+    request<ToolCatalogItem[]>('/api/admin/tools'),
+
   // Auth
   login: (email: string, password: string) =>
     request<{ accessToken: string; expiresIn: string }>('/api/auth/login', {
@@ -152,9 +156,6 @@ export const api = {
   getAgentVersion: (clientId: string, agentId: string, versionId: string) =>
     request<AgentVersion>(`/api/admin/clients/${clientId}/agents/${agentId}/versions/${versionId}`),
 
-  getRuntimeConfig: (clientId: string, agentId: string) =>
-    request<RuntimeConfig>(`/api/admin/clients/${clientId}/agents/${agentId}/runtime-config`),
-
   compilePrompt: (clientId: string, agentId: string, configuration?: AgentConfiguration) =>
     request<{ compiledPrompt: string }>(`/api/admin/clients/${clientId}/agents/${agentId}/compile-prompt`, {
       method: 'POST',
@@ -166,6 +167,11 @@ export const api = {
 
   publishAgent: (clientId: string, agentId: string) =>
     request<{ message: string; agent: Agent; checklist: any }>(`/api/admin/clients/${clientId}/agents/${agentId}/publish`, {
+      method: 'POST',
+    }),
+
+  getTestToken: (clientId: string, agentId: string) =>
+    request<{ livekitUrl: string; token: string; roomName: string }>(`/api/admin/clients/${clientId}/agents/${agentId}/test-token`, {
       method: 'POST',
     }),
 
@@ -213,25 +219,21 @@ export const api = {
       method: 'POST',
     }),
 
-  // Telephony / Outbound Calls
-  startOutboundCall: (clientId: string, agentId: string, phoneNumber: string, provider: 'exotel' | 'plivo' = 'exotel', record: boolean = false) =>
-    request<{ callSid: string; status: string }>(`/api/voice/clients/${clientId}/agents/${agentId}/calls/outbound`, {
+  // V3 LiveKit SIP Outbound Phone Test
+  startPhoneTest: (clientId: string, agentId: string, phoneNumber: string) =>
+    request<PhoneTestResult>(`/api/admin/clients/${clientId}/agents/${agentId}/phone-test`, {
       method: 'POST',
-      body: JSON.stringify({ phoneNumber, provider, record, timeLimit: 300 }),
+      body: JSON.stringify({ phoneNumber }),
     }),
-
-  getCallStatus: (callSid: string) =>
-    request<{ callSid: string; status: string }>(`/api/voice/calls/${callSid}/status`),
-
-  hangupCall: (callSid: string) =>
-    request<{ message: string }>(`/api/voice/calls/${callSid}/hangup`, { method: 'POST' }),
-
-  getLatestCallTranscript: () =>
-    request<{
-      callStatus?: string;
-      sessionId?: string;
-      startTime?: number;
-      items?: Array<{ id: string; role: 'system' | 'user' | 'agent'; speakerName?: string; text: string; turnId?: string; timestamp?: number }>;
-      message?: string;
-    }>('/api/telephony/transcript/latest'),
 };
+
+export interface PhoneTestResult {
+  success: boolean;
+  roomName: string;
+  callId?: string;
+  participantId?: string;
+  participantIdentity: string;
+  deploymentId: string;
+  dispatchId?: string;
+}
+

@@ -4,7 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { createChildLogger } from '../lib/logger';
 import { promptCompiler } from './promptCompiler';
 import type { AgentConfiguration } from './template';
-import type { RuntimeAgentConfig } from '@nextlite/shared';
+import { type RuntimeAgentConfig, normalizeToolId } from '@nextlite/shared';
 import { RuntimeConfigError } from '../errors/runtimeConfigError';
 
 export { RuntimeConfigError, type RuntimeConfigErrorCode } from '../errors/runtimeConfigError';
@@ -128,93 +128,25 @@ export class RuntimeAgentConfigService {
       configuration: config,
     });
 
+    // Canonical shape: config.tools.bindings; Fallback legacy shape: (config.tools as any).tools
+    const configuredBindings: any[] =
+      config.tools?.bindings && Array.isArray(config.tools.bindings)
+        ? config.tools.bindings
+        : Array.isArray((config.tools as any)?.tools)
+          ? (config.tools as any).tools
+          : [];
+
     // 7. Map to RuntimeAgentConfig DTO using stored configuration values
-    const runtimeConfig: RuntimeAgentConfig = {
-      tenant: {
-        tenantId: deployment.tenantId,
-      },
-      agent: {
-        agentId: agent.id,
-        agentName: agent.name,
-        status: agent.status,
-      },
-      deployment: {
-        deploymentId: deployment.id,
-        versionId: version.id,
-        versionNumber: version.versionNumber,
-      },
-      prompt: {
-        compiledSystemPrompt,
-        greeting: config.identity?.greeting,
-      },
-      voice: {
-        provider: config.voice?.provider,
-        sttModel: config.voice?.sttModel,
-        ttsModel: config.voice?.ttsModel,
-        voiceId: config.voice?.voiceId,
-        gender: config.voice?.gender,
-        speakingSpeed: config.voice?.speakingSpeed,
-        pitch: config.voice?.pitch,
-      },
-      language: {
-        primary: config.language?.primary,
-        supportedLanguages: config.language?.supported || [],
-        autoDetectEnabled: config.language?.autoDetect,
-        languageSwitchingEnabled: config.language?.languageSwitchEnabled,
-      },
-      runtime: {
-        modelProvider: config.runtimeSettings?.modelProvider || config.modelProvider,
-        llmModel: config.runtimeSettings?.llmModel || config.llmModel,
-        temperature: config.runtimeSettings?.modelTemperature,
-        interruptionMode:
-          config.runtimeSettings?.interruptionMode ||
-          (config.runtimeSettings?.allowCallerInterruptions !== undefined
-            ? config.runtimeSettings.allowCallerInterruptions
-              ? 'adaptive'
-              : 'disabled'
-            : undefined),
-        preemptiveGenerationEnabled: config.runtimeSettings?.preemptiveGenerationEnabled,
-        responseEagerness: config.runtimeSettings?.eagernessToRespond,
-        noiseCancellationModel: config.runtimeSettings?.noiseCancellationModel,
-        expressiveModeEnabled: config.runtimeSettings?.expressiveModeEnabled,
-        maxCallDurationSeconds: config.runtimeSettings?.maxCallLengthSeconds,
-      },
-      knowledge: {
-        enabled: config.knowledge?.enabled ?? false,
-        retrievalConfig: config.knowledge?.retrievalConfig
-          ? {
-              topK: config.knowledge.retrievalConfig.topK,
-              scoreThreshold: config.knowledge.retrievalConfig.similarityThreshold,
-            }
-          : undefined,
-      },
-      tools: {
-        enabled: config.tools?.enabled ?? false,
-        tools: (config.tools?.bindings || []).map((t) => ({
-          name: t.name || t.toolId,
-          description: t.description || '',
-          parameters: {},
-          enabled: t.enabled ?? true,
-          confirmationRequired: t.confirmationRequired,
-        })),
-      },
-      variables: {
-        inputVariables: (config.variables?.input || []).map((v) => ({
-          key: v.key,
-          label: v.label,
-          type: v.type,
-          required: v.required ?? false,
-          defaultValue: v.defaultValue,
-          scope: v.scope,
-        })),
-        outputVariables: (config.variables?.output || []).map((v) => ({
-          key: v.key,
-          label: v.label,
-          type: v.type,
-          required: v.required ?? false,
-        })),
-      },
-    };
+    const runtimeConfig = buildRuntimeAgentConfig(config, {
+      tenantId: deployment.tenantId,
+      agentId: agent.id,
+      agentName: agent.name,
+      agentStatus: agent.status,
+      deploymentId: deployment.id,
+      versionId: version.id,
+      versionNumber: version.versionNumber,
+      compiledSystemPrompt,
+    });
 
     logger.info(
       {
@@ -229,6 +161,123 @@ export class RuntimeAgentConfigService {
 
     return runtimeConfig;
   }
+}
+
+/**
+ * Pure mapping helper that builds a RuntimeAgentConfig DTO from an AgentConfiguration snapshot.
+ */
+export function buildRuntimeAgentConfig(
+  config: AgentConfiguration,
+  options: {
+    tenantId?: string;
+    agentId?: string;
+    agentName?: string;
+    agentStatus?: string;
+    deploymentId?: string;
+    versionId?: string;
+    versionNumber?: number;
+    compiledSystemPrompt?: string;
+  } = {},
+): RuntimeAgentConfig {
+  // Canonical shape: config.tools.bindings; Fallback legacy shape: (config.tools as any).tools
+  const configuredBindings: any[] =
+    config.tools?.bindings && Array.isArray(config.tools.bindings)
+      ? config.tools.bindings
+      : Array.isArray((config.tools as any)?.tools)
+        ? (config.tools as any).tools
+        : [];
+
+  return {
+    tenant: {
+      tenantId: options.tenantId || 'test-tenant',
+    },
+    agent: {
+      agentId: options.agentId || 'test-agent',
+      agentName: options.agentName || 'Test Agent',
+      status: options.agentStatus || 'active',
+    },
+    deployment: {
+      deploymentId: options.deploymentId || 'test-deployment',
+      versionId: options.versionId || 'test-version',
+      versionNumber: options.versionNumber || 1,
+    },
+    prompt: {
+      compiledSystemPrompt: options.compiledSystemPrompt || '',
+      greeting: config.identity?.greeting,
+      timezone: config.businessInformation?.timezone || 'Asia/Kolkata',
+    },
+    voice: {
+      provider: config.voice?.provider,
+      sttModel: config.voice?.sttModel,
+      ttsModel: config.voice?.ttsModel,
+      voiceId: config.voice?.voiceId,
+      gender: config.voice?.gender,
+      speakingSpeed: config.voice?.speakingSpeed,
+      pitch: config.voice?.pitch,
+    },
+    language: {
+      primary: config.language?.primary,
+      supportedLanguages: config.language?.supported || [],
+      autoDetectEnabled: config.language?.autoDetect,
+      languageSwitchingEnabled: config.language?.languageSwitchEnabled,
+    },
+    runtime: {
+      modelProvider: config.runtimeSettings?.modelProvider || config.modelProvider,
+      llmModel: config.runtimeSettings?.llmModel || config.llmModel,
+      temperature: config.runtimeSettings?.modelTemperature,
+      interruptionMode:
+        config.runtimeSettings?.interruptionMode ||
+        (config.runtimeSettings?.allowCallerInterruptions !== undefined
+          ? config.runtimeSettings.allowCallerInterruptions
+            ? 'adaptive'
+            : 'disabled'
+          : undefined),
+      preemptiveGenerationEnabled: config.runtimeSettings?.preemptiveGenerationEnabled,
+      responseEagerness: config.runtimeSettings?.eagernessToRespond,
+      noiseCancellationModel: config.runtimeSettings?.noiseCancellationModel,
+      expressiveModeEnabled: config.runtimeSettings?.expressiveModeEnabled,
+      maxCallDurationSeconds: config.runtimeSettings?.maxCallLengthSeconds,
+    },
+    knowledge: {
+      enabled: config.knowledge?.enabled ?? false,
+      retrievalConfig: config.knowledge?.retrievalConfig
+        ? {
+            topK: config.knowledge.retrievalConfig.topK,
+            scoreThreshold: config.knowledge.retrievalConfig.similarityThreshold,
+          }
+        : undefined,
+    },
+    tools: {
+      enabled: config.tools?.enabled ?? false,
+      tools: configuredBindings.map((t) => {
+        const canonicalId = normalizeToolId(t.toolId || t.name) || t.toolId || t.name;
+        return {
+          toolId: canonicalId,
+          name: canonicalId,
+          description: t.description || '',
+          parameters: t.parameters || {},
+          enabled: typeof t.enabled === 'boolean' ? t.enabled : true,
+          confirmationRequired: t.confirmationRequired,
+        };
+      }),
+    },
+    variables: {
+      inputVariables: (config.variables?.input || []).map((v) => ({
+        key: v.key,
+        label: v.label,
+        type: v.type,
+        required: v.required ?? false,
+        defaultValue: v.defaultValue,
+        scope: v.scope,
+      })),
+      outputVariables: (config.variables?.output || []).map((v) => ({
+        key: v.key,
+        label: v.label,
+        type: v.type,
+        required: v.required ?? false,
+      })),
+    },
+  };
 }
 
 export const runtimeAgentConfigService = new RuntimeAgentConfigService();

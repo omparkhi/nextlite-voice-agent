@@ -12,6 +12,23 @@ import { VariablesManager } from '../../components/agent-builder/VariablesManage
 import { SettingsEditor } from '../../components/agent-builder/SettingsEditor';
 import { PromptPreviewModal } from '../../components/agent-builder/PromptPreviewModal';
 import { ChecklistPanel } from '../../components/agent-builder/ChecklistPanel';
+import { ToolsManager } from '../../components/agent-builder/ToolsManager';
+
+const TIMEZONE_OPTIONS = [
+  { value: 'Asia/Kolkata', label: 'Asia/Kolkata (IST, +05:30)' },
+  { value: 'America/New_York', label: 'America/New_York (Eastern Time, UTC-5 / UTC-4)' },
+  { value: 'America/Chicago', label: 'America/Chicago (Central Time, UTC-6 / UTC-5)' },
+  { value: 'America/Denver', label: 'America/Denver (Mountain Time, UTC-7 / UTC-6)' },
+  { value: 'America/Los_Angeles', label: 'America/Los_Angeles (Pacific Time, UTC-8 / UTC-7)' },
+  { value: 'Europe/London', label: 'Europe/London (GMT / BST, UTC+0 / UTC+1)' },
+  { value: 'Europe/Paris', label: 'Europe/Paris (CET / CEST, UTC+1 / UTC+2)' },
+  { value: 'Europe/Berlin', label: 'Europe/Berlin (CET / CEST, UTC+1 / UTC+2)' },
+  { value: 'Asia/Dubai', label: 'Asia/Dubai (GST, UTC+4)' },
+  { value: 'Asia/Singapore', label: 'Asia/Singapore (SGT, UTC+8)' },
+  { value: 'Asia/Tokyo', label: 'Asia/Tokyo (JST, UTC+9)' },
+  { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST / AEDT, UTC+10 / UTC+11)' },
+  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+];
 
 const defaultConfiguration: AgentConfiguration = {
   identity: { agentName: 'Assistant', greeting: 'Hello! How can I help you today?', businessName: '' },
@@ -31,7 +48,7 @@ const defaultConfiguration: AgentConfiguration = {
   },
   variables: { input: [], output: [] },
   knowledge: { enabled: true, retrievalConfig: { topK: 3 } },
-  tools: { enabled: true, bindings: [] },
+  tools: { enabled: false, bindings: [] },
   systemInstructions: '',
 };
 
@@ -82,7 +99,7 @@ export function AgentDetail() {
               runtimeSettings: { ...defaultConfiguration.runtimeSettings, ...latest.configuration.runtimeSettings },
               variables: { input: latest.configuration.variables?.input || [], output: latest.configuration.variables?.output || [] },
               knowledge: { enabled: true, retrievalConfig: { topK: 3 }, ...latest.configuration.knowledge },
-              tools: { enabled: true, bindings: latest.configuration.tools?.bindings || [] },
+              tools: { enabled: latest.configuration.tools?.enabled ?? false, bindings: latest.configuration.tools?.bindings || [] },
               systemInstructions: latest.configuration.systemInstructions || '',
             });
           }
@@ -322,6 +339,22 @@ export function AgentDetail() {
 
           <button
             type="button"
+            onClick={() => setActiveTab('tools')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
+              activeTab === 'tools' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span>🛠</span>
+              <span>Tools</span>
+            </div>
+            <span className="text-[11px] text-gray-400 font-mono">
+              {(configuration.tools?.bindings || []).filter((b) => b.enabled).length}
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('knowledge')}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
               activeTab === 'knowledge' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
@@ -482,7 +515,7 @@ export function AgentDetail() {
                 <div className="space-y-3 pt-2">
                   <h4 className="font-semibold text-gray-900 text-base">Business Information</h4>
                   <div className="bg-gray-50/50 rounded-2xl border border-gray-200 p-4 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-gray-600 font-medium mb-1">Business Name</label>
                         <input
@@ -510,6 +543,24 @@ export function AgentDetail() {
                           placeholder="Mon-Sat 8:00 AM - 8:00 PM"
                           className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
                         />
+                      </div>
+                      <div>
+                        <label className="block text-gray-600 font-medium mb-1">Business Timezone</label>
+                        <select
+                          value={configuration.businessInformation?.timezone || 'Asia/Kolkata'}
+                          onChange={(e) =>
+                            handleConfigChange({
+                              businessInformation: { ...configuration.businessInformation, timezone: e.target.value },
+                            })
+                          }
+                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
+                        >
+                          {TIMEZONE_OPTIONS.map((tz) => (
+                            <option key={tz.value} value={tz.value}>
+                              {tz.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -552,6 +603,10 @@ export function AgentDetail() {
               />
             )}
 
+            {activeTab === 'tools' && (
+              <ToolsManager configuration={configuration} onChange={handleConfigChange} />
+            )}
+
             {activeTab === 'knowledge' && clientId && agentId && (
               <KnowledgeManager clientId={clientId} agentId={agentId} />
             )}
@@ -582,7 +637,7 @@ export function AgentDetail() {
                     onClick={() => setTestMode('phone')}
                     className={`pb-2.5 border-b-2 ${testMode === 'phone' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
                   >
-                    Phone Call Test (Exotel / Plivo)
+                    Phone Call Test
                   </button>
                 </div>
 

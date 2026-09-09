@@ -164,27 +164,32 @@ const EXPLICIT_LANGUAGE_RULES: ExplicitLanguageRule[] = [
       /can\s+you\s+speak\s+english/i,
       /\benglish\s+please\b/i,
       /\bswitch\s+to\s+english\b/i,
-      /\benglish\s*me(?:in)?\s*(?:baat|bolo)\b/i,
-      /\benglish\s*(?:madhe|it)\s*bola\b/i,
+      /\benglish\s*me(?:in)?\s*(?:baat|bolo|batao|karo)\b/i,
+      /\benglish\s*(?:madhe|it)\s*(?:bola|sanga)\b/i,
       /\bin\s+english\b/i,
+      /\benglish\s+mein\b/i,
+      /\bi\s+want\s+to\s+continue\s+in\s+english\b/i,
+      /\bi\s+prefer\s+english\b/i,
     ],
   },
   {
     languageCode: 'hi-IN',
     patterns: [
-      /हिंदी\s*में\s*(?:बात\s*करो|बोलो|बात\s*कीजिए|बात\s*कर\s*सकते\s*हो|संभाषण|बताओ)/i,
-      /हिन्दी\s*में\s*(?:बात\s*करो|बोलो|बात\s*कीजिए|बात\s*कर\s*सकते\s*हो|संभाषण|बताओ)/i,
+      /हिंदी\s*में\s*(?:बात\s*करो|बोलो|बात\s*कीजिए|बात\s*कर\s*सकते\s*हो|संभाषण|बताओ|बताइए)/i,
+      /हिन्दी\s*में\s*(?:बात\s*करो|बोलो|बात\s*कीजिए|बात\s*कर\s*सकते\s*हो|संभाषण|बताओ|बताइए)/i,
       /क्या\s*आप\s*हिंदी\s*में\s*बात\s*कर\s*सकते\s*हैं/i,
       /क्या\s*आप\s*हिन्दी\s*में\s*बात\s*कर\s*सकते\s*हैं/i,
       /हिंदी\s*में\s*बताओ/i,
+      /हिंदी\s*में\s*बताइए/i,
       /हिंदी\s*बोलो/i,
-      /\bhindi\s*me(?:in)?\s*(?:baat\s*karo|bolo|baat\s*kijiye|batao)\b/i,
+      /\bhindi\s*me(?:in)?\s*(?:baat\s*karo|bolo|baat\s*kijiye|batao|bataiye)\b/i,
       /(?:can|could|please|let'?s|would)\s+(?:you\s+)?(?:speak|talk|continue|switch)\s+(?:in|to|with)\s+hindi/i,
       /(?:speak|talk|continue|switch)\s+(?:in|to)\s+hindi/i,
       /talk\s+to\s+me\s+in\s+hindi/i,
       /\bswitch\s+to\s+hindi\b/i,
       /\bhindi\s+please\b/i,
       /\bin\s+hindi\b/i,
+      /\bhindi\s+mein\b/i,
     ],
   },
   {
@@ -195,6 +200,7 @@ const EXPLICIT_LANGUAGE_RULES: ExplicitLanguageRule[] = [
       /तुम्ही\s*मराठीत\s*बोलू\s*शकता\s*का/i,
       /मराठी\s*भाषा\s*वापरा/i,
       /मराठी\s*बोला/i,
+      /मराठी\s*सांगा/i,
       /\bmarathit\s*(?:bola|bol|sanga)\b/i,
       /\bmarathi\s*madhe\s*(?:bola|bol|sanga)\b/i,
       /(?:can|could|please|let'?s|would)\s+(?:you\s+)?(?:speak|talk|continue|switch)\s+(?:in|to|with)\s+marathi/i,
@@ -285,19 +291,126 @@ export function detectExplicitLanguageRequest(text: string): string | null {
   return null;
 }
 
+// Regex matching common Indic scripts (Devanagari, Bengali, Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada, Malayalam)
+const INDIC_SCRIPT_REGEX = /[\u0900-\u0D7F]/;
+const DEVANAGARI_REGEX = /[\u0900-\u097F]/;
+
+// Common Hindi grammatical markers in Latin (Hinglish) script (excluding common English words like 'the')
+const HINDI_LATIN_MARKERS_REGEX = /\b(?:ka|ki|ke|hai|hain|tha|thi|hoga|hogi|hoge|kya|chahiye|batao|bataiye|karo|kijiye|sakta|sakti|sakte|milna|lena|denge|dijiye|aaj|kal|samay|tarikh|nahi|nahin|haan|bhai|mujhe|aap|kaha|kahan|kaun|kaunsa|kitna|kitni|kitne|bolo|baat|liye|mein|se|ko)\b/i;
+
+// Common Marathi grammatical markers in Latin (Minglish) script
+const MARATHI_LATIN_MARKERS_REGEX = /\b(?:madhe|cha|chi|che|chya|ahe|aahe|ahet|hota|hoti|kay|hava|have|havi|sanga|bola|kara|shaktat|shakta|bhetayche|ghyayche|dya|aaj|udya|vel|tarikh|divas|nahi|nahin|yancha|yanchi|sathi|mala|tumhi|amhi|kiti|koni|konti|kadhi|kuthun|kuthe)\b/i;
+
+/**
+ * Evaluates whether an automatically detected STT language code represents reliable evidence
+ * to switch the active conversation language, filtering out noise, fillers, single words, and natural code-switching.
+ */
+export function isReliableAutomaticSwitch(
+  transcript: string,
+  candidateLanguage: string,
+  currentLanguage: string,
+): boolean {
+  if (!transcript || typeof transcript !== 'string') return false;
+  const trimmed = transcript.trim();
+  if (trimmed.length < 5) return false;
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  // An utterance with fewer than 3 words is not reliable for automatic switching (filters "okay", "doctor sharma", "नहीं नहीं", etc.)
+  if (words.length < 3) return false;
+
+  const candNorm = normalizeLanguageCode(candidateLanguage);
+  const currNorm = normalizeLanguageCode(currentLanguage);
+
+  const candBase = candNorm.split('-')[0]?.toLowerCase() || '';
+  const currBase = currNorm.split('-')[0]?.toLowerCase() || '';
+
+  // 1. Switching from an Indian language (e.g. Hindi, Marathi) to English ('en-IN'):
+  if (candBase === 'en' && currBase !== 'en') {
+    // If the text contains Indic script characters, it's definitely not English speech
+    if (INDIC_SCRIPT_REGEX.test(trimmed)) {
+      return false;
+    }
+
+    // If current is Hindi and the transcript contains Hindi grammatical particles (Hinglish):
+    if (currBase === 'hi' && HINDI_LATIN_MARKERS_REGEX.test(trimmed)) {
+      return false;
+    }
+
+    // If current is Marathi and the transcript contains Marathi grammatical particles (Minglish):
+    if (currBase === 'mr' && MARATHI_LATIN_MARKERS_REGEX.test(trimmed)) {
+      return false;
+    }
+
+    // Genuine English switch requires English words and length >= 3
+    return words.length >= 3;
+  }
+
+  // 2. Switching to Hindi ('hi-IN') from English or other language:
+  if (candBase === 'hi') {
+    // Check if text has Devanagari or Hindi markers
+    if (DEVANAGARI_REGEX.test(trimmed) || HINDI_LATIN_MARKERS_REGEX.test(trimmed)) {
+      return words.length >= 2;
+    }
+    return words.length >= 3;
+  }
+
+  // 3. Switching to Marathi ('mr-IN') from English or other language:
+  if (candBase === 'mr') {
+    // Check if text has Marathi markers
+    if (MARATHI_LATIN_MARKERS_REGEX.test(trimmed)) {
+      return words.length >= 2;
+    }
+    return words.length >= 3;
+  }
+
+  // 4. Switching to any other Indian language (e.g. Bengali, Gujarati, Kannada, Tamil, etc.):
+  return words.length >= 3;
+}
+
 /**
  * Build dynamic language directive to append to the system prompt.
  */
 export function buildLanguageInstruction(languageCode: string): string {
-  const langName = getLanguageDisplayName(languageCode);
-  return `\n\n# Active Conversation Language\n- Current conversation language: ${langName} (${languageCode}).\n- Respond in ${langName}. If the user speaks Hinglish or mixes languages naturally, respond appropriately while maintaining ${langName} as the primary language.`;
+  const norm = normalizeLanguageCode(languageCode);
+  const langName = getLanguageDisplayName(norm);
+  const baseLang = norm.split('-')[0]?.toLowerCase() || '';
+
+  let codeSwitchingGuidance = '';
+  if (baseLang === 'hi') {
+    codeSwitchingGuidance =
+      `- Respond in Hindi (conversational Hinglish).\n` +
+      `- Speak natural conversational Hinglish (Hindi + English). Do not force archaic or pure textbook Hindi.\n` +
+      `- Keep standard business/everyday terms in English naturally (e.g. appointment, booking, timing, phone number, team, fees, pricing, WhatsApp, payment, confirm).\n` +
+      `- DO NOT switch the entire conversation to English merely because the caller uses English words or numbers.`;
+  } else if (baseLang === 'mr') {
+    codeSwitchingGuidance =
+      `- Respond in Marathi (conversational Minglish).\n` +
+      `- Speak natural conversational Minglish (Marathi + English). Do not force archaic or pure textbook Marathi.\n` +
+      `- Keep standard business/everyday terms in English naturally (e.g. appointment, booking, timing, phone number, team, fees, pricing, WhatsApp, payment, confirm).\n` +
+      `- DO NOT switch the entire conversation to English merely because the caller uses English words or numbers.`;
+  } else {
+    codeSwitchingGuidance =
+      `- Respond in ${langName}.\n` +
+      `- Maintain this language as the active conversation language until the user explicitly requests another supported language or clearly switches.`;
+  }
+
+  return (
+    `\n\n=== ACTIVE CONVERSATION LANGUAGE POLICY ===\n` +
+    `- Active Conversation Language: ${langName} (${norm})\n` +
+    `${codeSwitchingGuidance}\n` +
+    `- LATEST USER INTENT: Always prioritize answering the user's latest question directly first (e.g. today's date, operating hours, fees/pricing, location) before continuing any prior conversational step.\n` +
+    `- SHORT UTTERANCES: Interpret short utterances (e.g. "हाँ", "नहीं", "नहीं नहीं", "Okay") in context of the previous turn rather than treating them as language changes.\n` +
+    `- PHONE NUMBER SEMANTICS: If the caller says "यही नंबर है" or "use this number", use incoming caller phone if available; if not available, politely ask for their number without claiming fake caller ID.`
+  );
 }
 
 /**
  * Combine base system prompt with active conversation language directive.
  */
 export function buildFullInstructions(baseInstructions: string, languageCode: string): string {
-  const cleanBase = baseInstructions.replace(/\n\n# Active Conversation Language[\s\S]*$/, '');
+  const cleanBase = baseInstructions
+    .replace(/\n\n=== ACTIVE CONVERSATION LANGUAGE POLICY ===[\s\S]*$/, '')
+    .replace(/\n\n# Active Conversation Language[\s\S]*$/, '');
   return `${cleanBase}${buildLanguageInstruction(languageCode)}`;
 }
 
@@ -306,6 +419,8 @@ export interface ProcessTurnResult {
   previousLanguage: string;
   currentLanguage: string;
   reason: 'explicit' | 'auto_detect' | 'none';
+  decision?: 'SWITCHED' | 'REJECTED' | 'SAME_LANGUAGE' | 'NO_DETECTION';
+  details?: string;
 }
 
 /**
@@ -376,13 +491,13 @@ export class ConversationLanguageManager {
    * Process a user turn to determine if language should switch.
    * Priority:
    * 1. Explicit user request (only if requested language is in supportedLanguages)
-   * 2. Automatic language detection (only if autoDetect and languageSwitching are enabled and in supportedLanguages)
+   * 2. Automatic language detection (only if autoDetect and languageSwitching are enabled, candidate is in supportedLanguages, and evidence is reliable)
    * 3. Language persists if no switch triggered.
    */
   processUserTurn(transcript: string, detectedLanguageCode?: string | null): ProcessTurnResult {
     const prev = this.current;
 
-    // 1. Check for explicit language switch request first
+    // 1. Check for explicit language switch request first (Highest Priority)
     const explicitCode = detectExplicitLanguageRequest(transcript);
     if (explicitCode) {
       const matched = matchSupportedLanguage(explicitCode, this.supported);
@@ -394,6 +509,8 @@ export class ConversationLanguageManager {
             previousLanguage: prev,
             currentLanguage: this.current,
             reason: 'explicit',
+            decision: 'SWITCHED',
+            details: `Explicit request for ${getLanguageDisplayName(matched)} (${matched})`,
           };
         }
         return {
@@ -401,6 +518,8 @@ export class ConversationLanguageManager {
           previousLanguage: prev,
           currentLanguage: this.current,
           reason: 'none',
+          decision: 'SAME_LANGUAGE',
+          details: `Explicit request for current active language (${matched})`,
         };
       }
       // Explicit request is for an unsupported language: SAFETY -> do NOT switch
@@ -409,30 +528,65 @@ export class ConversationLanguageManager {
         previousLanguage: prev,
         currentLanguage: this.current,
         reason: 'none',
+        decision: 'REJECTED',
+        details: `Explicit request for unsupported language (${explicitCode})`,
       };
     }
 
-    // 2. Automatic language detection
+    // 2. Automatic language detection (Evidence, not absolute authority)
     if (!this.languageSwitching || !this.autoDetect) {
       return {
         switched: false,
         previousLanguage: prev,
         currentLanguage: this.current,
         reason: 'none',
+        decision: 'REJECTED',
+        details: !this.languageSwitching ? 'Language switching disabled in configuration' : 'Auto detection disabled in configuration',
       };
     }
 
     if (detectedLanguageCode && detectedLanguageCode !== 'unknown') {
       const matched = matchSupportedLanguage(detectedLanguageCode, this.supported);
-      if (matched && matched !== this.current) {
-        this.current = matched;
+      if (matched) {
+        if (matched !== this.current) {
+          // Validate that this is a genuine, reliable language change rather than noise, single word, or Hinglish/Minglish
+          if (isReliableAutomaticSwitch(transcript, matched, this.current)) {
+            this.current = matched;
+            return {
+              switched: true,
+              previousLanguage: prev,
+              currentLanguage: this.current,
+              reason: 'auto_detect',
+              decision: 'SWITCHED',
+              details: `Reliable automatic speech detection in ${getLanguageDisplayName(matched)} (${matched})`,
+            };
+          }
+          return {
+            switched: false,
+            previousLanguage: prev,
+            currentLanguage: this.current,
+            reason: 'none',
+            decision: 'REJECTED',
+            details: `STT detection for ${matched} rejected: isolated word, filler, noise, or natural code-switching`,
+          };
+        }
         return {
-          switched: true,
+          switched: false,
           previousLanguage: prev,
           currentLanguage: this.current,
-          reason: 'auto_detect',
+          reason: 'none',
+          decision: 'SAME_LANGUAGE',
+          details: `Detected language matches active language (${this.current})`,
         };
       }
+      return {
+        switched: false,
+        previousLanguage: prev,
+        currentLanguage: this.current,
+        reason: 'none',
+        decision: 'REJECTED',
+        details: `Detected language (${detectedLanguageCode}) not in configured supportedLanguages`,
+      };
     }
 
     return {
@@ -440,6 +594,9 @@ export class ConversationLanguageManager {
       previousLanguage: prev,
       currentLanguage: this.current,
       reason: 'none',
+      decision: 'NO_DETECTION',
+      details: 'No STT language code detected on utterance',
     };
   }
 }
+

@@ -27,7 +27,7 @@ export function authenticateWorkerSecret(req: Request, res: Response, next: Next
     return;
   }
 
-  const expectedSecret = env.LIVEKIT_WORKER_SECRET;
+  const expectedSecret = env.WORKER_API_SECRET || env.LIVEKIT_WORKER_SECRET;
   if (!expectedSecret || providedSecret !== expectedSecret) {
     logger.warn('Worker authentication failed: invalid secret provided');
     res.status(401).json({ error: 'Invalid internal worker credential' });

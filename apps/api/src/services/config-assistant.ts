@@ -3,13 +3,34 @@ import { db } from '../db';
 import { configChangeProposals, agents, agentVersions } from '../db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import type { LLMService } from './llm';
-import type { AgentConfiguration } from './template';
+import { KNOWN_PLATFORM_TOOL_IDS, type AgentConfiguration } from './template';
+
+const toolBindingSchema = z.object({
+  toolId: z.string().refine((id) => (KNOWN_PLATFORM_TOOL_IDS as readonly string[]).includes(id), {
+    message: 'Unknown platform tool ID',
+  }),
+  name: z.string().min(1),
+  description: z.string(),
+  enabled: z.boolean(),
+  confirmationRequired: z.boolean().optional(),
+}).passthrough();
+
+const toolsConfigSchema = z.object({
+  enabled: z.boolean(),
+  bindings: z.array(toolBindingSchema).refine((bindings) => {
+    const ids = bindings.map((b) => b.toolId);
+    return new Set(ids).size === ids.length;
+  }, {
+    message: 'Duplicate toolId in tool bindings',
+  }),
+}).passthrough();
 
 const agentConfigurationSchema = z.object({
   identity: z.object({ greeting: z.string() }).passthrough(),
   voice: z.object({ voiceId: z.string(), provider: z.string() }).passthrough(),
   language: z.object({ primary: z.string(), supported: z.array(z.string()) }).passthrough(),
   businessInformation: z.object({ businessName: z.string() }).passthrough(),
+  tools: toolsConfigSchema.optional(),
   systemInstructions: z.string().optional(),
 }).passthrough();
 
@@ -66,9 +87,23 @@ export class ConfigAssistantServiceImpl implements ConfigAssistantService {
       },
     ];
 
-    const proposedConfig = await this.llm.chatWithJsonOutput(messages, configSchema) as unknown as AgentConfiguration;
+    const rawProposed = (await this.llm.chatWithJsonOutput(messages, configSchema)) as unknown as AgentConfiguration;
 
-    const validated = agentConfigurationSchema.parse(proposedConfig);
+    // Safety rules: preserve omitted fields (tools, businessInformation, timezone, etc.) from currentConfig
+    let proposedWithPreservedTools = { ...rawProposed };
+    if (rawProposed) {
+      if (rawProposed.businessInformation && currentConfig.businessInformation) {
+        proposedWithPreservedTools.businessInformation = {
+          ...currentConfig.businessInformation,
+          ...rawProposed.businessInformation,
+        };
+      }
+      if ((rawProposed.tools === undefined || rawProposed.tools === null) && currentConfig.tools) {
+        proposedWithPreservedTools.tools = currentConfig.tools;
+      }
+    }
+
+    const validated = agentConfigurationSchema.parse(proposedWithPreservedTools);
 
     const diff = this.computeDiff(currentConfig, validated);
 
@@ -99,20 +134,17 @@ export class ConfigAssistantServiceImpl implements ConfigAssistantService {
   async listProposals(tenantId: string, agentId: string): Promise<ConfigProposal[]> {
     const results = await db.select()
       .from(configChangeProposals)
-      .where(and(
-        eq(configChangeProposals.tenantId, tenantId),
-        eq(configChangeProposals.agentId, agentId),
-      ))
+      .where(and(eq(configChangeProposals.agentId, agentId), eq(configChangeProposals.tenantId, tenantId)))
       .orderBy(desc(configChangeProposals.createdAt));
 
-    return results.map(r => ({
-      id: r.id,
-      agentId: r.agentId,
-      userMessage: r.userMessage,
-      proposedConfig: r.proposedConfig as AgentConfiguration,
-      diff: r.diff as Record<string, { old: unknown; new: unknown }>,
-      status: r.status,
-      createdAt: r.createdAt,
+    return results.map(p => ({
+      id: p.id,
+      agentId: p.agentId,
+      userMessage: p.userMessage,
+      proposedConfig: p.proposedConfig as AgentConfiguration,
+      diff: p.diff as Record<string, { old: unknown; new: unknown }>,
+      status: p.status,
+      createdAt: p.createdAt,
     }));
   }
 
@@ -121,64 +153,75 @@ export class ConfigAssistantServiceImpl implements ConfigAssistantService {
       .from(configChangeProposals)
       .where(and(
         eq(configChangeProposals.id, proposalId),
-        eq(configChangeProposals.tenantId, tenantId),
         eq(configChangeProposals.agentId, agentId),
+        eq(configChangeProposals.tenantId, tenantId),
       ))
       .limit(1);
 
     if (proposalResults.length === 0) throw new Error('Proposal not found');
-    if (proposalResults[0].status !== 'PENDING') throw new Error('Proposal already reviewed');
+    const proposal = proposalResults[0];
 
-    const maxVersionResults = await db.select({ maxVersion: agentVersions.versionNumber })
+    if (proposal.status !== 'PENDING') throw new Error(`Proposal cannot be approved: already ${proposal.status}`);
+
+    const latestVersion = await db.select()
       .from(agentVersions)
       .where(eq(agentVersions.agentId, agentId))
       .orderBy(desc(agentVersions.versionNumber))
       .limit(1);
 
-    const nextVersion = (maxVersionResults[0]?.maxVersion || 0) + 1;
+    const nextVersionNumber = (latestVersion[0]?.versionNumber || 0) + 1;
 
     const versionResults = await db.insert(agentVersions).values({
       agentId,
-      versionNumber: nextVersion,
-      configuration: proposalResults[0].proposedConfig,
+      versionNumber: nextVersionNumber,
+      configuration: proposal.proposedConfig as any,
+      status: 'DRAFT',
       createdBy: userId,
-      notes: `Config assistant: ${proposalResults[0].userMessage}`,
+      notes: `Applied config assistant proposal: "${proposal.userMessage.substring(0, 100)}"`,
     }).returning();
 
     await db.update(configChangeProposals)
       .set({ status: 'APPROVED', reviewedBy: userId, reviewedAt: new Date() })
       .where(eq(configChangeProposals.id, proposalId));
 
-    return { versionId: versionResults[0].id, versionNumber: nextVersion };
+    return {
+      versionId: versionResults[0].id,
+      versionNumber: nextVersionNumber,
+    };
   }
 
   async reject(tenantId: string, agentId: string, proposalId: string, userId: string): Promise<void> {
-    const results = await db.select()
+    const proposalResults = await db.select()
       .from(configChangeProposals)
       .where(and(
         eq(configChangeProposals.id, proposalId),
-        eq(configChangeProposals.tenantId, tenantId),
         eq(configChangeProposals.agentId, agentId),
+        eq(configChangeProposals.tenantId, tenantId),
       ))
       .limit(1);
 
-    if (results.length === 0) throw new Error('Proposal not found');
-    if (results[0].status !== 'PENDING') throw new Error('Proposal already reviewed');
+    if (proposalResults.length === 0) throw new Error('Proposal not found');
+    const proposal = proposalResults[0];
+
+    if (proposal.status !== 'PENDING') throw new Error(`Proposal cannot be rejected: already ${proposal.status}`);
 
     await db.update(configChangeProposals)
       .set({ status: 'REJECTED', reviewedBy: userId, reviewedAt: new Date() })
       .where(eq(configChangeProposals.id, proposalId));
   }
 
-  private computeDiff(oldConfig: AgentConfiguration, newConfig: AgentConfiguration): Record<string, { old: unknown; new: unknown }> {
+  private computeDiff(current: AgentConfiguration, proposed: AgentConfiguration): Record<string, { old: unknown; new: unknown }> {
     const diff: Record<string, { old: unknown; new: unknown }> = {};
-    const flatOld = this.flattenObject(oldConfig as unknown as Record<string, unknown>);
-    const flatNew = this.flattenObject(newConfig as unknown as Record<string, unknown>);
+    const flatCurrent = this.flattenObject(current as unknown as Record<string, unknown>);
+    const flatProposed = this.flattenObject(proposed as unknown as Record<string, unknown>);
 
-    const allKeys = new Set([...Object.keys(flatOld), ...Object.keys(flatNew)]);
+    const allKeys = new Set([...Object.keys(flatCurrent), ...Object.keys(flatProposed)]);
+
     for (const key of allKeys) {
-      if (JSON.stringify(flatOld[key]) !== JSON.stringify(flatNew[key])) {
-        diff[key] = { old: flatOld[key], new: flatNew[key] };
+      const oldVal = flatCurrent[key];
+      const newVal = flatProposed[key];
+      if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
+        diff[key] = { old: oldVal ?? null, new: newVal ?? null };
       }
     }
     return diff;
@@ -199,19 +242,24 @@ export class ConfigAssistantServiceImpl implements ConfigAssistantService {
 
   private getDefaultConfig(): AgentConfiguration {
     return {
-      identity: { agentName: 'Assistant', name: 'Assistant', greeting: 'Hello! How can I help you today?' },
+      identity: { agentName: 'Assistant', displayName: 'Assistant', greeting: 'Hello! How can I help you today?', businessName: '' },
       persona: { role: 'AI Assistant', personality: 'Helpful and concise', tone: 'warm', style: 'concise', formality: 'mixed' },
       objective: { primaryObjective: 'Assist caller queries efficiently.' },
-      voice: { voiceId: 'shubh', provider: 'sarvam', gender: 'male' },
+      speakingStyle: { maxSentences: 2, oneQuestionAtATime: true, conciseResponses: true },
+      businessInformation: { businessName: '', businessType: 'General', hours: '', location: '', description: '', timezone: 'Asia/Kolkata' },
+      conversation: { phases: [] },
+      guardrails: { prohibitedTopics: [], escalationRules: [], fallbackBehavior: '' },
       language: { primary: 'en-IN', supported: ['en-IN'] },
-      businessInformation: { businessName: '', businessType: 'General', hours: '', location: '', description: '' },
-      role: { description: 'AI Assistant' },
-      goal: { primaryObjective: 'Assist caller queries efficiently.' },
-      personality: { tone: 'professional', style: 'concise', formality: 'formal' },
-      conversationRules: { maxTurns: 10, greetingStyle: 'professional', fallbackBehavior: '' },
-      appointmentRules: { slotDuration: 30, bufferTime: 15, workingHours: '', bookingRules: '' },
-      leadRules: { requiredFields: [], qualificationCriteria: '' },
-      escalationRules: { triggerConditions: [], transferNumber: '', timeout: 30 },
+      voice: { voiceId: 'shubh', provider: 'sarvam', gender: 'male' },
+      runtimeSettings: {
+        modelTemperature: 0.7,
+        allowCallerInterruptions: true,
+        nudges: { enabled: true, delaySeconds: 7, messages: ['Are you there?'], maxUnansweredNudges: 2 },
+        maxCallLengthSeconds: 300,
+      },
+      variables: { input: [], output: [] },
+      knowledge: { enabled: true, retrievalConfig: { topK: 3 } },
+      tools: { enabled: false, bindings: [] },
       systemInstructions: '',
     };
   }
@@ -220,21 +268,94 @@ export class ConfigAssistantServiceImpl implements ConfigAssistantService {
     return {
       type: 'object',
       properties: {
-        identity: { type: 'object', properties: { name: { type: 'string' }, greeting: { type: 'string' } }, required: ['name', 'greeting'] },
-        role: { type: 'object', properties: { description: { type: 'string' } }, required: ['description'] },
-        goal: { type: 'object', properties: { primaryObjective: { type: 'string' } }, required: ['primaryObjective'] },
-        voice: { type: 'object', properties: { voiceId: { type: 'string' }, provider: { type: 'string' } }, required: ['voiceId', 'provider'] },
-        language: { type: 'object', properties: { primary: { type: 'string' }, supported: { type: 'array', items: { type: 'string' } } }, required: ['primary', 'supported'] },
-        businessInformation: { type: 'object', properties: { businessName: { type: 'string' }, businessType: { type: 'string' }, hours: { type: 'string' }, location: { type: 'string' }, description: { type: 'string' } }, required: ['businessName', 'businessType', 'hours', 'location', 'description'] },
-        personality: { type: 'object', properties: { tone: { type: 'string' }, style: { type: 'string' }, formality: { type: 'string' } }, required: ['tone', 'style', 'formality'] },
-        conversationRules: { type: 'object', properties: { maxTurns: { type: 'number' }, greetingStyle: { type: 'string' }, fallbackBehavior: { type: 'string' } }, required: ['maxTurns', 'greetingStyle', 'fallbackBehavior'] },
-        appointmentRules: { type: 'object', properties: { slotDuration: { type: 'number' }, bufferTime: { type: 'number' }, workingHours: { type: 'string' }, bookingRules: { type: 'string' } }, required: ['slotDuration', 'bufferTime', 'workingHours', 'bookingRules'] },
-        leadRules: { type: 'object', properties: { requiredFields: { type: 'array', items: { type: 'string' } }, qualificationCriteria: { type: 'string' } }, required: ['requiredFields', 'qualificationCriteria'] },
-        escalationRules: { type: 'object', properties: { triggerConditions: { type: 'array', items: { type: 'string' } }, transferNumber: { type: 'string' }, timeout: { type: 'number' } }, required: ['triggerConditions', 'transferNumber', 'timeout'] },
+        identity: {
+          type: 'object',
+          properties: {
+            agentName: { type: 'string' },
+            displayName: { type: 'string' },
+            greeting: { type: 'string' },
+            businessName: { type: 'string' },
+          },
+          required: ['greeting'],
+        },
+        persona: {
+          type: 'object',
+          properties: {
+            role: { type: 'string' },
+            personality: { type: 'string' },
+            tone: { type: 'string' },
+            style: { type: 'string' },
+            formality: { type: 'string' },
+          },
+        },
+        objective: {
+          type: 'object',
+          properties: {
+            primaryObjective: { type: 'string' },
+            secondaryObjectives: { type: 'array', items: { type: 'string' } },
+          },
+        },
+        speakingStyle: {
+          type: 'object',
+          properties: {
+            maxSentences: { type: 'number' },
+            oneQuestionAtATime: { type: 'boolean' },
+            conciseResponses: { type: 'boolean' },
+          },
+        },
+        businessInformation: {
+          type: 'object',
+          properties: {
+            businessName: { type: 'string' },
+            businessType: { type: 'string' },
+            hours: { type: 'string' },
+            location: { type: 'string' },
+            description: { type: 'string' },
+            timezone: { type: 'string' },
+          },
+        },
+        conversation: {
+          type: 'object',
+          properties: {
+            phases: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  objective: { type: 'string' },
+                  instructions: { type: 'array', items: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+        guardrails: {
+          type: 'object',
+          properties: {
+            prohibitedTopics: { type: 'array', items: { type: 'string' } },
+            escalationRules: { type: 'array', items: { type: 'string' } },
+            fallbackBehavior: { type: 'string' },
+          },
+        },
+        voice: {
+          type: 'object',
+          properties: {
+            voiceId: { type: 'string' },
+            provider: { type: 'string' },
+            gender: { type: 'string' },
+          },
+        },
+        language: {
+          type: 'object',
+          properties: {
+            primary: { type: 'string' },
+            supported: { type: 'array', items: { type: 'string' } },
+          },
+        },
         systemInstructions: { type: 'string' },
       },
-      required: ['identity', 'role', 'goal', 'voice', 'language', 'businessInformation', 'personality', 'conversationRules', 'appointmentRules', 'leadRules', 'escalationRules', 'systemInstructions'],
-      additionalProperties: false,
+      required: ['identity', 'voice', 'language', 'businessInformation'],
     };
   }
 }

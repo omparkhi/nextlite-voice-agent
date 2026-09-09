@@ -128,7 +128,8 @@ describe('RuntimeAgentConfigService (Module A6)', () => {
     expect(result.runtime.noiseCancellationModel).toBe('quailVfS');
     expect(result.runtime.expressiveModeEnabled).toBe(false);
     expect(result.tools.tools).toHaveLength(1);
-    expect(result.tools.tools[0].name).toBe('Book Appointment');
+    expect(result.tools.tools[0].toolId).toBe('book_appointment');
+    expect(result.tools.tools[0].name).toBe('book_appointment');
   });
 
   it('TEST 2: Wrong tenant -> rejected with stable RUNTIME_CONFIG_DEPLOYMENT_NOT_FOUND code', async () => {

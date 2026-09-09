@@ -15,8 +15,6 @@ import testConversationRoutes from './routes/test-conversation';
 import configAssistantRoutes from './routes/config-assistant';
 import clientRoutes from './routes/client';
 import internalRoutes from './routes/internal';
-import voiceRoutes from './voice/routes';
-import { setupVoiceWebSocket } from './voice/server';
 import { logger } from './lib/logger';
 
 const app = express();
@@ -58,8 +56,7 @@ app.use('/api/admin', agentRoutes);
 app.use('/api/admin', knowledgeRoutes);
 app.use('/api/admin', testConversationRoutes);
 app.use('/api/admin', configAssistantRoutes);
-app.use('/api/voice', voiceRoutes);
-app.use('/api/telephony', voiceRoutes);
+app.use('/api/client', clientRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
@@ -75,9 +72,6 @@ const server = app.listen(PORT, () => {
   logger.info(`📊 Environment: ${env.NODE_ENV}`);
   logger.info(`🔗 Health check: http://localhost:${PORT}/api/health`);
 });
-
-// Setup voice WebSocket server
-setupVoiceWebSocket(server);
 
 export default app;
 

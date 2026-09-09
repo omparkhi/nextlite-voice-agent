@@ -36,8 +36,17 @@ const envSchema = z.object({
 
   SARVAM_API_KEY: z.string().optional(),
 
-  // LiveKit Agent Worker internal shared secret
-  LIVEKIT_WORKER_SECRET: z.string().default('dev-livekit-worker-secret-v3'),
+  // LiveKit Agent Worker internal shared secret (accepts WORKER_API_SECRET or LIVEKIT_WORKER_SECRET)
+  WORKER_API_SECRET: z.string().optional(),
+  LIVEKIT_WORKER_SECRET: z.string().optional(),
+
+  // LiveKit Server configuration
+  LIVEKIT_URL: z.string().optional(),
+  LIVEKIT_API_KEY: z.string().optional(),
+  LIVEKIT_API_SECRET: z.string().optional(),
+  LIVEKIT_AGENT_NAME: z.string().default('my-agent'),
+  LIVEKIT_SIP_DOMAIN: z.string().optional(),
+  LIVEKIT_SIP_TRUNK_ID: z.string().optional(),
 
   // Telephony provider
   TELEPHONY_PROVIDER: z.enum(['exotel', 'plivo']).default('exotel'),
@@ -49,12 +58,10 @@ const envSchema = z.object({
   EXOTEL_CALLER_ID: z.string().optional(),
   EXOTEL_BASE_URL: z.string().default('https://api.in.exotel.com'),
 
-  // Plivo credentials
+  // Plivo credentials (for SIP/Zentrunk and phone numbers)
   PLIVO_AUTH_ID: z.string().optional(),
   PLIVO_AUTH_TOKEN: z.string().optional(),
   PLIVO_CALLER_ID: z.string().optional(),
-  PLIVO_BASE_URL: z.string().optional(),
-  PLIVO_STREAM_HOST: z.string().optional(),
 });
 
 function validateEnv() {
@@ -65,8 +72,19 @@ function validateEnv() {
     process.exit(1);
   }
 
-  return result.data;
+  const data = result.data;
+  const workerSecret =
+    data.WORKER_API_SECRET ||
+    data.LIVEKIT_WORKER_SECRET ||
+    process.env.WORKER_API_SECRET ||
+    process.env.LIVEKIT_WORKER_SECRET ||
+    'dev-livekit-worker-secret-v3';
+
+  data.WORKER_API_SECRET = workerSecret;
+  data.LIVEKIT_WORKER_SECRET = workerSecret;
+
+  return data as typeof data & { WORKER_API_SECRET: string; LIVEKIT_WORKER_SECRET: string };
 }
 
 export const env = validateEnv();
-export type Env = z.infer<typeof envSchema>;
+export type Env = ReturnType<typeof validateEnv>;

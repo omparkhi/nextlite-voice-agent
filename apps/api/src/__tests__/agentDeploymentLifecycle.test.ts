@@ -398,4 +398,86 @@ describe('Module 2 — Agent Version & Deployment Lifecycle', () => {
       agentService.publishAgent(agentId, 'wrong-tenant', userId)
     ).rejects.toThrow('Agent not found');
   });
+
+  it('8. repeated publish replaces active production deployment and maintains single active production invariant', async () => {
+    const existingAgent = { id: agentId, tenantId, status: 'LIVE' };
+    mockQuery.agents.findFirst.mockResolvedValue(existingAgent);
+
+    const version4 = {
+      id: 'version-4',
+      agentId,
+      versionNumber: 4,
+      configuration: validConfig,
+      status: 'DRAFT',
+    };
+    mockQuery.agentVersions.findFirst.mockResolvedValue(version4);
+
+    const activeProdV3 = {
+      id: 'deploy-prod-v3',
+      tenantId,
+      agentId,
+      versionId: 'version-3',
+      environment: 'PRODUCTION',
+      status: 'ACTIVE',
+    };
+    mockQuery.deployments.findFirst.mockResolvedValue(activeProdV3);
+
+    const activeProdV4 = {
+      id: 'deploy-prod-v4',
+      tenantId,
+      agentId,
+      versionId: 'version-4',
+      environment: 'PRODUCTION',
+      status: 'ACTIVE',
+    };
+    mockInsert.mockReturnValue({
+      returning: vi.fn().mockResolvedValue([activeProdV4]),
+    });
+    mockUpdate.mockReturnValue(Promise.resolve(undefined));
+
+    const result = await agentService.publishAgent(agentId, tenantId, userId);
+
+    expect(result.deployment.id).toBe('deploy-prod-v4');
+    expect(result.deployment.versionId).toBe('version-4');
+    expect(result.deployment.environment).toBe('PRODUCTION');
+    expect(result.deployment.status).toBe('ACTIVE');
+
+    // Deactivated deploy-prod-v3
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'INACTIVE' }),
+      expect.anything(),
+    );
+  });
+
+  it('9. getActiveDeployment strictly filters by agentId, tenantId, environment and ACTIVE status', async () => {
+    const activeTestDeployment = {
+      id: 'deploy-test-1',
+      tenantId,
+      agentId,
+      versionId: 'version-4',
+      environment: 'TEST',
+      status: 'ACTIVE',
+      version: { id: 'version-4', versionNumber: 4 },
+    };
+    mockQuery.deployments.findFirst.mockResolvedValue(activeTestDeployment);
+
+    const testDeploy = await agentService.getActiveDeployment(agentId, tenantId, 'TEST');
+    expect(testDeploy).toEqual(activeTestDeployment);
+
+    const activeProdDeployment = {
+      id: 'deploy-prod-1',
+      tenantId,
+      agentId,
+      versionId: 'version-3',
+      environment: 'PRODUCTION',
+      status: 'ACTIVE',
+      version: { id: 'version-3', versionNumber: 3 },
+    };
+    mockQuery.deployments.findFirst.mockResolvedValue(activeProdDeployment);
+
+    const prodDeploy = await agentService.getActiveDeployment(agentId, tenantId, 'PRODUCTION');
+    expect(prodDeploy).toEqual(activeProdDeployment);
+    expect(prodDeploy?.versionId).toBe('version-3');
+  });
 });

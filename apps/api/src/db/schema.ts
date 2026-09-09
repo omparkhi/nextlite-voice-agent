@@ -164,6 +164,11 @@ export const deployments = pgTable('deployments', {
     .where(sql`status = 'ACTIVE'`),
 ]);
 
+/**
+ * @deprecated Retained for backward compatibility.
+ * Not used by the V3 production runtime. Runtime tool configurations are derived
+ * authoritatively from agent_versions.configuration.tools.bindings.
+ */
 export const agentTools = pgTable('agent_tools', {
   id: uuid('id').defaultRandom().primaryKey(),
   agentId: uuid('agent_id').references(() => agents.id).notNull(),
@@ -229,6 +234,136 @@ export const configChangeProposals = pgTable('config_change_proposals', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// --- Module 1A: Generic Persistence Models ---
+
+export const callDirectionEnum = pgEnum('call_direction', [
+  'INBOUND',
+  'OUTBOUND',
+  'WEB_TEST',
+]);
+
+export const callStatusEnum = pgEnum('call_status', [
+  'ACTIVE',
+  'COMPLETED',
+  'FAILED',
+  'MISSED',
+]);
+
+export const leadStatusEnum = pgEnum('lead_status', [
+  'NEW',
+  'CONTACTED',
+  'QUALIFIED',
+  'CLOSED',
+]);
+
+export const appointmentStatusEnum = pgEnum('appointment_status', [
+  'REQUESTED',
+  'CONFIRMED',
+  'CANCELLED',
+]);
+
+export const callSessions = pgTable('call_sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  agentId: uuid('agent_id').references(() => agents.id).notNull(),
+  deploymentId: uuid('deployment_id').references(() => deployments.id).notNull(),
+  roomName: varchar('room_name', { length: 255 }).notNull(),
+  callerNumber: varchar('caller_number', { length: 50 }),
+  direction: callDirectionEnum('direction').default('INBOUND').notNull(),
+  status: callStatusEnum('status').default('COMPLETED').notNull(),
+  durationSeconds: integer('duration_seconds').default(0).notNull(),
+  primaryLanguage: varchar('primary_language', { length: 50 }).default('en-IN'),
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  endedAt: timestamp('ended_at'),
+  transcriptText: text('transcript_text'),
+  turnsJson: jsonb('turns_json'),
+  toolsUsed: jsonb('tools_used'),
+  metricsJson: jsonb('metrics_json'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => [
+  index('call_sessions_tenant_idx').on(table.tenantId),
+  index('call_sessions_agent_idx').on(table.agentId),
+  index('call_sessions_deployment_idx').on(table.deploymentId),
+  index('call_sessions_created_at_idx').on(table.createdAt),
+  index('call_sessions_caller_number_idx').on(table.callerNumber),
+  index('call_sessions_status_idx').on(table.status),
+]);
+
+export const leads = pgTable('leads', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  agentId: uuid('agent_id').references(() => agents.id).notNull(),
+  callSessionId: uuid('call_session_id').references(() => callSessions.id),
+  customerName: varchar('customer_name', { length: 255 }).notNull(),
+  customerPhone: varchar('customer_phone', { length: 50 }).notNull(),
+  customerEmail: varchar('customer_email', { length: 255 }),
+  interestCategory: varchar('interest_category', { length: 255 }),
+  status: leadStatusEnum('status').default('NEW').notNull(),
+  notes: text('notes'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('leads_tenant_idx').on(table.tenantId),
+  index('leads_agent_idx').on(table.agentId),
+  index('leads_call_session_idx').on(table.callSessionId),
+  index('leads_status_idx').on(table.status),
+  index('leads_created_at_idx').on(table.createdAt),
+  index('leads_customer_phone_idx').on(table.customerPhone),
+]);
+
+export const appointments = pgTable('appointments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  agentId: uuid('agent_id').references(() => agents.id).notNull(),
+  callSessionId: uuid('call_session_id').references(() => callSessions.id),
+  appointmentNumber: varchar('appointment_number', { length: 50 }),
+  customerName: varchar('customer_name', { length: 255 }).notNull(),
+  customerPhone: varchar('customer_phone', { length: 50 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  resourceName: varchar('resource_name', { length: 255 }),
+  bookingDate: varchar('booking_date', { length: 50 }).notNull(),
+  bookingTime: varchar('booking_time', { length: 50 }).notNull(),
+  status: appointmentStatusEnum('status').default('REQUESTED').notNull(),
+  notes: text('notes'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('appointments_tenant_idx').on(table.tenantId),
+  index('appointments_agent_idx').on(table.agentId),
+  index('appointments_call_session_idx').on(table.callSessionId),
+  index('appointments_booking_date_idx').on(table.bookingDate),
+  index('appointments_status_idx').on(table.status),
+  index('appointments_created_at_idx').on(table.createdAt),
+  index('appointments_appointment_number_idx').on(table.appointmentNumber),
+  uniqueIndex('appointments_tenant_appointment_number_idx').on(table.tenantId, table.appointmentNumber),
+]);
+
+export const tenantAppointmentCounters = pgTable('tenant_appointment_counters', {
+  tenantId: uuid('tenant_id').references(() => tenants.id).primaryKey(),
+  lastNumber: integer('last_number').default(0).notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const phoneNumbers = pgTable('phone_numbers', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  agentId: uuid('agent_id').references(() => agents.id),
+  deploymentId: uuid('deployment_id').references(() => deployments.id),
+  phoneNumber: varchar('phone_number', { length: 50 }).notNull().unique(),
+  provider: varchar('provider', { length: 50 }).default('plivo').notNull(),
+  status: varchar('status', { length: 50 }).default('ACTIVE').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('phone_numbers_tenant_idx').on(table.tenantId),
+  index('phone_numbers_agent_idx').on(table.agentId),
+  index('phone_numbers_deployment_idx').on(table.deploymentId),
+  index('phone_numbers_phone_idx').on(table.phoneNumber),
+  index('phone_numbers_status_idx').on(table.status),
+]);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 
@@ -259,7 +394,9 @@ export type NewAgentVersion = typeof agentVersions.$inferInsert;
 export type Deployment = typeof deployments.$inferSelect;
 export type NewDeployment = typeof deployments.$inferInsert;
 
+/** @deprecated Retained for backward compatibility. Not used in V3 runtime. */
 export type AgentTool = typeof agentTools.$inferSelect;
+/** @deprecated Retained for backward compatibility. Not used in V3 runtime. */
 export type NewAgentTool = typeof agentTools.$inferInsert;
 
 export type KnowledgeSource = typeof knowledgeSources.$inferSelect;
@@ -271,6 +408,18 @@ export type NewKnowledgeChunk = typeof knowledgeChunks.$inferInsert;
 export type ConfigChangeProposal = typeof configChangeProposals.$inferSelect;
 export type NewConfigChangeProposal = typeof configChangeProposals.$inferInsert;
 
+export type CallSession = typeof callSessions.$inferSelect;
+export type NewCallSession = typeof callSessions.$inferInsert;
+
+export type Lead = typeof leads.$inferSelect;
+export type NewLead = typeof leads.$inferInsert;
+
+export type Appointment = typeof appointments.$inferSelect;
+export type NewAppointment = typeof appointments.$inferInsert;
+
+export type PhoneNumber = typeof phoneNumbers.$inferSelect;
+export type NewPhoneNumber = typeof phoneNumbers.$inferInsert;
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -278,6 +427,10 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   auditLogs: many(auditLogs),
   agents: many(agents),
   deployments: many(deployments),
+  callSessions: many(callSessions),
+  leads: many(leads),
+  appointments: many(appointments),
+  phoneNumbers: many(phoneNumbers),
 }));
 
 export const usersRelations = relations(users, ({ one, many }) => ({
@@ -318,6 +471,10 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   knowledgeChunks: many(knowledgeChunks),
   configProposals: many(configChangeProposals),
   deployments: many(deployments),
+  callSessions: many(callSessions),
+  leads: many(leads),
+  appointments: many(appointments),
+  phoneNumbers: many(phoneNumbers),
 }));
 
 export const agentVersionsRelations = relations(agentVersions, ({ one, many }) => ({
@@ -332,7 +489,7 @@ export const agentVersionsRelations = relations(agentVersions, ({ one, many }) =
   deployments: many(deployments),
 }));
 
-export const deploymentsRelations = relations(deployments, ({ one }) => ({
+export const deploymentsRelations = relations(deployments, ({ one, many }) => ({
   tenant: one(tenants, {
     fields: [deployments.tenantId],
     references: [tenants.id],
@@ -349,9 +506,11 @@ export const deploymentsRelations = relations(deployments, ({ one }) => ({
     fields: [deployments.createdBy],
     references: [users.id],
   }),
+  callSessions: many(callSessions),
+  phoneNumbers: many(phoneNumbers),
 }));
 
-
+/** @deprecated Retained for backward compatibility. Not used in V3 runtime. */
 export const agentToolsRelations = relations(agentTools, ({ one }) => ({
   agent: one(agents, {
     fields: [agentTools.agentId],
@@ -416,5 +575,67 @@ export const configChangeProposalsRelations = relations(configChangeProposals, (
   reviewedByUser: one(users, {
     fields: [configChangeProposals.reviewedBy],
     references: [users.id],
+  }),
+}));
+
+export const callSessionsRelations = relations(callSessions, ({ one, many }) => ({
+  tenant: one(tenants, {
+    fields: [callSessions.tenantId],
+    references: [tenants.id],
+  }),
+  agent: one(agents, {
+    fields: [callSessions.agentId],
+    references: [agents.id],
+  }),
+  deployment: one(deployments, {
+    fields: [callSessions.deploymentId],
+    references: [deployments.id],
+  }),
+  leads: many(leads),
+  appointments: many(appointments),
+}));
+
+export const leadsRelations = relations(leads, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [leads.tenantId],
+    references: [tenants.id],
+  }),
+  agent: one(agents, {
+    fields: [leads.agentId],
+    references: [agents.id],
+  }),
+  callSession: one(callSessions, {
+    fields: [leads.callSessionId],
+    references: [callSessions.id],
+  }),
+}));
+
+export const appointmentsRelations = relations(appointments, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [appointments.tenantId],
+    references: [tenants.id],
+  }),
+  agent: one(agents, {
+    fields: [appointments.agentId],
+    references: [agents.id],
+  }),
+  callSession: one(callSessions, {
+    fields: [appointments.callSessionId],
+    references: [callSessions.id],
+  }),
+}));
+
+export const phoneNumbersRelations = relations(phoneNumbers, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [phoneNumbers.tenantId],
+    references: [tenants.id],
+  }),
+  agent: one(agents, {
+    fields: [phoneNumbers.agentId],
+    references: [agents.id],
+  }),
+  deployment: one(deployments, {
+    fields: [phoneNumbers.deploymentId],
+    references: [deployments.id],
   }),
 }));

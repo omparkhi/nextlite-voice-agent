@@ -5,7 +5,7 @@ import {
   buildFullInstructions,
   ConversationLanguageManager,
 } from './languageManager.ts';
-import { createKnowledgeTool } from './knowledgeTool.ts';
+import { toolRegistry, type ToolRuntimeContext } from './tools/index.ts';
 
 export const DEFAULT_SYSTEM_PROMPT = dedent`
     You are a friendly, reliable voice assistant that answers questions, explains topics, and completes tasks with available tools.
@@ -24,22 +24,26 @@ export const DEFAULT_SYSTEM_PROMPT = dedent`
     # Conversational flow
 
     - Help the user accomplish their objective efficiently and correctly. Prefer the simplest safe step first. Check understanding and adapt.
+    - Prioritize latest user intent: Always answer the caller's latest question directly first (e.g. today's date, operating hours, fees/pricing, location) before continuing any previous conversational step. Never repeat previous questions mechanically.
     - Provide guidance in small steps and confirm completion before continuing.
+    - Handle short utterances (e.g. "हाँ", "नहीं", "नहीं नहीं", "Okay") in context of the previous turn.
+    - When a caller refers to their number ("use this number", "यही नंबर है"), use incoming caller phone if present, otherwise politely ask for their number without claiming fake caller ID.
+    - Speak natural conversational language (e.g. Hinglish for Hindi, Minglish for Marathi), keeping standard business terms in English. Do not switch completely to English from isolated borrowed words.
     - Summarize key results when closing a topic.
 
     # Tools & Knowledge Base
 
-    - Use available tools when the user asks a question whose answer depends on business or clinic facts.
-    - When answering questions about business services, doctor schedules, operating hours, procedures, fees, or policies, use the query_knowledge_base tool to retrieve authoritative facts.
+    - Use available tools when the user asks a question whose answer depends on business facts or stored knowledge.
+    - When answering questions about business services, staff/resource schedules, operating hours, procedures, fees/pricing, or policies, use the query_knowledge_base tool to retrieve authoritative facts.
     - Retrieved knowledge is authoritative. Never invent or hallucinate unavailable business information.
     - If retrieved knowledge does not contain the required information or returns no results, politely state that the information is currently unavailable or offer a helpful fallback.
-    - Answer naturally, conversationally, and concisely in the user's spoken language after retrieving knowledge.
-    - When tools return structured data, summarize it clearly without reciting technical database identifiers.
+    - When tools return structured data, summarize it clearly without reciting technical database identifiers. When a tool returns a customer-facing reference or display number (e.g. A-001), communicate only that short reference to the caller. NEVER read aloud or pronounce long database UUIDs, technical hashes, or internal technical identifiers.
+    - When the user requests an appointment, booking, consultation, or site visit and provides or confirms details, execute the book_appointment tool. When the user requests a callback, execute create_callback_lead. State the request was recorded ONLY after the tool returns success. Never claim confirmed booking unless the tool status explicitly indicates CONFIRMED (default requests are recorded with status REQUESTED for team verification).
 
     # Guardrails
 
     - Stay within safe, lawful, and appropriate use; decline harmful or out-of-scope requests.
-    - For medical, legal, or financial topics, provide general information only and suggest consulting a qualified professional.
+    - For professional advice topics (e.g. medical, legal, or financial), provide general information only and suggest consulting a qualified professional.
     - Protect privacy and minimize sensitive data.
   `;
 
@@ -47,7 +51,7 @@ export const DEFAULT_SYSTEM_PROMPT = dedent`
 export function createAgent(
   runtimeConfig?: RuntimeAgentConfig,
   initialLanguageOrManager?: string | ConversationLanguageManager,
-  deploymentId?: string,
+  deploymentIdOrContext?: string | ToolRuntimeContext,
 ) {
   const baseInstructions = runtimeConfig?.prompt?.compiledSystemPrompt?.trim()
     ? runtimeConfig.prompt.compiledSystemPrompt
@@ -93,9 +97,11 @@ export function createAgent(
         llmModel.startsWith('xai/')))
   ) {
     // B. LiveKit Gateway: use inference.LLM preserving the configured model
-    const model = llmModel || (modelProvider === 'google' ? 'google/gemma-4-31b-it' : 'openai/gpt-4.1-mini');
+    const model = (llmModel || (modelProvider === 'google' ? 'google/gemma-4-31b-it' : 'openai/gpt-4.1-mini')) as ConstructorParameters<
+      typeof inference.LLM
+    >[0]['model'];
     const llmOptions: ConstructorParameters<typeof inference.LLM>[0] = {
-      model: model as any,
+      model,
     };
     if (typeof temperature === 'number') {
       llmOptions.modelOptions = {
@@ -107,20 +113,21 @@ export function createAgent(
     // C. Invalid/unsupported configuration: fail clearly with a useful configuration error
     throw new Error(
       `Unsupported LLM configuration in RuntimeAgentConfig: modelProvider='${modelProvider}', llmModel='${llmModel}'. ` +
-        `Supported providers are 'sarvam' (e.g. 'sarvam-105b-conversations') or LiveKit Gateway providers ('google', 'openai').`,
+      `Supported providers are 'sarvam' (e.g. 'sarvam-105b-conversations') or LiveKit Gateway providers ('google', 'openai').`,
     );
   }
 
-  // Authoritative Tools Configuration
-  const effectiveDeploymentId = deploymentId || runtimeConfig?.deployment?.deploymentId;
-  const tools = [];
+  // Authoritative Tools Configuration resolved via ToolRegistry
+  const runtimeContext: ToolRuntimeContext =
+    typeof deploymentIdOrContext === 'string'
+      ? { deploymentId: deploymentIdOrContext }
+      : deploymentIdOrContext || { deploymentId: runtimeConfig?.deployment?.deploymentId || '' };
 
-  if (runtimeConfig?.knowledge?.enabled && effectiveDeploymentId) {
-    tools.push(
-      createKnowledgeTool(effectiveDeploymentId, {
-        topK: runtimeConfig.knowledge.retrievalConfig?.topK,
-      }),
-    );
+  const tools = toolRegistry.resolveTools(runtimeConfig, runtimeContext);
+
+  if (tools.length > 0) {
+    const toolNames = tools.map((t) => t.name).join(', ');
+    console.log(`[Agent] Resolved ${tools.length} active tools for deployment=${runtimeContext.deploymentId || 'unknown'}: [${toolNames}]`);
   }
 
   return Agent.create({
@@ -150,13 +157,13 @@ export function resolveInterruptionOptions(
 
 /**
  * Resolves LiveKit PreemptiveGenerationOptions from RuntimeAgentConfig preemptiveGenerationEnabled.
- * Defaults to true if undefined.
+ * Defaults to false unless explicitly configured as true.
  */
 export function resolvePreemptiveGenerationOptions(
   preemptiveGenerationEnabled?: boolean,
 ): { enabled: boolean } {
   return {
-    enabled: preemptiveGenerationEnabled !== false,
+    enabled: preemptiveGenerationEnabled === true,
   };
 }
 

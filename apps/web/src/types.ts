@@ -136,6 +136,7 @@ export interface AgentConfiguration {
     location?: string;
     address?: string;
     hours?: string;
+    timezone?: string;
     contactInformation?: string;
     customFacts?: Record<string, any>;
   };
@@ -175,11 +176,19 @@ export interface AgentConfiguration {
     gender?: 'male' | 'female';
     speakingSpeed?: number;
     pitch?: number;
+    sttModel?: string;
+    ttsModel?: string;
   };
   runtimeSettings?: {
+    modelProvider?: string;
+    llmModel?: string;
     modelTemperature?: number;
     allowCallerInterruptions?: boolean;
+    interruptionMode?: 'adaptive' | 'always' | 'disabled' | string;
+    preemptiveGenerationEnabled?: boolean;
     eagernessToRespond?: 'low' | 'medium' | 'high' | string;
+    noiseCancellationModel?: string;
+    expressiveModeEnabled?: boolean;
     volumeThreshold?: number;
     backgroundSound?: 'none' | 'office' | 'clinic' | 'call_center' | string;
     nudges?: {
@@ -194,6 +203,8 @@ export interface AgentConfiguration {
     };
     maxCallLengthSeconds?: number;
   };
+  modelProvider?: string;
+  llmModel?: string;
   variables?: {
     input: InputVariable[];
     output: OutputVariable[];
@@ -341,4 +352,21 @@ export interface ConfigProposal {
 export interface ConfigAssistantResponse {
   versionId: string;
   versionNumber: number;
+}
+
+export interface ToolCatalogParameter {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+}
+
+export interface ToolCatalogItem {
+  toolId: string;
+  name: string;
+  displayName: string;
+  description: string;
+  category: string;
+  parameters: ToolCatalogParameter[];
+  confirmationSupported: boolean;
 }

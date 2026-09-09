@@ -6,8 +6,10 @@ import { tenants } from '../db/schema';
 import { authenticateToken, requireRole } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import { createChildLogger } from '../lib/logger';
-import { templateService } from '../services/template';
+import { templateService, KNOWN_PLATFORM_TOOL_IDS } from '../services/template';
 import { agentService } from '../services/agent';
+import { livekitService } from '../services/livekit';
+import { getPlatformToolCatalog } from '../services/toolCatalog';
 
 const logger = createChildLogger({ module: 'agent-routes' });
 const router = Router();
@@ -25,43 +27,227 @@ const updateAgentSchema = z.object({
   status: z.enum(['DRAFT', 'READY', 'LIVE', 'PAUSED', 'ARCHIVED']).optional(),
 });
 
-const saveConfigSchema = z.object({
-  configuration: z.object({
-    identity: z.object({ name: z.string(), greeting: z.string() }),
-    role: z.object({ description: z.string() }),
-    goal: z.object({ primaryObjective: z.string() }),
-    voice: z.object({ voiceId: z.string(), provider: z.string(), gender: z.enum(['male', 'female']).optional() }),
-    language: z.object({ primary: z.string(), supported: z.array(z.string()) }),
-    personality: z.object({ tone: z.string(), style: z.string(), formality: z.string() }),
-    businessInformation: z.object({
-      businessName: z.string(),
-      businessType: z.string(),
-      hours: z.string(),
-      location: z.string(),
-      description: z.string(),
-    }),
-    conversationRules: z.object({
-      maxTurns: z.number(),
-      greetingStyle: z.string(),
-      fallbackBehavior: z.string(),
-    }),
-    appointmentRules: z.object({
-      slotDuration: z.number(),
-      bufferTime: z.number(),
-      workingHours: z.string(),
-      bookingRules: z.string(),
-    }),
-    leadRules: z.object({
-      requiredFields: z.array(z.string()),
-      qualificationCriteria: z.string(),
-    }),
-    escalationRules: z.object({
-      triggerConditions: z.array(z.string()),
-      transferNumber: z.string(),
-      timeout: z.number(),
-    }),
-    systemInstructions: z.string(),
+export const inputVariableSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().optional().default(''),
+  description: z.string().optional(),
+  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'phone', 'email', 'enum']).optional().default('string'),
+  required: z.boolean().optional().default(false),
+  defaultValue: z.unknown().optional(),
+  source: z.enum(['STATIC', 'RUNTIME', 'CALLER', 'SYSTEM', 'INTEGRATION']).optional(),
+  scope: z.enum(['CALL', 'TENANT', 'GLOBAL']).optional(),
+  sensitive: z.boolean().optional(),
+});
+
+export const outputVariableSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().optional().default(''),
+  description: z.string().optional(),
+  type: z.enum(['string', 'number', 'boolean', 'date', 'datetime', 'phone', 'email', 'enum']).optional().default('string'),
+  required: z.boolean().optional().default(false),
+  extractionStrategy: z.enum(['TURN', 'CALL_END', 'TOOL_RESULT', 'SYSTEM']).optional().default('CALL_END'),
+  sensitive: z.boolean().optional(),
+});
+
+export const conversationPhaseSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  objective: z.string().optional().default(''),
+  instructions: z.array(z.string()).optional(),
+  requiredInformation: z.array(z.string()).optional(),
+  optionalInformation: z.array(z.string()).optional(),
+  questions: z.array(z.string()).optional(),
+  completionCriteria: z.array(z.string()).optional(),
+  transitionConditions: z.array(z.string()).optional(),
+  failureBehavior: z.string().optional(),
+  nextPhase: z.string().optional(),
+});
+
+export const agentConfigurationSchema = z.object({
+  identity: z.object({
+    displayName: z.string().optional(),
+    agentName: z.string().optional(),
+    name: z.string().optional(),
+    description: z.string().optional(),
+    greeting: z.string().min(1),
+    introduction: z.string().optional(),
+    businessName: z.string().optional(),
+    avatar: z.string().optional(),
   }),
+  persona: z.object({
+    role: z.string().optional().default(''),
+    personality: z.string().optional().default(''),
+    tone: z.string().optional().default(''),
+    style: z.string().optional().default(''),
+    formality: z.enum(['formal', 'informal', 'mixed']).or(z.string()).optional().default('mixed'),
+    aiIdentityBehavior: z.string().optional(),
+  }).optional(),
+  environment: z.object({
+    situation: z.string().optional(),
+    channel: z.enum(['voice', 'chat', 'omnichannel']).or(z.string()).optional(),
+    audience: z.string().optional(),
+    businessContext: z.string().optional(),
+    callerContext: z.string().optional(),
+  }).optional(),
+  objective: z.object({
+    primaryObjective: z.string().optional().default(''),
+    secondaryObjectives: z.array(z.string()).optional(),
+    successCriteria: z.array(z.string()).optional(),
+    failureConditions: z.array(z.string()).optional(),
+  }).optional(),
+  speakingStyle: z.object({
+    maxSentences: z.number().optional(),
+    maxWords: z.number().optional(),
+    oneQuestionAtATime: z.boolean().optional(),
+    conciseResponses: z.boolean().optional(),
+    fillerStyle: z.string().optional(),
+    acknowledgementStyle: z.string().optional(),
+    reaskStyle: z.string().optional(),
+    avoidMarkdown: z.boolean().optional(),
+    avoidSymbols: z.boolean().optional(),
+    codeSwitchingStyle: z.string().optional(),
+  }).optional(),
+  businessInformation: z.object({
+    businessName: z.string().optional().default(''),
+    businessType: z.string().optional(),
+    description: z.string().optional(),
+    location: z.string().optional(),
+    address: z.string().optional(),
+    hours: z.string().optional(),
+    timezone: z
+      .string()
+      .refine(
+        (tz) => {
+          if (!tz || tz.trim() === '') return true;
+          try {
+            Intl.DateTimeFormat(undefined, { timeZone: tz.trim() });
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        {
+          message: 'Invalid IANA timezone identifier',
+        },
+      )
+      .optional(),
+    contactInformation: z.string().optional(),
+    customFacts: z.record(z.string(), z.unknown()).optional(),
+  }).optional().default({ businessName: '' }),
+  conversation: z.object({
+    phases: z.array(conversationPhaseSchema).optional().default([]),
+  }).optional(),
+  businessRules: z.object({
+    appointmentRules: z.record(z.string(), z.unknown()).optional(),
+    leadRules: z.record(z.string(), z.unknown()).optional(),
+    pricingRules: z.record(z.string(), z.unknown()).optional(),
+    cancellationRules: z.record(z.string(), z.unknown()).optional(),
+    customRules: z.array(z.string()).optional(),
+  }).optional(),
+  guardrails: z.object({
+    prohibitedTopics: z.array(z.string()).optional(),
+    prohibitedClaims: z.array(z.string()).optional(),
+    hallucinationRules: z.array(z.string()).optional(),
+    escalationRules: z.array(z.string()).optional(),
+    emergencyRules: z.array(z.string()).optional(),
+    humanHandoffRules: z.array(z.string()).optional(),
+    competitorHandling: z.string().optional(),
+    abuseHandling: z.string().optional(),
+    fallbackBehavior: z.string().optional(),
+  }).optional(),
+  language: z.object({
+    primary: z.string().min(1),
+    supported: z.array(z.string()).optional().default([]),
+    startingLanguage: z.string().optional(),
+    autoDetect: z.boolean().optional(),
+    languageSwitchEnabled: z.boolean().optional(),
+    switchSensitivity: z.string().optional(),
+    outputNumbersInIndic: z.boolean().optional(),
+  }),
+  voice: z.object({
+    provider: z.string().min(1),
+    voiceId: z.string().min(1),
+    gender: z.enum(['male', 'female', 'neutral']).optional(),
+    speakingSpeed: z.number().optional(),
+    pitch: z.number().optional(),
+    sttModel: z.string().optional(),
+    ttsModel: z.string().optional(),
+  }),
+  runtimeSettings: z.object({
+    modelProvider: z.string().optional(),
+    llmModel: z.string().optional(),
+    modelTemperature: z.number().min(0).max(2).optional(),
+    allowCallerInterruptions: z.boolean().optional(),
+    interruptionMode: z.enum(['adaptive', 'always', 'disabled']).or(z.string()).optional(),
+    preemptiveGenerationEnabled: z.boolean().optional(),
+    eagernessToRespond: z.enum(['low', 'medium', 'high']).or(z.string()).optional(),
+    noiseCancellationModel: z.string().optional(),
+    expressiveModeEnabled: z.boolean().optional(),
+    volumeThreshold: z.number().optional(),
+    backgroundSound: z.enum(['none', 'office', 'clinic', 'call_center']).or(z.string()).optional(),
+    nudges: z.object({
+      enabled: z.boolean(),
+      delaySeconds: z.number(),
+      messages: z.array(z.string()),
+      maxUnansweredNudges: z.number(),
+    }).optional(),
+    voicemail: z.object({
+      detectionEnabled: z.boolean(),
+      message: z.string().optional(),
+    }).optional(),
+    maxCallLengthSeconds: z.number().optional(),
+  }).optional(),
+  variables: z.object({
+    input: z.array(inputVariableSchema).optional().default([]),
+    output: z.array(outputVariableSchema).optional().default([]),
+  }).optional(),
+  knowledge: z.object({
+    enabled: z.boolean().optional().default(false),
+    retrievalConfig: z.object({
+      topK: z.number().int().positive().optional().default(3),
+      similarityThreshold: z.number().min(0).max(1).optional(),
+    }).optional(),
+    attachedSourceIds: z.array(z.string()).optional(),
+  }).optional(),
+  tools: z.object({
+    enabled: z.boolean().optional().default(false),
+    bindings: z.array(
+      z.object({
+        toolId: z.string().refine((id) => (KNOWN_PLATFORM_TOOL_IDS as readonly string[]).includes(id), {
+          message: 'Unknown platform tool ID',
+        }),
+        name: z.string().min(1),
+        description: z.string(),
+        enabled: z.boolean(),
+        confirmationRequired: z.boolean().optional(),
+      }).passthrough(),
+    )
+    .refine((bindings) => {
+      const ids = bindings.map((b) => b.toolId);
+      return new Set(ids).size === ids.length;
+    }, {
+      message: 'Duplicate toolId detected in tool bindings',
+    })
+    .optional()
+    .default([]),
+  }).optional(),
+
+  // Backward compatibility legacy fields
+  modelProvider: z.string().optional(),
+  llmModel: z.string().optional(),
+  role: z.object({ description: z.string() }).optional(),
+  goal: z.object({ primaryObjective: z.string() }).optional(),
+  personality: z.object({ tone: z.string(), style: z.string(), formality: z.string() }).optional(),
+  conversationRules: z.object({ maxTurns: z.number(), greetingStyle: z.string(), fallbackBehavior: z.string() }).optional(),
+  appointmentRules: z.object({ slotDuration: z.number(), bufferTime: z.number(), workingHours: z.string(), bookingRules: z.string() }).optional(),
+  leadRules: z.object({ requiredFields: z.array(z.string()), qualificationCriteria: z.string() }).optional(),
+  escalationRules: z.object({ triggerConditions: z.array(z.string()), transferNumber: z.string(), timeout: z.number() }).optional(),
+  systemInstructions: z.string().optional(),
+});
+
+export const saveConfigSchema = z.object({
+  configuration: agentConfigurationSchema,
   notes: z.string().optional(),
 });
 
@@ -70,6 +256,17 @@ async function verifyClient(clientId: string): Promise<boolean> {
   const client = await db.query.tenants.findFirst({ where: eq(tenants.id, clientId) });
   return !!client;
 }
+
+// GET /api/admin/tools (Platform Tool Catalog)
+router.get('/tools', async (_req: Request, res: Response) => {
+  try {
+    const catalog = getPlatformToolCatalog();
+    res.json(catalog);
+  } catch (error) {
+    logger.error(error, 'Get platform tool catalog error');
+    res.status(500).json({ error: 'Failed to retrieve platform tool catalog' });
+  }
+});
 
 // GET /api/admin/templates
 router.get('/templates', async (_req: Request, res: Response) => {
@@ -247,7 +444,18 @@ router.get('/clients/:clientId/agents/:agentId/versions/:versionId', async (req:
   }
 });
 
-// GET /api/admin/clients/:clientId/agents/:agentId/runtime-config
+/**
+ * @deprecated Legacy V1/V2 compatibility endpoint.
+ *
+ * NOTE: The production V3 voice agent worker does NOT use this route.
+ * Authoritative V3 worker runtime configuration is resolved via the deployment-scoped
+ * endpoint: GET /api/internal/runtime-config/:deploymentId
+ *
+ * This route is retained strictly for backward compatibility and should not be used
+ * for production worker execution.
+ *
+ * GET /api/admin/clients/:clientId/agents/:agentId/runtime-config
+ */
 router.get('/clients/:clientId/agents/:agentId/runtime-config', async (req: Request, res: Response) => {
   try {
     const { clientId, agentId } = req.params;
@@ -349,4 +557,89 @@ router.post('/clients/:clientId/agents/:agentId/publish', async (req: Request, r
   }
 });
 
+// POST /api/admin/clients/:clientId/agents/:agentId/test-token
+router.post('/clients/:clientId/agents/:agentId/test-token', async (req: Request, res: Response) => {
+  try {
+    const { clientId, agentId } = req.params;
+    if (!(await verifyClient(clientId))) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+
+    const result = await livekitService.createTestToken(agentId, clientId, req.user!.userId);
+    res.json(result);
+  } catch (error: any) {
+    if (error?.message === 'Agent not found') {
+      res.status(404).json({ error: 'Agent not found' });
+      return;
+    }
+    if (error?.message === 'No active TEST deployment found for this agent') {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error?.message === 'LiveKit service is not configured' || error?.message === 'LiveKit credentials are not configured') {
+      res.status(503).json({ error: error.message });
+      return;
+    }
+    if (error?.message === 'Failed to dispatch LiveKit agent worker' || error?.message === 'Failed to create LiveKit test room') {
+      res.status(502).json({ error: error.message });
+      return;
+    }
+    logger.error(error, 'Generate test token error');
+    res.status(500).json({ error: 'Failed to generate test token' });
+  }
+});
+
+const phoneTestSchema = z.object({
+  phoneNumber: z.string().min(1).max(30),
+});
+
+// POST /api/admin/clients/:clientId/agents/:agentId/phone-test
+router.post('/clients/:clientId/agents/:agentId/phone-test', validate(phoneTestSchema), async (req: Request, res: Response) => {
+  try {
+    const { clientId, agentId } = req.params;
+    const { phoneNumber } = req.body;
+
+    if (!(await verifyClient(clientId))) {
+      res.status(404).json({ error: 'Client not found' });
+      return;
+    }
+
+    const result = await livekitService.createOutboundPhoneCall(agentId, clientId, phoneNumber);
+    res.json(result);
+  } catch (error: any) {
+    if (error?.message === 'Agent not found') {
+      res.status(404).json({ error: 'Agent not found' });
+      return;
+    }
+    if (error?.message?.startsWith('Invalid phone number')) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error?.message === 'No active TEST deployment found for this agent') {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (
+      error?.message === 'LiveKit service is not configured' ||
+      error?.message === 'LiveKit credentials are not configured' ||
+      error?.message === 'LiveKit SIP trunk is not configured'
+    ) {
+      res.status(503).json({ error: error.message });
+      return;
+    }
+    if (
+      error?.message === 'Failed to dispatch LiveKit agent worker' ||
+      error?.message === 'Failed to create LiveKit room for phone test' ||
+      error?.message === 'Failed to initiate SIP outbound call'
+    ) {
+      res.status(502).json({ error: error.message });
+      return;
+    }
+    logger.error(error, 'Initiate outbound phone test error');
+    res.status(500).json({ error: 'Failed to initiate phone test call' });
+  }
+});
+
 export default router;
+

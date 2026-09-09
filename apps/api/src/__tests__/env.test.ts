@@ -41,6 +41,30 @@ describe('Environment Configuration', () => {
     expect(env.JWT_SECRET).toBe(validEnv.JWT_SECRET);
   });
 
+  it('should parse LIVEKIT_SIP_DOMAIN and LIVEKIT_SIP_TRUNK_ID correctly when provided', async () => {
+    Object.assign(process.env, {
+      ...validEnv,
+      LIVEKIT_SIP_DOMAIN: 'nextlite-voice-agent-wrdt17l1.sip.livekit.cloud',
+      LIVEKIT_SIP_TRUNK_ID: 'ST_kDL4uhP8DqQG',
+    });
+
+    const { env } = await import('../config/env.js');
+
+    expect(env.LIVEKIT_SIP_DOMAIN).toBe('nextlite-voice-agent-wrdt17l1.sip.livekit.cloud');
+    expect(env.LIVEKIT_SIP_TRUNK_ID).toBe('ST_kDL4uhP8DqQG');
+  });
+
+  it('should allow LIVEKIT_SIP_DOMAIN and LIVEKIT_SIP_TRUNK_ID to be omitted without failing non-SIP validation', async () => {
+    Object.assign(process.env, validEnv);
+    delete process.env.LIVEKIT_SIP_DOMAIN;
+    delete process.env.LIVEKIT_SIP_TRUNK_ID;
+
+    const { env } = await import('../config/env.js');
+
+    expect(env.PORT).toBe(3001);
+    expect(env.DATABASE_URL).toBe(validEnv.DATABASE_URL);
+  });
+
   it.skip('should use default values when optional vars not provided', async () => {
     // Skipped: dotenv.config() loads actual .env file from filesystem
     Object.assign(process.env, validEnv);

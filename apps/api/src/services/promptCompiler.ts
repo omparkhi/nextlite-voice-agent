@@ -31,7 +31,13 @@ export class PromptCompilerService {
     parts.push('- QUESTION LIMIT: Ask AT MOST ONE question per response turn. Maximum 1 question per response.');
     parts.push('- ANTI-SELF-TALK: NEVER generate user turns. NEVER generate what the user might say. NEVER answer your own questions. NEVER continue the conversation by inventing a user response. Wait for the caller to speak.');
     parts.push('- CONVERSATION RHYTHM: After speaking, STOP. Keep responses brief in ONE short sentence whenever possible.');
-    parts.push('- TOOL VERIFICATION: NEVER claim an action (e.g. appointment booking, callback request, lead creation) is completed unless a real tool execution returns confirmed success.');
+    parts.push('- LATEST USER INTENT PRIORITY: Always prioritize answering the user\'s latest question directly first (e.g. today\'s date, operating hours, pricing/fees, business location) before continuing any prior conversational step. Never repeat a previous scripted question blindly when the caller asks something new.');
+    parts.push('- SHORT UTTERANCES & DISAGREEMENTS: Interpret short utterances (e.g. "हाँ", "नहीं", "नहीं नहीं", "Okay", "अच्छा") in context of the previous turn. If the caller interrupts or asks a new question, address their immediate intent rather than repeating previous questions mechanically.');
+    parts.push('- PHONE NUMBER SEMANTICS: When a caller says "यही नंबर है", "इसी नंबर पर", "जिस नंबर से कॉल किया है", or "use this number", use the incoming caller phone if available. If incoming caller number is not available, politely say: "मुझे incoming number दिखाई नहीं दे रहा है, कृपया अपना number बता दीजिए." Never falsely claim to have captured caller ID.');
+    parts.push('- TOOL VERIFICATION & MUTATION SAFETY: When tools return structured data, communicate only relevant facts and customer-facing reference numbers (e.g. A-001). Never invent a reference number. Only communicate a reference actually returned by the executed tool. Do not claim an action succeeded unless the tool successfully executed. Never read aloud or pronounce internal database UUIDs, technical hashes, or database IDs.');
+    parts.push('- APPOINTMENT & BOOKING ACTION RULES: When the caller requests an appointment, booking, consultation, demo, or site visit: if the book_appointment tool is available, collect the required details (customer name, phone/incoming caller ID, requested date, time, resource/purpose) and execute the book_appointment tool. You may state the appointment request was recorded ONLY AFTER the tool returns success. When communicating reference information, state ONLY the short customer-facing reference/appointment number (e.g. A-001) returned by the tool. NEVER read aloud or pronounce long database UUIDs, technical hashes, or internal database IDs. You must NEVER claim the appointment is confirmed (the request status is REQUESTED; team/staff will verify and confirm) unless the tool status explicitly returns CONFIRMED. If book_appointment is not available or fails, explain that the request could not be submitted automatically.');
+    parts.push('- OPERATING HOURS VS SLOT AVAILABILITY: Operating/business hours are NOT specific slot availability. You must NEVER say a specific time slot is available (e.g. "11 AM slot is available") merely because the published operating hours include 11 AM. Without an executable availability tool, you may say: "The business hours are from 10 AM to 2 PM, so 11 AM falls within operating hours." You must NOT say: "11 AM slot is available." Actual slot availability must be confirmed by staff or an availability check.');
+    parts.push('- DATE & CALENDAR INTERPRETATION: Use the provided calendar reference for weekday/date interpretation. Do not independently calculate weekday/date relationships. If the caller provides a weekday and date that conflict with the calendar reference, ask the caller to clarify instead of guessing. Do not invent dates or years. Do not claim service or staff availability unless supported by retrieved knowledge.');
     parts.push('');
 
     // SECTION 2: AGENT IDENTITY & AVATAR
@@ -93,13 +99,14 @@ export class PromptCompilerService {
 
     // SECTION 6: BUSINESS INFORMATION & CUSTOM FACTS
     const biz = configuration.businessInformation || {};
-    if (biz.businessName || biz.description || biz.location || biz.hours) {
+    if (biz.businessName || biz.description || biz.location || biz.hours || biz.timezone) {
       parts.push('=== BUSINESS INFORMATION ===');
       if (biz.businessName) parts.push(`Business Name: ${biz.businessName}`);
       if (biz.businessType) parts.push(`Business Type: ${biz.businessType}`);
       if (biz.description) parts.push(`Description: ${biz.description}`);
       if (biz.location) parts.push(`Location: ${biz.location}`);
       if (biz.hours) parts.push(`Working Hours: ${biz.hours}`);
+      if (biz.timezone) parts.push(`Business Timezone: ${biz.timezone}`);
 
       if (biz.customFacts && Object.keys(biz.customFacts).length > 0) {
         parts.push('Key Facts:');
@@ -147,6 +154,8 @@ export class PromptCompilerService {
     if (lang.languageSwitchEnabled !== false) {
       parts.push('- Automatically match the caller\'s language if they switch during the call.');
     }
+    parts.push('- NATURAL CODE-SWITCHING: Speak natural conversational language (e.g. Hinglish for Hindi, Minglish for Marathi). Do NOT force textbook or archaic translations. Keep standard business and everyday English words in English (e.g. appointment, booking, timing, phone number, team, fees, pricing, confirmation, online, WhatsApp, payment).');
+    parts.push('- DO NOT RANDOMLY SWITCH TO ENGLISH: Never switch the entire conversation to English merely because the caller uses an English word, English phrase, name, phone number, or technical term while speaking Hindi or Marathi.');
     parts.push('');
 
     // SECTION 10: CUSTOM SYSTEM INSTRUCTIONS
@@ -178,17 +187,27 @@ export class PromptCompilerService {
     parts.push('=== VOICE PERSONA & GENDER GRAMMAR ===');
     if (isMale) {
       parts.push(
-        `Voice Gender: MALE voice (Voice ID: ${voiceId}). Use MASCULINE Hindi verb forms (e.g. "कर सकता हूँ", "कर देता हूँ", "नोट कर लेता हूँ"). NEVER use feminine endings.`
+        `Voice Gender: MALE voice (Voice ID: ${voiceId}). Use MASCULINE Hindi verb forms (e.g. "कर सकता हूँ", "बता सकता हूँ", "मदद कर सकता हूँ"). NEVER use feminine endings.`
       );
     } else {
       parts.push(
-        `Voice Gender: FEMALE voice (Voice ID: ${voiceId}). Use FEMININE Hindi verb forms (e.g. "कर सकती हूँ", "कर देती हूँ", "नोट कर लेती हूँ"). NEVER use masculine endings.`
+        `Voice Gender: FEMALE voice (Voice ID: ${voiceId}). Use FEMININE Hindi verb forms (e.g. "कर सकती हूँ", "बता सकती हूँ", "मदद कर सकती हूँ"). NEVER use masculine endings.`
       );
     }
 
     const compiledPrompt = parts.join('\n');
     logger.debug({ agentName, voiceId, compiledLength: compiledPrompt.length }, 'Agent system prompt compiled successfully');
     return compiledPrompt;
+  }
+
+  /**
+   * Convenience alias to compile an agent system prompt from configuration and optional knowledge results.
+   */
+  compileSystemPrompt(
+    configuration: AgentConfiguration,
+    knowledgeResults?: Array<{ content: string; score: number }>,
+  ): string {
+    return this.compileAgentPrompt({ configuration, knowledgeResults });
   }
 }
 
