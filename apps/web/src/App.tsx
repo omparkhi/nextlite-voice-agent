@@ -15,6 +15,12 @@ import { AgentBuilder } from './pages/admin/AgentBuilder';
 import { AgentDetail } from './pages/admin/AgentDetail';
 import { ClientLayout } from './components/ClientLayout';
 import { ClientDashboard } from './pages/client/Dashboard';
+import { ClientCalls } from './pages/client/Calls';
+import { ClientLeads } from './pages/client/Leads';
+import { ClientAppointments } from './pages/client/Appointments';
+import { ClientFollowUps } from './pages/client/FollowUps';
+import { ClientAnalytics } from './pages/client/Analytics';
+import { ClientPhoneAgents } from './pages/client/PhoneAgents';
 import Home from './pages/Home';
 
 function App() {
@@ -46,16 +52,22 @@ function App() {
           <Route path="clients/:clientId/agents/:agentId" element={<AgentDetail />} />
         </Route>
         
-        {/* Client routes */}
+        {/* Client CRM routes */}
         <Route
           path="/dashboard"
           element={
-            <ProtectedRoute requiredRole="CLIENT_OWNER">
+            <ProtectedRoute requiredRole={['CLIENT_OWNER', 'CLIENT_VIEWER']}>
               <ClientLayout />
             </ProtectedRoute>
           }
         >
           <Route index element={<ClientDashboard />} />
+          <Route path="calls" element={<ClientCalls />} />
+          <Route path="leads" element={<ClientLeads />} />
+          <Route path="appointments" element={<ClientAppointments />} />
+          <Route path="follow-ups" element={<ClientFollowUps />} />
+          <Route path="analytics" element={<ClientAnalytics />} />
+          <Route path="phone-agents" element={<ClientPhoneAgents />} />
         </Route>
         
         {/* Catch all */}

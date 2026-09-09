@@ -54,5 +54,8 @@ export { CallSessionService, callSessionService } from './callSession';
 export { LeadService, leadService } from './lead';
 export { AppointmentService, appointmentService } from './appointment';
 export { PhoneNumberService, phoneNumberService } from './phoneNumber';
+export { WhatsAppService, whatsAppService } from './whatsapp';
+export { FollowUpService, followUpService } from './followUp';
+export { AnalyticsService, analyticsService } from './analytics';
 
 

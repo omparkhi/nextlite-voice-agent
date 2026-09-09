@@ -262,6 +262,13 @@ export const appointmentStatusEnum = pgEnum('appointment_status', [
   'CANCELLED',
 ]);
 
+export const followUpStatusEnum = pgEnum('follow_up_status', [
+  'PENDING',
+  'SENT',
+  'DELIVERED',
+  'FAILED',
+]);
+
 export const callSessions = pgTable('call_sessions', {
   id: uuid('id').defaultRandom().primaryKey(),
   tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
@@ -364,6 +371,34 @@ export const phoneNumbers = pgTable('phone_numbers', {
   index('phone_numbers_status_idx').on(table.status),
 ]);
 
+export const followUps = pgTable('follow_ups', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tenantId: uuid('tenant_id').references(() => tenants.id).notNull(),
+  leadId: uuid('lead_id').references(() => leads.id),
+  appointmentId: uuid('appointment_id').references(() => appointments.id),
+  callSessionId: uuid('call_session_id').references(() => callSessions.id),
+  customerName: varchar('customer_name', { length: 255 }),
+  customerPhone: varchar('customer_phone', { length: 50 }).notNull(),
+  channel: varchar('channel', { length: 50 }).default('WHATSAPP').notNull(),
+  provider: varchar('provider', { length: 50 }).default('DEMO').notNull(),
+  messageType: varchar('message_type', { length: 50 }).default('CUSTOM').notNull(),
+  messageText: text('message_text').notNull(),
+  status: followUpStatusEnum('status').default('SENT').notNull(),
+  providerMessageId: varchar('provider_message_id', { length: 255 }),
+  isDemo: boolean('is_demo').default(true).notNull(),
+  sentAt: timestamp('sent_at').defaultNow().notNull(),
+  deliveredAt: timestamp('delivered_at'),
+  failedAt: timestamp('failed_at'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => [
+  index('follow_ups_tenant_idx').on(table.tenantId),
+  index('follow_ups_customer_phone_idx').on(table.customerPhone),
+  index('follow_ups_created_at_idx').on(table.createdAt),
+  index('follow_ups_status_idx').on(table.status),
+]);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 
@@ -419,6 +454,9 @@ export type NewAppointment = typeof appointments.$inferInsert;
 
 export type PhoneNumber = typeof phoneNumbers.$inferSelect;
 export type NewPhoneNumber = typeof phoneNumbers.$inferInsert;
+
+export type FollowUp = typeof followUps.$inferSelect;
+export type NewFollowUp = typeof followUps.$inferInsert;
 
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
@@ -637,5 +675,24 @@ export const phoneNumbersRelations = relations(phoneNumbers, ({ one }) => ({
   deployment: one(deployments, {
     fields: [phoneNumbers.deploymentId],
     references: [deployments.id],
+  }),
+}));
+
+export const followUpsRelations = relations(followUps, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [followUps.tenantId],
+    references: [tenants.id],
+  }),
+  lead: one(leads, {
+    fields: [followUps.leadId],
+    references: [leads.id],
+  }),
+  appointment: one(appointments, {
+    fields: [followUps.appointmentId],
+    references: [appointments.id],
+  }),
+  callSession: one(callSessions, {
+    fields: [followUps.callSessionId],
+    references: [callSessions.id],
   }),
 }));

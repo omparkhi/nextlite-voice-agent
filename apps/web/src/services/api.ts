@@ -46,7 +46,24 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   return response.json();
 }
 
-import type { Agent, AgentTemplate, AgentVersion, AgentConfiguration, KnowledgeSource, TestConversationResponse, ConfigProposal, ConfigAssistantResponse, ToolCatalogItem } from '../types';
+import type {
+  Agent,
+  AgentTemplate,
+  AgentVersion,
+  AgentConfiguration,
+  KnowledgeSource,
+  TestConversationResponse,
+  ConfigProposal,
+  ConfigAssistantResponse,
+  ToolCatalogItem,
+  CallSession,
+  Lead,
+  Appointment,
+  PhoneNumberItem,
+  FollowUpItem,
+  AnalyticsOverviewData,
+  SendWhatsAppPayload,
+} from '../types';
 
 export const api = {
   // Admin - Platform Tools
@@ -117,6 +134,99 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  // Client - Calls
+  getClientCalls: (params?: { limit?: number; offset?: number; agentId?: string; status?: string }) => {
+    const stringParams: Record<string, string> = {};
+    if (params?.limit !== undefined) stringParams.limit = String(params.limit);
+    if (params?.offset !== undefined) stringParams.offset = String(params.offset);
+    if (params?.agentId) stringParams.agentId = params.agentId;
+    if (params?.status) stringParams.status = params.status;
+    return request<{ calls: CallSession[]; total: number; limit: number; offset: number }>('/api/client/calls', {
+      params: stringParams,
+    });
+  },
+
+  getClientCall: (id: string) =>
+    request<CallSession>(`/api/client/calls/${id}`),
+
+  // Client - Leads
+  getClientLeads: (params?: { limit?: number; offset?: number; agentId?: string; status?: string }) => {
+    const stringParams: Record<string, string> = {};
+    if (params?.limit !== undefined) stringParams.limit = String(params.limit);
+    if (params?.offset !== undefined) stringParams.offset = String(params.offset);
+    if (params?.agentId) stringParams.agentId = params.agentId;
+    if (params?.status) stringParams.status = params.status;
+    return request<{ leads: Lead[]; total: number; limit: number; offset: number }>('/api/client/leads', {
+      params: stringParams,
+    });
+  },
+
+  getClientLead: (id: string) =>
+    request<Lead>(`/api/client/leads/${id}`),
+
+  updateClientLead: (id: string, data: Partial<Lead>) =>
+    request<Lead>(`/api/client/leads/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  // Client - Appointments
+  getClientAppointments: (params?: { limit?: number; offset?: number; agentId?: string; status?: string; bookingDate?: string }) => {
+    const stringParams: Record<string, string> = {};
+    if (params?.limit !== undefined) stringParams.limit = String(params.limit);
+    if (params?.offset !== undefined) stringParams.offset = String(params.offset);
+    if (params?.agentId) stringParams.agentId = params.agentId;
+    if (params?.status) stringParams.status = params.status;
+    if (params?.bookingDate) stringParams.bookingDate = params.bookingDate;
+    return request<{ appointments: Appointment[]; total: number; limit: number; offset: number }>('/api/client/appointments', {
+      params: stringParams,
+    });
+  },
+
+  getClientAppointment: (id: string) =>
+    request<Appointment>(`/api/client/appointments/${id}`),
+
+  updateClientAppointment: (id: string, data: Partial<Appointment>) =>
+    request<Appointment>(`/api/client/appointments/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  // Client - Phone Numbers & Agents
+  getClientPhoneNumbers: () =>
+    request<{ phoneNumbers: PhoneNumberItem[] }>('/api/client/phone-numbers'),
+
+  getClientAgents: () =>
+    request<{ agents: any[] }>('/api/client/agents'),
+
+  // Client - Follow-ups & WhatsApp
+  getClientFollowUps: (params?: { limit?: number; offset?: number; status?: string; channel?: string }) => {
+    const stringParams: Record<string, string> = {};
+    if (params?.limit !== undefined) stringParams.limit = String(params.limit);
+    if (params?.offset !== undefined) stringParams.offset = String(params.offset);
+    if (params?.status) stringParams.status = params.status;
+    if (params?.channel) stringParams.channel = params.channel;
+    return request<{ followUps: FollowUpItem[]; total: number; limit: number; offset: number }>('/api/client/follow-ups', {
+      params: stringParams,
+    });
+  },
+
+  getClientFollowUp: (id: string) =>
+    request<FollowUpItem>(`/api/client/follow-ups/${id}`),
+
+  sendWhatsAppFollowUp: (payload: SendWhatsAppPayload) =>
+    request<{ success: boolean; followUpId: string; status: string; provider: string; providerMessageId?: string; isDemo: boolean; message: string }>(
+      '/api/client/follow-ups/send-whatsapp',
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
+
+  // Client - Analytics Overview
+  getAnalyticsOverview: () =>
+    request<AnalyticsOverviewData>('/api/client/analytics/overview'),
 
   // Admin - Templates
   getTemplates: () =>

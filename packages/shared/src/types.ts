@@ -39,6 +39,7 @@ export type CallDirection = 'INBOUND' | 'OUTBOUND' | 'WEB_TEST';
 export type CallStatus = 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'MISSED';
 export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CLOSED';
 export type AppointmentStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
+export type FollowUpStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED';
 
 export interface CallSession {
   id: string;
@@ -162,4 +163,128 @@ export interface CreatePhoneNumberRequest {
   phoneNumber: string;
   provider?: string;
   status?: string;
+}
+
+// Module 1B: Client CRM & Follow-up Messaging Contracts
+
+export interface FollowUp {
+  id: string;
+  tenantId: string;
+  leadId?: string | null;
+  appointmentId?: string | null;
+  callSessionId?: string | null;
+  customerName?: string | null;
+  customerPhone: string;
+  channel: 'WHATSAPP' | 'SMS' | 'EMAIL' | string;
+  provider: 'DEMO' | 'META' | 'TWILIO' | string;
+  messageType: 'APPOINTMENT_REQUEST' | 'APPOINTMENT_CONFIRMATION' | 'LEAD_CALLBACK' | 'CUSTOM' | string;
+  messageText: string;
+  status: FollowUpStatus;
+  providerMessageId?: string | null;
+  isDemo: boolean;
+  sentAt: string | Date;
+  deliveredAt?: string | Date | null;
+  failedAt?: string | Date | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  lead?: Partial<Lead> | null;
+  appointment?: Partial<Appointment> | null;
+  callSession?: Partial<CallSession> | null;
+}
+
+export interface CreateFollowUpRequest {
+  tenantId: string;
+  leadId?: string | null;
+  appointmentId?: string | null;
+  callSessionId?: string | null;
+  customerName?: string | null;
+  customerPhone: string;
+  channel?: string;
+  provider?: string;
+  messageType?: string;
+  messageText: string;
+  status?: FollowUpStatus;
+  providerMessageId?: string | null;
+  isDemo?: boolean;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface SendWhatsAppRequest {
+  leadId?: string;
+  appointmentId?: string;
+  callSessionId?: string;
+  customerName?: string;
+  customerPhone: string;
+  message: string;
+  messageType?: 'APPOINTMENT_REQUEST' | 'APPOINTMENT_CONFIRMATION' | 'LEAD_CALLBACK' | 'CUSTOM' | string;
+  provider?: 'DEMO' | 'META' | 'TWILIO';
+}
+
+export interface SendWhatsAppResponse {
+  success: boolean;
+  followUpId: string;
+  status: FollowUpStatus;
+  provider: string;
+  providerMessageId?: string;
+  isDemo: boolean;
+  message: string;
+}
+
+export interface AnalyticsOverview {
+  totalCalls: number;
+  connectedCalls: number;
+  totalDurationSeconds: number;
+  averageDurationSeconds: number;
+  totalLeads: number;
+  qualifiedLeads: number;
+  totalAppointments: number;
+  confirmedAppointments: number;
+  requestedAppointments: number;
+  pendingFollowUps: number;
+  sentFollowUps: number;
+  callTrend: Array<{
+    date: string;
+    total: number;
+    completed: number;
+    missed: number;
+    failed: number;
+  }>;
+  callOutcomes: {
+    completed: number;
+    missed: number;
+    failed: number;
+    active: number;
+  };
+  leadFunnel: {
+    new: number;
+    contacted: number;
+    qualified: number;
+    closed: number;
+  };
+  appointmentStatus: {
+    requested: number;
+    confirmed: number;
+    cancelled: number;
+  };
+  languages: Array<{
+    language: string;
+    count: number;
+    percentage: number;
+  }>;
+  directions: {
+    inbound: number;
+    outbound: number;
+    webTest: number;
+  };
+  toolUsage: Array<{
+    toolName: string;
+    count: number;
+  }>;
+  performance: {
+    avgTurnLatencyMs?: number;
+    avgSttLatencyMs?: number;
+    avgLlmLatencyMs?: number;
+    avgTtsLatencyMs?: number;
+  };
 }

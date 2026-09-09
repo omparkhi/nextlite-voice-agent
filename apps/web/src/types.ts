@@ -370,3 +370,211 @@ export interface ToolCatalogItem {
   parameters: ToolCatalogParameter[];
   confirmationSupported: boolean;
 }
+
+// --- Module 1B: Client CRM & Follow-up Types ---
+
+export type CallDirection = 'INBOUND' | 'OUTBOUND' | 'WEB_TEST';
+export type CallStatus = 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'MISSED';
+export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CLOSED';
+export type AppointmentStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
+export type FollowUpStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED';
+
+export interface CallSession {
+  id: string;
+  tenantId: string;
+  agentId: string;
+  deploymentId: string;
+  roomName: string;
+  callerNumber?: string | null;
+  direction: CallDirection;
+  status: CallStatus;
+  durationSeconds: number;
+  primaryLanguage?: string | null;
+  startedAt: string;
+  endedAt?: string | null;
+  transcriptText?: string | null;
+  turnsJson?: Array<{
+    speaker: 'AI' | 'Caller' | 'Agent' | string;
+    text: string;
+    timestamp?: number | string;
+    durationMs?: number;
+  }> | null;
+  toolsUsed?: Array<string | { toolName?: string; name?: string; parameters?: any; result?: any }> | null;
+  metricsJson?: {
+    turnLatencyMs?: number;
+    e2eLatencyMs?: number;
+    sttLatencyMs?: number;
+    llmLatencyMs?: number;
+    ttsLatencyMs?: number;
+    turnCount?: number;
+    userSpokenDurationMs?: number;
+    agentSpokenDurationMs?: number;
+  } | null;
+  createdAt: string;
+  agent?: { id: string; name: string; status?: string };
+  deployment?: { id: string; environment: string; status: string };
+  leads?: Lead[];
+  appointments?: Appointment[];
+}
+
+export interface Lead {
+  id: string;
+  tenantId: string;
+  agentId: string;
+  callSessionId?: string | null;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string | null;
+  interestCategory?: string | null;
+  status: LeadStatus;
+  notes?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  agent?: { id: string; name: string };
+  callSession?: {
+    id: string;
+    roomName: string;
+    callerNumber?: string | null;
+    direction: CallDirection;
+    status: CallStatus;
+    durationSeconds: number;
+  } | null;
+}
+
+export interface Appointment {
+  id: string;
+  tenantId: string;
+  agentId: string;
+  callSessionId?: string | null;
+  appointmentNumber?: string | null; // e.g. 'A-001'
+  customerName: string;
+  customerPhone: string;
+  title: string;
+  resourceName?: string | null;
+  bookingDate: string;
+  bookingTime: string;
+  status: AppointmentStatus;
+  notes?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  agent?: { id: string; name: string };
+  callSession?: {
+    id: string;
+    roomName: string;
+    callerNumber?: string | null;
+    direction: CallDirection;
+    status: CallStatus;
+    durationSeconds: number;
+  } | null;
+}
+
+export interface PhoneNumberItem {
+  id: string;
+  tenantId: string;
+  agentId?: string | null;
+  deploymentId?: string | null;
+  phoneNumber: string;
+  provider: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  agent?: { id: string; name: string };
+  deployment?: { id: string; environment: string; status: string };
+}
+
+export interface FollowUpItem {
+  id: string;
+  tenantId: string;
+  leadId?: string | null;
+  appointmentId?: string | null;
+  callSessionId?: string | null;
+  customerName?: string | null;
+  customerPhone: string;
+  channel: string;
+  provider: string;
+  messageType: string;
+  messageText: string;
+  status: FollowUpStatus;
+  providerMessageId?: string | null;
+  isDemo: boolean;
+  sentAt: string;
+  deliveredAt?: string | null;
+  failedAt?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+  lead?: Partial<Lead> | null;
+  appointment?: Partial<Appointment> | null;
+  callSession?: Partial<CallSession> | null;
+}
+
+export interface AnalyticsOverviewData {
+  totalCalls: number;
+  connectedCalls: number;
+  totalDurationSeconds: number;
+  averageDurationSeconds: number;
+  totalLeads: number;
+  qualifiedLeads: number;
+  totalAppointments: number;
+  confirmedAppointments: number;
+  requestedAppointments: number;
+  pendingFollowUps: number;
+  sentFollowUps: number;
+  callTrend: Array<{
+    date: string;
+    total: number;
+    completed: number;
+    missed: number;
+    failed: number;
+  }>;
+  callOutcomes: {
+    completed: number;
+    missed: number;
+    failed: number;
+    active: number;
+  };
+  leadFunnel: {
+    new: number;
+    contacted: number;
+    qualified: number;
+    closed: number;
+  };
+  appointmentStatus: {
+    requested: number;
+    confirmed: number;
+    cancelled: number;
+  };
+  languages: Array<{
+    language: string;
+    count: number;
+    percentage: number;
+  }>;
+  directions: {
+    inbound: number;
+    outbound: number;
+    webTest: number;
+  };
+  toolUsage: Array<{
+    toolName: string;
+    count: number;
+  }>;
+  performance: {
+    avgTurnLatencyMs?: number;
+    avgSttLatencyMs?: number;
+    avgLlmLatencyMs?: number;
+    avgTtsLatencyMs?: number;
+  };
+}
+
+export interface SendWhatsAppPayload {
+  leadId?: string;
+  appointmentId?: string;
+  callSessionId?: string;
+  customerName?: string;
+  customerPhone: string;
+  message: string;
+  messageType?: 'APPOINTMENT_REQUEST' | 'APPOINTMENT_CONFIRMATION' | 'LEAD_CALLBACK' | 'CUSTOM';
+  provider?: 'DEMO' | 'META' | 'TWILIO';
+}
