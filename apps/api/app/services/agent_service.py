@@ -133,9 +133,9 @@ class AgentService:
 
         default_config = tmpl_config or {
             "identity": {"agentName": name, "greeting": "Hello! How can I assist you today?"},
-            "persona": {"role": "Receptionist & Scheduling Assistant", "tone": "helpful and professional"},
-            "objective": {"primaryObjective": "Assist callers with inquiries and schedule appointments."},
-            "systemPrompt": "You are a professional voice receptionist. Keep responses concise and conversational.",
+            "persona": {"role": "AI Voice Assistant", "tone": "helpful and professional"},
+            "objective": {"primaryObjective": "Assist callers with inquiries and handle requests accurately and politely."},
+            "systemPrompt": "You are a professional AI voice assistant. Keep responses concise, direct, and conversational.",
             "voice": {"provider": "sarvam", "voiceId": "shubh", "gender": "male"},
             "language": {"primary": "hi-IN", "supported": ["en-IN", "hi-IN"]},
             "tools": {

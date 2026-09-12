@@ -356,7 +356,7 @@ class Appointment(Base):
     appointmentNumber: Mapped[Optional[str]] = mapped_column("appointment_number", String(50), nullable=True)
     customerName: Mapped[str] = mapped_column("customer_name", String(255), nullable=False)
     customerPhone: Mapped[str] = mapped_column("customer_phone", String(50), nullable=False)
-    title: Mapped[str] = mapped_column("title", String(255), nullable=False, default="Consultation")
+    title: Mapped[str] = mapped_column("title", String(255), nullable=False, default="Appointment")
     resourceName: Mapped[Optional[str]] = mapped_column("resource_name", String(255), nullable=True)
     bookingDate: Mapped[str] = mapped_column("booking_date", String(50), nullable=False)
     bookingTime: Mapped[str] = mapped_column("booking_time", String(50), nullable=False)

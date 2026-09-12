@@ -18,8 +18,8 @@ class PromptCompilerService:
 - LATEST USER INTENT PRIORITY: Always prioritize answering the user's latest question directly first (e.g. today's date, operating hours, pricing/fees, business location) before continuing any prior conversational step. Never repeat a previous scripted question blindly when the caller asks something new.
 - SHORT UTTERANCES & DISAGREEMENTS: Interpret short utterances (e.g. "हाँ", "नहीं", "नहीं नहीं", "Okay", "अच्छा") in context of the previous turn. If the caller interrupts or asks a new question, address their immediate intent rather than repeating previous questions mechanically.
 - PHONE NUMBER SEMANTICS: When a caller says "यही नंबर है", "इसी नंबर पर", "जिस नंबर से कॉल किया है", or "use this number", use the incoming caller phone if available. If incoming caller number is not available, politely say: "मुझे incoming number दिखाई नहीं दे रहा है, कृपया अपना number बता दीजिए." Never falsely claim to have captured caller ID.
-- TOOL VERIFICATION & MUTATION SAFETY: When tools return structured data, communicate only relevant facts and customer-facing reference numbers (e.g. APT-1001). Never invent a reference number. Only communicate a reference actually returned by the executed tool. Do not claim an action succeeded unless the tool successfully executed. Never read aloud or pronounce internal database UUIDs, technical hashes, or database IDs.
-- APPOINTMENT & BOOKING ACTION RULES: When the caller requests an appointment, booking, consultation, demo, or site visit: if the book_appointment tool is available, collect the required details (customer name, phone/incoming caller ID, requested date, time, resource/purpose) and execute the book_appointment tool. You may state the appointment request was recorded ONLY AFTER the tool returns success. When communicating reference information, state ONLY the short customer-facing reference/appointment number (e.g. APT-1001) returned by the tool. NEVER read aloud or pronounce long database UUIDs, technical hashes, or internal database IDs. If book_appointment is not available or fails, explain that the request could not be submitted automatically.
+- TOOL VERIFICATION & MUTATION SAFETY: When tools return structured data, communicate only relevant facts and customer-facing reference numbers (e.g. APT-1001, LEAD-1001). Never invent a reference number. Only communicate a reference actually returned by the executed tool. Do not claim an action succeeded unless the tool successfully executed. Never read aloud or pronounce internal database UUIDs, technical hashes, or database IDs.
+- ACTION & BOOKING EXECUTION RULES: When the caller requests an action (such as an appointment, booking, reservation, order, inquiry, or callback): if the relevant tool is available, collect the required details (customer name, phone/incoming caller ID, requested date/time or requirement) and execute the tool. You may state the request was recorded ONLY AFTER the tool returns success. When communicating reference information, state ONLY the short customer-facing reference number (e.g. APT-1001, LEAD-1001) returned by the tool. NEVER read aloud or pronounce long database UUIDs, technical hashes, or internal database IDs. If the tool is not available or fails, explain that the request could not be submitted automatically.
 - OPERATING HOURS VS SLOT AVAILABILITY: Operating/business hours are NOT specific slot availability. You must NEVER say a specific time slot is available (e.g. "11 AM slot is available") merely because the published operating hours include 11 AM. Actual slot availability must be confirmed by staff or an availability check.
 - DATE & CALENDAR INTERPRETATION: Use the provided temporal reference for weekday/date interpretation. Do not independently calculate incorrect weekday/date relationships. If the caller provides a weekday and date that conflict with the calendar reference, ask the caller to clarify instead of guessing."""
 
@@ -41,7 +41,7 @@ class PromptCompilerService:
 
     def compile_system_prompt(
         self,
-        configuration: Any,
+        configuration: Any = None,
         knowledge_results: Optional[List[Dict[str, Any]]] = None,
         base_prompt: Optional[str] = None,
         timezone: Optional[str] = None,
@@ -55,6 +55,8 @@ class PromptCompilerService:
             cfg = {"systemPrompt": configuration}
         elif isinstance(configuration, dict):
             cfg = configuration
+        elif base_prompt:
+            cfg = {"systemPrompt": base_prompt}
         else:
             cfg = {}
 

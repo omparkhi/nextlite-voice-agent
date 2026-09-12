@@ -62,7 +62,7 @@ class ToolExecutionService:
         if not customer_name:
             raise ValueError("customerName is required for booking an appointment")
 
-        service_type = arguments.get("serviceType") or arguments.get("service") or "General Consultation"
+        service_type = arguments.get("title") or arguments.get("serviceType") or arguments.get("service") or "General Appointment"
         apt_date = arguments.get("appointmentDate") or arguments.get("date") or "Tomorrow"
         apt_time = arguments.get("appointmentTime") or arguments.get("time") or "10:00 AM"
         phone = arguments.get("customerPhone") or caller_phone or "+910000000000"

@@ -24,7 +24,7 @@ CANONICAL_TOOL_DEFS = {
                 "title": {"type": "string", "description": "Reason for visit or appointment purpose"},
                 "bookingDate": {"type": "string", "description": "Date of appointment (YYYY-MM-DD or relative like tomorrow)"},
                 "bookingTime": {"type": "string", "description": "Time of appointment (e.g. 10:00 AM, 12:00 PM)"},
-                "resourceName": {"type": "string", "description": "Requested staff, doctor, or specialist"},
+                "resourceName": {"type": "string", "description": "Requested staff member, host, specialist, or service provider"},
                 "customerPhone": {"type": "string", "description": "Contact phone number"},
                 "notes": {"type": "string", "description": "Additional notes"}
             },
@@ -52,7 +52,7 @@ CANONICAL_TOOL_DEFS = {
     "query_knowledge_base": RuntimeToolDefinition(
         tool_id="query_knowledge_base",
         name="query_knowledge_base",
-        description="Query the business knowledge base to retrieve authoritative facts, pricing, policies, and clinic details.",
+        description="Query the business knowledge base to retrieve authoritative facts, pricing, policies, and business details.",
         parameters={
             "type": "object",
             "properties": {

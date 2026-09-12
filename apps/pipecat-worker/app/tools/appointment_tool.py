@@ -44,7 +44,7 @@ APPOINTMENT_TOOL_PROPERTIES: Dict[str, Any] = {
     },
     "resourceName": {
         "type": "string",
-        "description": "Requested staff or doctor",
+        "description": "Requested staff member, host, specialist, or service provider",
     },
     "customerPhone": {
         "type": "string",

@@ -17,9 +17,8 @@ def test_prompt_compiler_temporal_and_safety():
         primary_lang="hi-IN",
         supported_langs=["en-IN", "hi-IN", "mr-IN"]
     )
-    assert "# UNIVERSAL TELEPHONE RUNTIME RULES" in compiled
-    assert "ANTI-HALLUCINATION" in compiled
-    assert "UUID SUPPRESSION" in compiled
+    assert "NEXTLITE CORE RUNTIME SAFETY BOUNDARY" in compiled
+    assert "ANTI-SELF-TALK" in compiled
     assert "Current Timezone: Asia/Kolkata" in compiled
     assert "Primary Language: hi-IN" in compiled
     assert "You are a clinic receptionist." in compiled
@@ -42,4 +41,4 @@ def test_internal_config_invalid_secret_rejection(client):
         headers={"Authorization": "Bearer invalid-worker-secret"}
     )
     assert res.status_code == 401
-    assert "Invalid worker secret" in res.json()["detail"]
+    assert "Worker authentication required" in res.json()["detail"]

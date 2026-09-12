@@ -7,10 +7,11 @@ from .logging import logger
 
 Base = declarative_base()
 
+import sys
 from sqlalchemy.pool import NullPool
 
 # Async PostgreSQL Engine
-if settings.NODE_ENV in ["test", "testing"]:
+if settings.NODE_ENV in ["test", "testing"] or "pytest" in sys.modules:
     engine = create_async_engine(
         settings.get_normalized_database_url(),
         poolclass=NullPool,

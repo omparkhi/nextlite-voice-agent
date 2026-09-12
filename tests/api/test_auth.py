@@ -27,24 +27,22 @@ def test_jwt_token_generation_and_claims():
     assert payload["tenantId"] == t_id
     assert payload["role"] == "ADMIN"
 
-@pytest.mark.asyncio
-async def test_protected_route_unauthorized_rejection():
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        res = await ac.get("/api/auth/me")
-        assert res.status_code == 401
-        assert "Authentication required" in res.json()["detail"]
+from starlette.testclient import TestClient
 
-@pytest.mark.asyncio
-async def test_protected_route_with_valid_jwt():
+def test_protected_route_unauthorized_rejection():
+    client = TestClient(app)
+    res = client.get("/api/auth/me")
+    assert res.status_code == 401
+    assert "Authentication required" in res.json()["detail"]
+
+def test_protected_route_with_valid_jwt():
     u_id = str(uuid.uuid4())
     t_id = str(uuid.uuid4())
     pair = generate_token_pair(u_id, t_id, "CLIENT_OWNER")
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        res = await ac.get(
-            "/api/auth/me",
-            headers={"Authorization": f"Bearer {pair['accessToken']}"}
-        )
-        assert res.status_code in [200, 404]
+    client = TestClient(app)
+    res = client.get(
+        "/api/auth/me",
+        headers={"Authorization": f"Bearer {pair['accessToken']}"}
+    )
+    assert res.status_code in [200, 404]

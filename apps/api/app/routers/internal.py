@@ -181,7 +181,7 @@ async def create_internal_appointment(
     if not customer_name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="customerName is required")
 
-    service_type = payload.get("title") or payload.get("serviceType") or payload.get("service") or "General Consultation"
+    service_type = payload.get("title") or payload.get("serviceType") or payload.get("service") or "General Appointment"
     apt_date = payload.get("bookingDate") or payload.get("appointmentDate") or payload.get("date") or "Tomorrow"
     apt_time = payload.get("bookingTime") or payload.get("appointmentTime") or payload.get("time") or "10:00 AM"
     phone = payload.get("customerPhone") or payload.get("phone") or "+910000000000"

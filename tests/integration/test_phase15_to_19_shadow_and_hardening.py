@@ -3,6 +3,7 @@ import uuid
 import asyncio
 import time
 from httpx import AsyncClient, ASGITransport
+from starlette.testclient import TestClient
 from apps.api.app.main import app
 from apps.api.app.auth.tokens import generate_access_token
 from apps.api.app.domain.tools_safety import get_user_safe_display_id, normalize_tool_id
@@ -59,53 +60,52 @@ async def test_module16_pstn_acceptance_flow():
     assert 'bidirectional="true"' in xml_output
     assert mock_ws_url in xml_output
 
-@pytest.mark.asyncio
-async def test_module17_concurrency_and_tenant_isolation():
+def test_module17_concurrency_and_tenant_isolation():
     """Module 17: Concurrent appointments test and strict multi-tenant boundary checks."""
     admin_tenant = str(uuid.uuid4())
     admin_user = str(uuid.uuid4())
     admin_token = generate_access_token(user_id=admin_user, tenant_id=admin_tenant, role="ADMIN")
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # Create Tenant A
-        t_a_res = await ac.post("/api/admin/clients", json={
-            "name": "Owner A",
-            "email": f"owner_a_{uuid.uuid4().hex[:6]}@domain.com",
-            "businessName": f"Tenant A {uuid.uuid4().hex[:6]}"
-        }, headers=admin_headers)
-        assert t_a_res.status_code == 201
-        tenant_a_id = t_a_res.json()["id"]
+    client = TestClient(app)
 
-        # Create Tenant B
-        t_b_res = await ac.post("/api/admin/clients", json={
-            "name": "Owner B",
-            "email": f"owner_b_{uuid.uuid4().hex[:6]}@domain.com",
-            "businessName": f"Tenant B {uuid.uuid4().hex[:6]}"
-        }, headers=admin_headers)
-        assert t_b_res.status_code == 201
-        tenant_b_id = t_b_res.json()["id"]
+    # Create Tenant A
+    t_a_res = client.post("/api/admin/clients", json={
+        "name": "Owner A",
+        "email": f"owner_a_{uuid.uuid4().hex[:6]}@domain.com",
+        "businessName": f"Tenant A {uuid.uuid4().hex[:6]}"
+    }, headers=admin_headers)
+    assert t_a_res.status_code == 201
+    tenant_a_id = t_a_res.json()["id"]
 
-        token_a = generate_access_token(user_id=str(uuid.uuid4()), tenant_id=tenant_a_id, role="CLIENT_OWNER")
-        token_b = generate_access_token(user_id=str(uuid.uuid4()), tenant_id=tenant_b_id, role="CLIENT_OWNER")
+    # Create Tenant B
+    t_b_res = client.post("/api/admin/clients", json={
+        "name": "Owner B",
+        "email": f"owner_b_{uuid.uuid4().hex[:6]}@domain.com",
+        "businessName": f"Tenant B {uuid.uuid4().hex[:6]}"
+    }, headers=admin_headers)
+    assert t_b_res.status_code == 201
+    tenant_b_id = t_b_res.json()["id"]
 
-        headers_a = {"Authorization": f"Bearer {token_a}"}
-        headers_b = {"Authorization": f"Bearer {token_b}"}
+    token_a = generate_access_token(user_id=str(uuid.uuid4()), tenant_id=tenant_a_id, role="CLIENT_OWNER")
+    token_b = generate_access_token(user_id=str(uuid.uuid4()), tenant_id=tenant_b_id, role="CLIENT_OWNER")
 
-        # Tenant A creating WhatsApp message
-        wa_payload = {
-            "customerPhone": "+919876543210",
-            "message": "Hello from Tenant A",
-            "customerName": "Ramesh Kumar"
-        }
-        res_a = await ac.post("/api/client/follow-ups/send-whatsapp", json=wa_payload, headers=headers_a)
-        assert res_a.status_code == 200
-        followup_id_a = res_a.json()["followUpId"]
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+    headers_b = {"Authorization": f"Bearer {token_b}"}
 
-        # Tenant B accessing Tenant A's follow up record -> MUST BE 404 (strictly isolated)
-        res_cross = await ac.get(f"/api/client/follow-ups/{followup_id_a}", headers=headers_b)
-        assert res_cross.status_code == 404
+    # Tenant A creating WhatsApp message
+    wa_payload = {
+        "customerPhone": "+919876543210",
+        "message": "Hello from Tenant A",
+        "customerName": "Ramesh Kumar"
+    }
+    res_a = client.post("/api/client/follow-ups/send-whatsapp", json=wa_payload, headers=headers_a)
+    assert res_a.status_code == 200
+    followup_id_a = res_a.json()["followUpId"]
+
+    # Tenant B accessing Tenant A's follow up record -> MUST BE 404 (strictly isolated)
+    res_cross = client.get(f"/api/client/follow-ups/{followup_id_a}", headers=headers_b)
+    assert res_cross.status_code == 404
 
 @pytest.mark.asyncio
 async def test_module18_monotonic_timing_and_metrics():

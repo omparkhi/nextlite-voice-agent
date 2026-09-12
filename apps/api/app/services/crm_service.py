@@ -80,31 +80,34 @@ class CRMService:
         res = await self.session.execute(query)
         sessions = res.scalars().all()
 
+        mapped_sessions = [
+            {
+                "id": str(s.id),
+                "tenantId": str(s.tenantId),
+                "agentId": str(s.agentId) if s.agentId else None,
+                "deploymentId": str(s.deploymentId) if s.deploymentId else None,
+                "roomName": s.roomName,
+                "status": s.status.value if hasattr(s.status, "value") else str(s.status),
+                "direction": s.direction.value if hasattr(s.direction, "value") else str(s.direction),
+                "callerNumber": s.callerNumber,
+                "callerPhoneNumber": s.callerNumber,
+                "durationSeconds": s.durationSeconds or 0,
+                "primaryLanguage": s.primaryLanguage or "en-IN",
+                "transcriptText": s.transcriptText,
+                "transcript": s.turnsJson or [],
+                "turnsJson": s.turnsJson or [],
+                "toolsUsed": s.toolsUsed or [],
+                "metricsJson": s.metricsJson or {},
+                "startedAt": s.startedAt.isoformat() if s.startedAt else None,
+                "endedAt": s.endedAt.isoformat() if s.endedAt else None,
+                "createdAt": s.createdAt.isoformat() if s.createdAt else None,
+            }
+            for s in sessions
+        ]
+
         return {
-            "sessions": [
-                {
-                    "id": str(s.id),
-                    "tenantId": str(s.tenantId),
-                    "agentId": str(s.agentId) if s.agentId else None,
-                    "deploymentId": str(s.deploymentId) if s.deploymentId else None,
-                    "roomName": s.roomName,
-                    "status": s.status.value if hasattr(s.status, "value") else str(s.status),
-                    "direction": s.direction.value if hasattr(s.direction, "value") else str(s.direction),
-                    "callerNumber": s.callerNumber,
-                    "callerPhoneNumber": s.callerNumber,
-                    "durationSeconds": s.durationSeconds or 0,
-                    "primaryLanguage": s.primaryLanguage or "en-IN",
-                    "transcriptText": s.transcriptText,
-                    "transcript": s.turnsJson or [],
-                    "turnsJson": s.turnsJson or [],
-                    "toolsUsed": s.toolsUsed or [],
-                    "metricsJson": s.metricsJson or {},
-                    "startedAt": s.startedAt.isoformat() if s.startedAt else None,
-                    "endedAt": s.endedAt.isoformat() if s.endedAt else None,
-                    "createdAt": s.createdAt.isoformat() if s.createdAt else None,
-                }
-                for s in sessions
-            ],
+            "calls": mapped_sessions,
+            "sessions": mapped_sessions,
             "total": total,
             "limit": limit,
             "offset": offset
