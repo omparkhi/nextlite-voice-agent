@@ -109,6 +109,7 @@ try:
     from pipecat.turns.user_turn_strategies import ExternalUserTurnStrategies, UserTurnStrategies
     from pipecat.turns.user_start import ExternalUserTurnStartStrategy
     from pipecat.turns.user_stop import ExternalUserTurnStopStrategy
+    from pipecat.observers.user_bot_latency_observer import UserBotLatencyObserver
 except ImportError as e:
     FrameProcessor = object
     FrameDirection = None
@@ -1611,6 +1612,27 @@ async def websocket_plivo_endpoint(
         ])
         startup_tracker.record_stage("pipeline_created")
 
+        user_bot_latency_observer = UserBotLatencyObserver()
+
+        @user_bot_latency_observer.event_handler("on_latency_measured")
+        async def on_pipecat_latency_measured(latency: float):
+            latency_ms = round(latency * 1000)
+            logger.info(f"[PIPECAT_NATIVE_LATENCY] User-to-bot latency: {latency_ms}ms ({latency:.3f}s)")
+
+        @user_bot_latency_observer.event_handler("on_latency_breakdown")
+        async def on_pipecat_latency_breakdown(breakdown):
+            ttfb_info = [f"{b.processor}:{b.duration_secs*1000:.0f}ms" for b in breakdown.ttfb]
+            text_agg_str = f"{breakdown.text_aggregation.duration_secs*1000:.0f}ms" if breakdown.text_aggregation else "none"
+            logger.info(
+                f"[PIPECAT_NATIVE_BREAKDOWN] TTFB=[{', '.join(ttfb_info)}] | "
+                f"text_agg={text_agg_str} | user_turn={breakdown.user_turn_secs}s"
+            )
+
+        @user_bot_latency_observer.event_handler("on_first_bot_speech_latency")
+        async def on_pipecat_first_bot_speech_latency(latency: float):
+            latency_ms = round(latency * 1000)
+            logger.info(f"[PIPECAT_NATIVE_FIRST_SPEECH] First bot speech latency: {latency_ms}ms ({latency:.3f}s)")
+
         worker = PipelineWorker(
             pipeline,
             params=PipelineParams(
@@ -1618,6 +1640,7 @@ async def websocket_plivo_endpoint(
                 audio_out_sample_rate=8000,
                 enable_metrics=True,
             ),
+            observers=[user_bot_latency_observer],
         )
 
         # Queue initial greeting immediately on pipeline start directly to TTS
