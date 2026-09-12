@@ -173,6 +173,8 @@ class TurnTimingTracker:
         self.llm_request_start: Optional[float] = None  # HTTP request started
         self.llm_first_provider_response: Optional[float] = None  # First HTTP response headers/connection
         self.first_llm_output: Optional[float] = None  # First text token delta
+        self.llm_first_releasable_text: Optional[float] = None  # First complete clause/sentence
+        self.text_released_to_tts: Optional[float] = None  # Text released/dispatched to TTS
         self.tool_call_delta: Optional[float] = None  # First tool call delta
         self.tool_call_complete: Optional[float] = None  # Tool arguments JSON complete
         self.llm_response_complete: Optional[float] = None
@@ -245,6 +247,8 @@ class TurnTimingTracker:
         self.llm_request_start = None
         self.llm_first_provider_response = None
         self.first_llm_output = None
+        self.llm_first_releasable_text = None
+        self.text_released_to_tts = None
         self.tool_call_delta = None
         self.tool_call_complete = None
         self.llm_response_complete = None
@@ -447,6 +451,15 @@ class TurnTimingTracker:
 
         self.record_event("tool_executed", end_time, tool=tool_name, durationMs=duration_ms, success=success)
 
+    def record_text_released_to_tts(self, ts: Optional[float] = None):
+        """Records timestamp when first aggregated text clause/sentence is released to TTS."""
+        if self.text_released_to_tts is not None:
+            return
+        now = ts if ts is not None else time.perf_counter()
+        self.text_released_to_tts = now
+        self.llm_first_releasable_text = now
+        self.record_event("text_released_to_tts", now)
+
     def record_tts_start(self, ts: Optional[float] = None):
         now = ts if ts is not None else time.perf_counter()
         self.tts_start = now
@@ -636,11 +649,15 @@ class TurnTimingTracker:
         aggregation_to_first_audio_ms = diff_ms(self.first_tts_audio, self.user_aggregation_finalized, "aggregationToFirstAudioMs")
 
         # 14. llm_first_output_to_tts_start_ms / llmToTTSStartMs = tts_start - first_llm_output
-        llm_first_output_to_tts_start_ms = diff_ms(self.tts_start, self.first_llm_output, "llmFirstOutputToTtsStartMs")
+        first_output_ref = self.first_llm_output or self.first_post_tool_llm_output
+        llm_first_text_to_release_ms = diff_ms(self.text_released_to_tts, first_output_ref, "llmFirstTextToReleaseMs")
+        llm_first_output_to_tts_start_ms = diff_ms(self.tts_start, first_output_ref, "llmFirstOutputToTtsStartMs")
+        llm_first_text_to_tts_start_ms = llm_first_output_to_tts_start_ms
         llm_to_tts_start_ms = llm_first_output_to_tts_start_ms
 
         # 15. first_llm_output_to_first_audio_ms = first_tts_audio - first_llm_output
-        first_llm_output_to_first_audio_ms = diff_ms(self.first_tts_audio, self.first_llm_output, "firstLLMOutputToFirstAudioMs")
+        first_llm_output_to_first_audio_ms = diff_ms(self.first_tts_audio, first_output_ref, "firstLLMOutputToFirstAudioMs")
+        llm_first_text_to_first_audio_ms = first_llm_output_to_first_audio_ms
 
         # 16. total_turn_duration_ms / totalTurnMs = turn_complete - speech_start
         end_ref = self.turn_complete or self.tts_stop or self.first_tts_audio
@@ -670,9 +687,12 @@ class TurnTimingTracker:
             "llmRequestToFirstOutputMs": llm_request_to_first_output_ms,
             "llmToFirstToolDeltaMs": llm_to_first_tool_delta_ms,
             "firstToolDeltaToToolCompleteMs": first_tool_delta_to_tool_complete_ms,
+            "llmFirstTextToReleaseMs": llm_first_text_to_release_ms,
+            "llmFirstTextToTtsStartMs": llm_first_text_to_tts_start_ms,
             "llmFirstOutputToTtsStartMs": llm_first_output_to_tts_start_ms,
             "llmToTTSStartMs": llm_to_tts_start_ms,
             "firstLLMOutputToFirstAudioMs": first_llm_output_to_first_audio_ms,
+            "llmFirstTextToFirstAudioMs": llm_first_text_to_first_audio_ms,
             "toolDurationMs": tool_duration_ms,
             "toolExecutionMs": tool_duration_ms,
             "tools": tools_list if tools_list else None,

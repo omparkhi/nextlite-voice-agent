@@ -1374,12 +1374,18 @@ async def websocket_plivo_endpoint(
         )
         # Phase 21A & 22D: Early Release Phrase & Clause Aggregator (fast first chunk dispatch)
         tts_service._text_aggregator = EarlyReleaseTextAggregator(
-            min_first_chunk_words=2,
-            min_first_chunk_chars=10,
+            min_first_chunk_words=3,
+            min_first_chunk_chars=30,
             min_clause_words=3,
             min_clause_chars=15,
         )
         startup_tracker.record_stage("tts_service_created")
+
+        @tts_service.event_handler("on_tts_request")
+        async def on_tts_request(service, context_id: str, text: str):
+            now_mono = time.perf_counter()
+            turn_tracker.record_text_released_to_tts(now_mono)
+            logger.info(f"[TTS Release] Text released to TTS (context_id={context_id}, len={len(text)}): '{text[:40]}...'")
 
         @tts_service.event_handler("on_connected")
         async def on_tts_connected(service):

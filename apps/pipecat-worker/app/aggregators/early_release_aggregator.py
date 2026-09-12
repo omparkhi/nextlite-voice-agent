@@ -164,10 +164,7 @@ class EarlyReleaseTextAggregator(BaseTextAggregator):
 
                 # Must satisfy minimum meaningful phrase threshold to prevent 1-word fragments
                 if word_count >= required_words and char_count >= required_chars:
-                    # Require lookahead whitespace or character following the clause boundary
-                    # so we don't split mid-token
-                    if i + 1 < len(text):
-                        return i + 1
+                    return i + 1
 
         return None
 
@@ -204,32 +201,28 @@ class EarlyReleaseTextAggregator(BaseTextAggregator):
         for char in text:
             self._buffer += char
 
-            # If we were waiting for lookahead after sentence-ending punctuation
+            # If we were waiting for lookahead after sentence-ending period
             if self._needs_lookahead:
-                if char.strip():
-                    self._needs_lookahead = False
-                    boundary = self._find_sentence_boundary(self._buffer)
-                    if boundary:
-                        result = self._buffer[:boundary].strip(" ")
-                        self._buffer = self._buffer[boundary:]
-                        self._first_chunk_released = True
-                        yield Aggregation(text=result, type=AggregationType.SENTENCE)
-                        continue
-                else:
-                    # Still whitespace, keep accumulating
+                self._needs_lookahead = False
+                boundary = self._find_sentence_boundary(self._buffer)
+                if boundary:
+                    result = self._buffer[:boundary].strip(" ")
+                    self._buffer = self._buffer[boundary:]
+                    self._first_chunk_released = True
+                    yield Aggregation(text=result, type=AggregationType.SENTENCE)
                     continue
 
-            # Check 1: Terminal sentence boundary with lookahead
+            # Check 1: Terminal sentence boundary
             if self._buffer and self._buffer[-1] in SENTENCE_ENDING_PUNCTUATION:
-                # For unambiguous Devanagari danda, no lookahead required
-                if self._buffer[-1] in UNAMBIGUOUS_SENTENCE_ENDING_PUNCTUATION:
+                # Unambiguous punctuation: Devanagari danda, exclamation, question mark -> release immediately!
+                if self._buffer[-1] in UNAMBIGUOUS_SENTENCE_ENDING_PUNCTUATION or self._buffer[-1] in ("!", "?"):
                     result = self._buffer.strip(" ")
                     self._buffer = ""
                     self._first_chunk_released = True
                     yield Aggregation(text=result, type=AggregationType.SENTENCE)
                     continue
                 else:
-                    # Latin punctuation: mark need lookahead to disambiguate
+                    # Latin period (.): mark need lookahead to disambiguate from abbreviations/numbers
                     self._needs_lookahead = True
                     continue
 
