@@ -9,6 +9,7 @@ from .logging import logger
 from .db import engine, redis_client
 from .routers.auth import router as auth_router
 from .routers.agents import router as agents_router
+from .routers.internal import router as internal_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +31,7 @@ app = FastAPI(
 # Mount Routers
 app.include_router(auth_router)
 app.include_router(agents_router)
+app.include_router(internal_router)
 
 # Bypass ngrok browser interposer page for API and WebSocket calls
 @app.middleware("http")
