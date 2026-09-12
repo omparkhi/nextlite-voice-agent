@@ -84,3 +84,39 @@ async def finalize_call_session(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call session not found")
     await session.commit()
     return {"id": str(finalized.id), "status": finalized.status.value}
+
+@router.post("/tools/execute")
+async def execute_tool(
+    payload: Dict[str, Any],
+    authenticated: bool = Depends(require_worker),
+    session: AsyncSession = Depends(get_db)
+):
+    from ..services.tool_execution_service import ToolExecutionService
+
+    tool_name = payload.get("toolName") or payload.get("name")
+    if not tool_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="toolName is required")
+
+    tenant_id_str = payload.get("tenantId")
+    if not tenant_id_str:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="tenantId is required")
+
+    tenant_id = uuid.UUID(tenant_id_str)
+    agent_id = uuid.UUID(payload["agentId"]) if payload.get("agentId") else None
+    call_session_id = uuid.UUID(payload["callSessionId"]) if payload.get("callSessionId") else None
+    caller_phone = payload.get("callerPhoneNumber") or payload.get("customerPhone")
+    arguments = payload.get("arguments") or payload.get("parameters") or {}
+
+    service = ToolExecutionService(session)
+    try:
+        result = await service.execute_tool(
+            tool_name=tool_name,
+            arguments=arguments,
+            trusted_tenant_id=tenant_id,
+            trusted_agent_id=agent_id,
+            trusted_caller_phone=caller_phone,
+            call_session_id=call_session_id
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
