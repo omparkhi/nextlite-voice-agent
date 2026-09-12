@@ -84,12 +84,17 @@ def test_phase4_pipeline_assembly():
         LLMContextAggregatorPair,
     )
     from pipecat.services.sarvam.llm import SarvamLLMService, SarvamLLMSettings
-    from pipecat.services.sarvam.stt import SarvamSTTService
+    from pipecat.services.sarvam.stt import SarvamRealtimeSTTService
     from pipecat.services.sarvam.tts import SarvamTTSService
 
-    stt_service = SarvamSTTService(
+    stt_service = SarvamRealtimeSTTService(
         api_key="test_key",
-        settings=SarvamSTTService.Settings(model=settings.STT_MODEL),
+        sample_rate=8000,
+        settings=SarvamRealtimeSTTService.Settings(
+            model=settings.STT_MODEL,
+            stream_type="fast",
+        ),
+        endpointing="vad",
     )
     context = LLMContext(messages=[{"role": "system", "content": settings.TEST_PROMPT}])
     context_aggregator = LLMContextAggregatorPair(context)

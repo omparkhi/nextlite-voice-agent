@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     PIPECAT_AUDIO_DEBUG: bool = False
 
     # Phase 2 & 4 technical test defaults (temporary pipeline verification only)
-    STT_MODEL: str = "saaras:v3"
+    STT_MODEL: str = "saaras:v3-realtime"
     TTS_MODEL: str = "bulbul:v3"
     LLM_MODEL: str = "sarvam-105b-conversations"
     PHASE2_TEST_VOICE_ID: str = "shubh"  # Scoped to telephony test loopback

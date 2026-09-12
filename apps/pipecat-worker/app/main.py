@@ -64,6 +64,7 @@ try:
     from pipecat.frames.frames import (
         Frame,
         AudioRawFrame,
+        InterimTranscriptionFrame,
         TranscriptionFrame,
         TTSSpeakFrame,
         TTSAudioRawFrame,
@@ -100,7 +101,7 @@ try:
     from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
     from pipecat.serializers.plivo import PlivoFrameSerializer
     from pipecat.services.sarvam.llm import SarvamLLMService, SarvamLLMSettings
-    from pipecat.services.sarvam.stt import SarvamSTTService
+    from pipecat.services.sarvam.stt import SarvamRealtimeSTTService
     from pipecat.services.sarvam.tts import SarvamTTSService
     from pipecat.transports.websocket.fastapi import (
         FastAPIWebsocketParams,
@@ -454,6 +455,16 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
             if self._turn_tracker:
                 self._turn_tracker.record_speech_stop()
             logger.info(f"[Trace G - {frame.__class__.__name__}] Server-side speech stop proposal received")
+
+        elif isinstance(frame, InterimTranscriptionFrame):
+            text = frame.text.strip()
+            if text:
+                stt_partial_time = time.perf_counter()
+                if self._turn_tracker and getattr(self._turn_tracker, "stt_first_partial", None) is None:
+                    if hasattr(self._turn_tracker, "record_stt_first_partial"):
+                        self._turn_tracker.record_stt_first_partial(stt_partial_time, transcript=text)
+                self._timing_tracker["last_stt_partial_time"] = stt_partial_time
+                logger.debug(f"[Trace STT Partial] text='{text}'")
 
         elif isinstance(frame, TranscriptionFrame):
             text = frame.text.strip()
@@ -1237,7 +1248,13 @@ async def websocket_plivo_endpoint(
             await websocket.close(code=4003, reason="Empty voiceId in runtime config")
             return
 
-        stt_model = (runtime_config.voice.stt_model or settings.STT_MODEL).strip()
+        raw_stt_model = (runtime_config.voice.stt_model or settings.STT_MODEL).strip()
+        if raw_stt_model in ("saaras:v3", "saaras:v2", "saaras", "saaras:v4", "saaras:v3-realtime"):
+            stt_model = "saaras:v3-realtime"
+            if raw_stt_model != "saaras:v3-realtime":
+                logger.info(f"[STT Compatibility] Normalized STT model '{raw_stt_model}' to 'saaras:v3-realtime'")
+        else:
+            stt_model = raw_stt_model
         
         # TTS Model Compatibility Normalization
         raw_tts_model = (runtime_config.voice.tts_model or settings.TTS_MODEL).strip()
@@ -1419,15 +1436,21 @@ async def websocket_plivo_endpoint(
             logger.info(f"[Plivo Transport] WebSocket client disconnected event triggered for stream_id={stream_id}")
             await finalize_call_session("COMPLETED")
 
-        # 8. Instantiate Sarvam STT Service
+        # 8. Instantiate Sarvam Realtime STT Service
         startup_tracker.record_stage("stt_service_create_start")
         logger.info(
-            f"[SarvamSTT Config] Initializing SarvamSTTService | model={stt_model} | "
-            f"vad_signals=True | sample_rate=8000 | language={language_manager.current_language}"
+            f"[SarvamRealtimeSTT Config] Initializing SarvamRealtimeSTTService | model={stt_model} | "
+            f"stream_type=fast | sample_rate={stream_sample_rate} | language={language_manager.current_language}"
         )
-        stt_service = SarvamSTTService(
+        stt_service = SarvamRealtimeSTTService(
             api_key=settings.SARVAM_API_KEY,
-            settings=SarvamSTTService.Settings(model=stt_model, vad_signals=True),
+            sample_rate=stream_sample_rate,
+            settings=SarvamRealtimeSTTService.Settings(
+                model=stt_model,
+                language_code=language_manager.current_language or "en-IN",
+                stream_type="fast",
+            ),
+            endpointing="vad",
             ttfs_p99_latency=0.15,
         )
         startup_tracker.record_stage("stt_service_created")
@@ -1436,27 +1459,7 @@ async def websocket_plivo_endpoint(
         async def on_stt_connected(service):
             startup_tracker.record_stage("stt_ready")
             startup_tracker.record_stage("stt_connected")
-            logger.info(f"[SarvamSTT] WebSocket connected successfully (elapsed: {time.perf_counter() - conn_start_time:.3f}s)")
-
-        @stt_service.event_handler("on_speech_started")
-        async def on_speech_started(service):
-            speech_start = time.perf_counter()
-            turn_tracker.record_speech_start(speech_start)
-            timing_tracker["last_speech_start_time"] = speech_start
-            logger.info(f"[Trace B - Sarvam VAD START_SPEECH] User started speaking (elapsed: {speech_start - conn_start_time:.3f}s)")
-
-        @stt_service.event_handler("on_speech_stopped")
-        async def on_speech_stopped(service):
-            speech_stop = time.perf_counter()
-            turn_tracker.record_speech_stop(speech_stop)
-            timing_tracker["last_speech_stop_time"] = speech_stop
-            logger.info(f"[Trace F - Sarvam VAD END_SPEECH] User stopped speaking (elapsed: {speech_stop - conn_start_time:.3f}s)")
-
-        @stt_service.event_handler("on_utterance_end")
-        async def on_utterance_end(service):
-            utterance_end = time.perf_counter()
-            turn_tracker.record_utterance_end(utterance_end)
-            logger.info(f"[SarvamSTT] Utterance end received (elapsed: {utterance_end - conn_start_time:.3f}s)")
+            logger.info(f"[SarvamRealtimeSTT] WebSocket connected successfully (elapsed: {time.perf_counter() - conn_start_time:.3f}s)")
 
         # 9. Resolve Authoritative Runtime Tools & Instantiate Native Conversation Context
         startup_tracker.record_stage("tool_registry_start")

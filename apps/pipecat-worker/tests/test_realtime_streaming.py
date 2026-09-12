@@ -205,16 +205,15 @@ async def test_plivo_test_xml_does_not_contain_diagnostic_speak():
 
 
 def test_sarvam_stt_service_enables_vad_signals():
-    """Verify main.py configures SarvamSTTService with vad_signals=True.
+    """Verify main.py configures SarvamRealtimeSTTService with endpointing='vad'.
     
-    Without vad_signals=True, Sarvam's WebSocket API does not send VAD events,
-    proposing no turn-start or turn-stop frames. As a result, LLMUserAggregator
-    never finishes the user turn or pushes LLMContextFrame to Sarvam LLM.
+    With endpointing='vad', Sarvam's server-side VAD events propose turn-start
+    and turn-stop frames so user turn aggregation drives LLM response generation.
     """
     main_py = pathlib.Path(__file__).parent.parent / "app" / "main.py"
     source = main_py.read_text(encoding="utf-8")
 
-    assert "vad_signals=True" in source, (
-        "SarvamSTTService.Settings must be initialized with vad_signals=True "
+    assert 'endpointing="vad"' in source, (
+        "SarvamRealtimeSTTService must be initialized with endpointing='vad' "
         "so Sarvam's server-side VAD events drive user turn completion."
     )

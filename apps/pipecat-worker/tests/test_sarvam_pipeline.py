@@ -16,7 +16,7 @@ from pipecat.frames.frames import (
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.task import PipelineParams, PipelineWorker
 from pipecat.serializers.plivo import PlivoFrameSerializer
-from pipecat.services.sarvam.stt import SarvamSTTService
+from pipecat.services.sarvam.stt import SarvamRealtimeSTTService, SarvamSTTService
 from pipecat.services.sarvam.tts import SarvamTTSService
 
 
@@ -30,17 +30,27 @@ def test_pipecat_sarvam_imports():
     import pipecat
     import sarvamai
     assert pipecat.__version__ == "1.8.1"
+    assert hasattr(SarvamRealtimeSTTService, "run_stt")
     assert hasattr(SarvamSTTService, "run_stt")
     assert hasattr(SarvamTTSService, "run_tts")
 
 
-def test_sarvam_stt_instantiation():
-    """Verify SarvamSTTService instantiates cleanly with saaras:v3 model."""
-    stt = SarvamSTTService(
+def test_sarvam_realtime_stt_instantiation():
+    """Verify SarvamRealtimeSTTService instantiates cleanly with saaras:v3-realtime model and fast stream_type."""
+    stt = SarvamRealtimeSTTService(
         api_key="test-api-key",
-        settings=SarvamSTTService.Settings(model="saaras:v3"),
+        sample_rate=8000,
+        settings=SarvamRealtimeSTTService.Settings(
+            model="saaras:v3-realtime",
+            language_code="en-IN",
+            stream_type="fast",
+        ),
+        endpointing="vad",
     )
-    assert stt._settings.model == "saaras:v3"
+    assert stt._settings.model == "saaras:v3-realtime"
+    assert stt._settings.stream_type == "fast"
+    assert stt._endpointing == "vad"
+    assert stt._init_sample_rate == 8000
 
 
 def test_sarvam_tts_instantiation():
@@ -106,9 +116,15 @@ async def test_deterministic_echo_processor_ignores_empty_text():
 
 def test_pipeline_assembly():
     """Verify full Pipecat pipeline constructs and links processors without errors."""
-    stt = SarvamSTTService(
+    stt = SarvamRealtimeSTTService(
         api_key="test-api-key",
-        settings=SarvamSTTService.Settings(model="saaras:v3"),
+        sample_rate=8000,
+        settings=SarvamRealtimeSTTService.Settings(
+            model="saaras:v3-realtime",
+            language_code="en-IN",
+            stream_type="fast",
+        ),
+        endpointing="vad",
     )
     echo = DeterministicTestEchoProcessor()
     tts = SarvamTTSService(
@@ -135,5 +151,5 @@ def test_health_check_phase2(client):
     data = response.json()
     assert data["status"] == "ok"
     assert data["phase"].startswith("phase-")
-    assert data["stt_model"] == "saaras:v3"
+    assert data["stt_model"] == "saaras:v3-realtime"
     assert data["tts_model"] == "bulbul:v3"

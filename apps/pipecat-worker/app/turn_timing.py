@@ -164,6 +164,7 @@ class TurnTimingTracker:
         self.speech_stop: Optional[float] = None
         self.sarvam_vad_stop: Optional[float] = None
         self.stt_utterance_end: Optional[float] = None
+        self.stt_first_partial: Optional[float] = None
         self.stt_final: Optional[float] = None
         self.user_aggregation_finalized: Optional[float] = None
         self.llm_context_frame: Optional[float] = None
@@ -235,6 +236,7 @@ class TurnTimingTracker:
         self.speech_stop = None
         self.sarvam_vad_stop = None
         self.stt_utterance_end = None
+        self.stt_first_partial = None
         self.stt_final = None
         self.user_aggregation_finalized = None
         self.llm_context_frame = None
@@ -303,6 +305,13 @@ class TurnTimingTracker:
 
     def record_utterance_end(self, ts: Optional[float] = None):
         self.record_stt_utterance_end(ts)
+
+    def record_stt_first_partial(self, ts: Optional[float] = None, transcript: Optional[str] = None):
+        if self.stt_first_partial is not None:
+            return
+        now = ts if ts is not None else time.perf_counter()
+        self.stt_first_partial = now
+        self.record_event("stt_first_partial", now, transcript_len=len(transcript) if transcript else None)
 
     def record_stt_final(self, ts: Optional[float] = None, transcript: Optional[str] = None):
         now = ts if ts is not None else time.perf_counter()
@@ -537,6 +546,7 @@ class TurnTimingTracker:
         # 4. vad_stop_to_stt_final_ms / speechStopToFinalTranscriptMs = stt_final - speech_stop
         vad_stop_to_stt_final_ms = diff_ms(self.stt_final, self.speech_stop, "vadStopToSttFinalMs")
         speech_stop_to_final_transcript_ms = vad_stop_to_stt_final_ms
+        speech_start_to_first_partial_ms = diff_ms(self.stt_first_partial, self.speech_start, "speechStartToFirstPartialMs")
 
         # 5. stt_final_to_user_aggregation_ms / finalTranscriptToAggregationMs = user_aggregation_finalized - stt_final
         stt_final_to_aggregation_ms = diff_ms(self.user_aggregation_finalized, self.stt_final, "sttFinalToAggregationMs")
@@ -646,6 +656,7 @@ class TurnTimingTracker:
             "utteranceEndToSttFinalMs": utterance_end_to_stt_final_ms,
             "vadStopToSttFinalMs": vad_stop_to_stt_final_ms,
             "speechStopToFinalTranscriptMs": speech_stop_to_final_transcript_ms,
+            "speechStartToFirstPartialMs": speech_start_to_first_partial_ms,
             "sttFinalToAggregationMs": stt_final_to_aggregation_ms,
             "finalTranscriptToAggregationMs": final_transcript_to_aggregation_ms,
             "aggregationToLlmStartMs": aggregation_to_llm_start_canonical,
