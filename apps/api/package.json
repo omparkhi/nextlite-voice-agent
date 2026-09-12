@@ -29,14 +29,14 @@
     "helmet": "^7.1.0",
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
+    "livekit-server-sdk": "^2.10.0",
     "multer": "^2.3.0",
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
     "postgres": "^3.4.4",
     "resend": "^2.0.0",
     "uuid": "^9.0.0",
-    "zod": "^3.22.4",
-    "livekit-server-sdk": "^2.10.0"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
@@ -46,11 +46,13 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/multer": "^2.2.0",
     "@types/node": "^20.10.0",
+    "@types/supertest": "^7.2.1",
     "@types/uuid": "^9.0.7",
     "@typescript-eslint/eslint-plugin": "^6.13.2",
     "@typescript-eslint/parser": "^6.13.2",
     "drizzle-kit": "^0.30.0",
     "eslint": "^8.55.0",
+    "supertest": "^7.2.2",
     "tsx": "^4.7.0",
     "typescript": "^5.3.2",
     "vitest": "^1.1.0"

@@ -21,6 +21,7 @@ import { ClientAppointments } from './pages/client/Appointments';
 import { ClientFollowUps } from './pages/client/FollowUps';
 import { ClientAnalytics } from './pages/client/Analytics';
 import { ClientPhoneAgents } from './pages/client/PhoneAgents';
+import { ReceptionistDashboard } from './pages/receptionist/ReceptionistDashboard';
 import Home from './pages/Home';
 
 function App() {
@@ -29,6 +30,8 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Home />} />
+        <Route path="/receptionist" element={<ReceptionistDashboard />} />
+        <Route path="/receptionist/schedule" element={<ReceptionistDashboard />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

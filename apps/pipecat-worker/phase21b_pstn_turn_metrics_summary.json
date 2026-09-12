@@ -1,0 +1,3109 @@
+{
+  "summary": [
+    {
+      "call_index": 1,
+      "stream_id": "pstn-p21b-1-7ad135d6",
+      "turn_index": 1,
+      "response_latency_ms": 4277,
+      "llm_http_ms": 2411,
+      "llm_ttft_ms": 2421,
+      "early_release_delay_ms": 459,
+      "tts_ttfb_ms": 962,
+      "interrupted": false,
+      "events": [
+        "user_speech_stop",
+        "stt_utterance_end",
+        "user_aggregated",
+        "llm_request_created",
+        "llm_http_request_started",
+        "llm_first_provider_response",
+        "llm_first_text_output",
+        "tts_started",
+        "llm_response_complete",
+        "tts_first_audio",
+        "tts_stopped",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 1,
+      "stream_id": "pstn-p21b-1-7ad135d6",
+      "turn_index": 2,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 1,
+      "stream_id": "pstn-p21b-1-7ad135d6",
+      "turn_index": 3,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 2,
+      "stream_id": "pstn-p21b-2-85ed8c07",
+      "turn_index": 1,
+      "response_latency_ms": null,
+      "llm_http_ms": 591,
+      "llm_ttft_ms": 593,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "user_speech_stop",
+        "stt_utterance_end",
+        "user_aggregated",
+        "llm_request_created",
+        "llm_http_request_started",
+        "llm_first_provider_response",
+        "llm_first_text_output",
+        "first_tool_call_delta",
+        "tool_call_complete",
+        "llm_response_complete",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 2,
+      "stream_id": "pstn-p21b-2-85ed8c07",
+      "turn_index": 2,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": 731,
+      "early_release_delay_ms": 563,
+      "tts_ttfb_ms": 1093,
+      "interrupted": false,
+      "events": [
+        "tool_executed",
+        "post_tool_llm_context",
+        "post_tool_llm_request_created",
+        "post_tool_llm_http_request_started",
+        "post_tool_llm_first_provider_response",
+        "post_tool_llm_first_output",
+        "llm_first_text_output",
+        "tts_started",
+        "post_tool_llm_response_complete",
+        "tts_first_audio",
+        "tts_stopped",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 2,
+      "stream_id": "pstn-p21b-2-85ed8c07",
+      "turn_index": 3,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 2,
+      "stream_id": "pstn-p21b-2-85ed8c07",
+      "turn_index": 4,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 3,
+      "stream_id": "pstn-p21b-3-2cf57fcb",
+      "turn_index": 1,
+      "response_latency_ms": 2920,
+      "llm_http_ms": 781,
+      "llm_ttft_ms": 785,
+      "early_release_delay_ms": 382,
+      "tts_ttfb_ms": 1341,
+      "interrupted": false,
+      "events": [
+        "user_speech_stop",
+        "stt_utterance_end",
+        "user_aggregated",
+        "llm_request_created",
+        "llm_http_request_started",
+        "llm_first_provider_response",
+        "llm_first_text_output",
+        "tts_started",
+        "llm_response_complete",
+        "tts_first_audio",
+        "tts_stopped",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 3,
+      "stream_id": "pstn-p21b-3-2cf57fcb",
+      "turn_index": 2,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 3,
+      "stream_id": "pstn-p21b-3-2cf57fcb",
+      "turn_index": 3,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 4,
+      "stream_id": "pstn-p21b-4-0b6e1363",
+      "turn_index": 1,
+      "response_latency_ms": null,
+      "llm_http_ms": 641,
+      "llm_ttft_ms": 644,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "user_speech_stop",
+        "stt_utterance_end",
+        "user_aggregated",
+        "llm_request_created",
+        "llm_http_request_started",
+        "llm_first_provider_response",
+        "llm_first_text_output",
+        "first_tool_call_delta",
+        "tool_call_complete",
+        "llm_response_complete",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 4,
+      "stream_id": "pstn-p21b-4-0b6e1363",
+      "turn_index": 2,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": 669,
+      "early_release_delay_ms": 484,
+      "tts_ttfb_ms": 728,
+      "interrupted": false,
+      "events": [
+        "tool_executed",
+        "post_tool_llm_context",
+        "post_tool_llm_request_created",
+        "post_tool_llm_http_request_started",
+        "post_tool_llm_first_provider_response",
+        "post_tool_llm_first_output",
+        "llm_first_text_output",
+        "tts_started",
+        "tts_first_audio",
+        "post_tool_llm_response_complete",
+        "tts_stopped",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 4,
+      "stream_id": "pstn-p21b-4-0b6e1363",
+      "turn_index": 3,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 4,
+      "stream_id": "pstn-p21b-4-0b6e1363",
+      "turn_index": 4,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 5,
+      "stream_id": "pstn-p21b-5-72989937",
+      "turn_index": 1,
+      "response_latency_ms": null,
+      "llm_http_ms": 605,
+      "llm_ttft_ms": 608,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "user_speech_stop",
+        "stt_utterance_end",
+        "user_aggregated",
+        "llm_request_created",
+        "llm_http_request_started",
+        "llm_first_provider_response",
+        "llm_first_text_output",
+        "first_tool_call_delta",
+        "tool_call_complete",
+        "llm_response_complete",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 5,
+      "stream_id": "pstn-p21b-5-72989937",
+      "turn_index": 2,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": 588,
+      "early_release_delay_ms": 438,
+      "tts_ttfb_ms": 1706,
+      "interrupted": true,
+      "events": [
+        "tool_executed",
+        "post_tool_llm_context",
+        "post_tool_llm_request_created",
+        "post_tool_llm_http_request_started",
+        "post_tool_llm_first_provider_response",
+        "post_tool_llm_first_output",
+        "llm_first_text_output",
+        "tts_started",
+        "post_tool_llm_response_complete",
+        "tts_first_audio",
+        "tts_connected",
+        "interrupted",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 5,
+      "stream_id": "pstn-p21b-5-72989937",
+      "turn_index": 3,
+      "response_latency_ms": 2202,
+      "llm_http_ms": 643,
+      "llm_ttft_ms": 645,
+      "early_release_delay_ms": 459,
+      "tts_ttfb_ms": 701,
+      "interrupted": false,
+      "events": [
+        "user_speech_stop",
+        "stt_utterance_end",
+        "user_aggregated",
+        "llm_request_created",
+        "llm_http_request_started",
+        "llm_first_provider_response",
+        "llm_first_text_output",
+        "tts_started",
+        "tts_first_audio",
+        "llm_response_complete",
+        "tts_stopped",
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 5,
+      "stream_id": "pstn-p21b-5-72989937",
+      "turn_index": 4,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    },
+    {
+      "call_index": 5,
+      "stream_id": "pstn-p21b-5-72989937",
+      "turn_index": 5,
+      "response_latency_ms": null,
+      "llm_http_ms": null,
+      "llm_ttft_ms": null,
+      "early_release_delay_ms": null,
+      "tts_ttfb_ms": null,
+      "interrupted": false,
+      "events": [
+        "turn_completed"
+      ]
+    }
+  ],
+  "stream_data": {
+    "pstn-p21b-1-7ad135d6": {
+      "events": [],
+      "turn_metrics": [
+        {
+          "turnId": "turn-d36e7821",
+          "turnIndex": 1,
+          "responseLatencyMs": 4277,
+          "speechDurationMs": 11757,
+          "vadStopToUtteranceEndMs": 161,
+          "aggregationToLlmStartMs": 4,
+          "aggregationToLLMStartMs": 4,
+          "aggregationToLLMRequestMs": 4,
+          "llmHttpRequestMs": 2411,
+          "llmProviderToFirstOutputMs": 10,
+          "llmToFirstOutputMs": 2421,
+          "llmStartToFirstOutputMs": 2421,
+          "llmRequestToFirstOutputMs": 2421,
+          "llmFirstOutputToTtsStartMs": 459,
+          "llmToTTSStartMs": 459,
+          "firstLLMOutputToFirstAudioMs": 1421,
+          "ttsStartToFirstAudioMs": 962,
+          "userStopToFirstAudioMs": 4277,
+          "speechStopToFirstAudioMs": 4277,
+          "aggregationToFirstAudioMs": 3846,
+          "totalTurnDurationMs": 17474,
+          "totalTurnMs": 17474,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-d36e7821",
+              "event": "user_speech_stop",
+              "timestamp": "2026-09-11T19:44:10.114988+00:00",
+              "monotonicTimestamp": 17521.808161,
+              "elapsedFromCallStartMs": 13966
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "stt_utterance_end",
+              "timestamp": "2026-09-11T19:44:10.276546+00:00",
+              "monotonicTimestamp": 17521.96966,
+              "elapsedFromCallStartMs": 14127
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "user_aggregated",
+              "timestamp": "2026-09-11T19:44:10.546515+00:00",
+              "monotonicTimestamp": 17522.239686,
+              "elapsedFromCallStartMs": 14398
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "llm_request_created",
+              "timestamp": "2026-09-11T19:44:10.550846+00:00",
+              "monotonicTimestamp": 17522.244019,
+              "elapsedFromCallStartMs": 14402
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "llm_http_request_started",
+              "timestamp": "2026-09-11T19:44:10.551584+00:00",
+              "monotonicTimestamp": 17522.244019,
+              "elapsedFromCallStartMs": 14402
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "llm_first_provider_response",
+              "timestamp": "2026-09-11T19:44:12.961411+00:00",
+              "monotonicTimestamp": 17524.654565,
+              "elapsedFromCallStartMs": 16812
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:44:12.971521+00:00",
+              "monotonicTimestamp": 17524.664695,
+              "elapsedFromCallStartMs": 16823
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "tts_started",
+              "timestamp": "2026-09-11T19:44:13.430334+00:00",
+              "monotonicTimestamp": 17525.123511,
+              "elapsedFromCallStartMs": 17281
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "llm_response_complete",
+              "timestamp": "2026-09-11T19:44:14.339851+00:00",
+              "monotonicTimestamp": 17526.033016,
+              "elapsedFromCallStartMs": 18191
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "tts_first_audio",
+              "timestamp": "2026-09-11T19:44:14.392458+00:00",
+              "monotonicTimestamp": 17526.085636,
+              "elapsedFromCallStartMs": 18243
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "tts_stopped",
+              "timestamp": "2026-09-11T19:44:15.831232+00:00",
+              "monotonicTimestamp": 17527.524409,
+              "elapsedFromCallStartMs": 19682
+            },
+            {
+              "turnId": "turn-d36e7821",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:44:15.831461+00:00",
+              "monotonicTimestamp": 17527.524649,
+              "elapsedFromCallStartMs": 19682
+            }
+          ]
+        },
+        {
+          "turnId": "turn-47087e6a",
+          "turnIndex": 2,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 0,
+          "totalTurnMs": 0,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-47087e6a",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:44:15.832136+00:00",
+              "monotonicTimestamp": 17527.52532,
+              "elapsedFromCallStartMs": 19683
+            }
+          ]
+        },
+        {
+          "turnId": "turn-70537dab",
+          "turnIndex": 3,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 5129,
+          "totalTurnMs": 5129,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-70537dab",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:44:20.961352+00:00",
+              "monotonicTimestamp": 17532.654536,
+              "elapsedFromCallStartMs": 24812
+            }
+          ]
+        }
+      ],
+      "traces": [
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_start",
+          "timestamp": "2026-09-11T19:43:56.584734+00:00",
+          "monotonicTimestamp": 17508.277921,
+          "elapsedFromCallStartMs": 436
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T19:43:57.062993+00:00",
+          "monotonicTimestamp": 17508.756184,
+          "elapsedFromCallStartMs": 914
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T19:43:57.081821+00:00",
+          "monotonicTimestamp": 17508.774593,
+          "elapsedFromCallStartMs": 932
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.562631+00:00",
+          "monotonicTimestamp": 17509.255811,
+          "elapsedFromCallStartMs": 1414
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.563624+00:00",
+          "monotonicTimestamp": 17509.256812,
+          "elapsedFromCallStartMs": 1415
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.593278+00:00",
+          "monotonicTimestamp": 17509.286456,
+          "elapsedFromCallStartMs": 1444
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.659323+00:00",
+          "monotonicTimestamp": 17509.352499,
+          "elapsedFromCallStartMs": 1510
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.720646+00:00",
+          "monotonicTimestamp": 17509.413828,
+          "elapsedFromCallStartMs": 1572
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.781080+00:00",
+          "monotonicTimestamp": 17509.474257,
+          "elapsedFromCallStartMs": 1632
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.846559+00:00",
+          "monotonicTimestamp": 17509.539742,
+          "elapsedFromCallStartMs": 1698
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.911266+00:00",
+          "monotonicTimestamp": 17509.60444,
+          "elapsedFromCallStartMs": 1762
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:57.968443+00:00",
+          "monotonicTimestamp": 17509.661626,
+          "elapsedFromCallStartMs": 1819
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:58.045903+00:00",
+          "monotonicTimestamp": 17509.739078,
+          "elapsedFromCallStartMs": 1897
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:58.106855+00:00",
+          "monotonicTimestamp": 17509.800038,
+          "elapsedFromCallStartMs": 1958
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:58.171680+00:00",
+          "monotonicTimestamp": 17509.864864,
+          "elapsedFromCallStartMs": 2023
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:58.236360+00:00",
+          "monotonicTimestamp": 17509.929541,
+          "elapsedFromCallStartMs": 2087
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:58.298344+00:00",
+          "monotonicTimestamp": 17509.991521,
+          "elapsedFromCallStartMs": 2149
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:58.331050+00:00",
+          "monotonicTimestamp": 17510.024233,
+          "elapsedFromCallStartMs": 2182
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:43:58.336804+00:00",
+          "monotonicTimestamp": 17510.029987,
+          "elapsedFromCallStartMs": 2188
+        },
+        {
+          "turnId": "turn-402c4e5f",
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T19:43:58.357266+00:00",
+          "monotonicTimestamp": 17510.050212,
+          "elapsedFromCallStartMs": 2208
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "user_speech_stop",
+          "timestamp": "2026-09-11T19:44:10.114988+00:00",
+          "monotonicTimestamp": 17521.808161,
+          "elapsedFromCallStartMs": 13966
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "stt_utterance_end",
+          "timestamp": "2026-09-11T19:44:10.276546+00:00",
+          "monotonicTimestamp": 17521.96966,
+          "elapsedFromCallStartMs": 14127
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "user_aggregated",
+          "timestamp": "2026-09-11T19:44:10.546515+00:00",
+          "monotonicTimestamp": 17522.239686,
+          "elapsedFromCallStartMs": 14398
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "llm_request_created",
+          "timestamp": "2026-09-11T19:44:10.550846+00:00",
+          "monotonicTimestamp": 17522.244019,
+          "elapsedFromCallStartMs": 14402
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "llm_http_request_started",
+          "timestamp": "2026-09-11T19:44:10.551584+00:00",
+          "monotonicTimestamp": 17522.244019,
+          "elapsedFromCallStartMs": 14402
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "llm_first_provider_response",
+          "timestamp": "2026-09-11T19:44:12.961411+00:00",
+          "monotonicTimestamp": 17524.654565,
+          "elapsedFromCallStartMs": 16812
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:44:12.971521+00:00",
+          "monotonicTimestamp": 17524.664695,
+          "elapsedFromCallStartMs": 16823
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "tts_started",
+          "timestamp": "2026-09-11T19:44:13.430334+00:00",
+          "monotonicTimestamp": 17525.123511,
+          "elapsedFromCallStartMs": 17281
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "llm_response_complete",
+          "timestamp": "2026-09-11T19:44:14.339851+00:00",
+          "monotonicTimestamp": 17526.033016,
+          "elapsedFromCallStartMs": 18191
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "tts_first_audio",
+          "timestamp": "2026-09-11T19:44:14.392458+00:00",
+          "monotonicTimestamp": 17526.085636,
+          "elapsedFromCallStartMs": 18243
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "tts_stopped",
+          "timestamp": "2026-09-11T19:44:15.831232+00:00",
+          "monotonicTimestamp": 17527.524409,
+          "elapsedFromCallStartMs": 19682
+        },
+        {
+          "turnId": "turn-d36e7821",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:44:15.831461+00:00",
+          "monotonicTimestamp": 17527.524649,
+          "elapsedFromCallStartMs": 19682
+        },
+        {
+          "turnId": "turn-47087e6a",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:44:15.832136+00:00",
+          "monotonicTimestamp": 17527.52532,
+          "elapsedFromCallStartMs": 19683
+        },
+        {
+          "turnId": "turn-70537dab",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:44:20.961352+00:00",
+          "monotonicTimestamp": 17532.654536,
+          "elapsedFromCallStartMs": 24812
+        }
+      ],
+      "startup": {
+        "streamId": "pstn-p21b-1-7ad135d6",
+        "websocketAcceptToPlivoStartMs": 1,
+        "plivoStartToRuntimeConfigMs": 36,
+        "runtimeConfigToCallSessionMs": 445,
+        "callSessionToPipelineMs": null,
+        "pipelineToSttReadyMs": null,
+        "pipelineToTtsReadyMs": 479,
+        "greetingQueueToFirstAudioMs": 491,
+        "totalCallStartupToFirstAudioMs": 1414
+      }
+    },
+    "pstn-p21b-2-85ed8c07": {
+      "events": [],
+      "turn_metrics": [
+        {
+          "turnId": "turn-bd77d93f",
+          "turnIndex": 1,
+          "responseLatencyMs": null,
+          "speechDurationMs": 9958,
+          "vadStopToUtteranceEndMs": 156,
+          "aggregationToLlmStartMs": 2,
+          "aggregationToLLMStartMs": 2,
+          "aggregationToLLMRequestMs": 2,
+          "llmHttpRequestMs": 591,
+          "llmProviderToFirstOutputMs": 2,
+          "llmToFirstOutputMs": 593,
+          "llmStartToFirstOutputMs": 593,
+          "llmRequestToFirstOutputMs": 593,
+          "llmToFirstToolDeltaMs": 892,
+          "firstToolDeltaToToolCompleteMs": 641,
+          "totalTurnDurationMs": 11940,
+          "totalTurnMs": 11940,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "user_speech_stop",
+              "timestamp": "2026-09-11T19:44:39.738144+00:00",
+              "monotonicTimestamp": 17551.431318,
+              "elapsedFromCallStartMs": 12020
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "stt_utterance_end",
+              "timestamp": "2026-09-11T19:44:39.893995+00:00",
+              "monotonicTimestamp": 17551.58717,
+              "elapsedFromCallStartMs": 12176
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "user_aggregated",
+              "timestamp": "2026-09-11T19:44:40.151195+00:00",
+              "monotonicTimestamp": 17551.844367,
+              "elapsedFromCallStartMs": 12433
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "llm_request_created",
+              "timestamp": "2026-09-11T19:44:40.153488+00:00",
+              "monotonicTimestamp": 17551.846662,
+              "elapsedFromCallStartMs": 12436
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "llm_http_request_started",
+              "timestamp": "2026-09-11T19:44:40.153810+00:00",
+              "monotonicTimestamp": 17551.846662,
+              "elapsedFromCallStartMs": 12436
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "llm_first_provider_response",
+              "timestamp": "2026-09-11T19:44:40.744669+00:00",
+              "monotonicTimestamp": 17552.437838,
+              "elapsedFromCallStartMs": 13027
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:44:40.746985+00:00",
+              "monotonicTimestamp": 17552.440148,
+              "elapsedFromCallStartMs": 13029
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "first_tool_call_delta",
+              "timestamp": "2026-09-11T19:44:41.045796+00:00",
+              "monotonicTimestamp": 17552.738951,
+              "elapsedFromCallStartMs": 13328
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "tool_call_complete",
+              "timestamp": "2026-09-11T19:44:41.686847+00:00",
+              "monotonicTimestamp": 17553.379996,
+              "elapsedFromCallStartMs": 13969
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "llm_response_complete",
+              "timestamp": "2026-09-11T19:44:41.687707+00:00",
+              "monotonicTimestamp": 17553.379996,
+              "elapsedFromCallStartMs": 13969
+            },
+            {
+              "turnId": "turn-bd77d93f",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:44:41.720766+00:00",
+              "monotonicTimestamp": 17553.413946,
+              "elapsedFromCallStartMs": 14003
+            }
+          ]
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "turnIndex": 2,
+          "responseLatencyMs": null,
+          "llmFirstOutputToTtsStartMs": 563,
+          "llmToTTSStartMs": 563,
+          "firstLLMOutputToFirstAudioMs": 1656,
+          "toolDurationMs": 1123,
+          "toolExecutionMs": 1123,
+          "tools": [
+            {
+              "name": "query_knowledge_base",
+              "durationMs": 1123,
+              "success": true
+            }
+          ],
+          "toolResultToPostToolLlmStartMs": 7,
+          "toolResultToPostToolLLMMs": 7,
+          "postToolLlmToFirstOutputMs": 731,
+          "postToolLlmMs": 731,
+          "postToolLLMToTTSMs": 564,
+          "postToolOutputToTTSMs": 564,
+          "postToolTTSToFirstAudioMs": 1093,
+          "toolResultToFirstAudioMs": 2395,
+          "ttsStartToFirstAudioMs": 1093,
+          "totalTurnDurationMs": 4901,
+          "totalTurnMs": 4901,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "tool_executed",
+              "timestamp": "2026-09-11T19:44:42.838019+00:00",
+              "monotonicTimestamp": 17554.530677,
+              "elapsedFromCallStartMs": 15120,
+              "tool": "query_knowledge_base",
+              "durationMs": 1123,
+              "success": true
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "post_tool_llm_context",
+              "timestamp": "2026-09-11T19:44:42.842919+00:00",
+              "monotonicTimestamp": 17554.536094,
+              "elapsedFromCallStartMs": 15125
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "post_tool_llm_request_created",
+              "timestamp": "2026-09-11T19:44:42.844049+00:00",
+              "monotonicTimestamp": 17554.537219,
+              "elapsedFromCallStartMs": 15126
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "post_tool_llm_http_request_started",
+              "timestamp": "2026-09-11T19:44:42.844417+00:00",
+              "monotonicTimestamp": 17554.537219,
+              "elapsedFromCallStartMs": 15126
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "post_tool_llm_first_provider_response",
+              "timestamp": "2026-09-11T19:44:43.571898+00:00",
+              "monotonicTimestamp": 17555.265074,
+              "elapsedFromCallStartMs": 15854
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "post_tool_llm_first_output",
+              "timestamp": "2026-09-11T19:44:43.575441+00:00",
+              "monotonicTimestamp": 17555.268602,
+              "elapsedFromCallStartMs": 15858
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:44:43.576961+00:00",
+              "monotonicTimestamp": 17555.26995,
+              "elapsedFromCallStartMs": 15859
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "tts_started",
+              "timestamp": "2026-09-11T19:44:44.139626+00:00",
+              "monotonicTimestamp": 17555.832801,
+              "elapsedFromCallStartMs": 16422
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "post_tool_llm_response_complete",
+              "timestamp": "2026-09-11T19:44:45.045507+00:00",
+              "monotonicTimestamp": 17556.738682,
+              "elapsedFromCallStartMs": 17328
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "tts_first_audio",
+              "timestamp": "2026-09-11T19:44:45.233001+00:00",
+              "monotonicTimestamp": 17556.926166,
+              "elapsedFromCallStartMs": 17515
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "tts_stopped",
+              "timestamp": "2026-09-11T19:44:46.621750+00:00",
+              "monotonicTimestamp": 17558.314922,
+              "elapsedFromCallStartMs": 18904
+            },
+            {
+              "turnId": "turn-66a2d3ff",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:44:46.622154+00:00",
+              "monotonicTimestamp": 17558.315333,
+              "elapsedFromCallStartMs": 18904
+            }
+          ]
+        },
+        {
+          "turnId": "turn-e08345a1",
+          "turnIndex": 3,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 0,
+          "totalTurnMs": 0,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-e08345a1",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:44:46.623089+00:00",
+              "monotonicTimestamp": 17558.316275,
+              "elapsedFromCallStartMs": 18905
+            }
+          ]
+        },
+        {
+          "turnId": "turn-099ff5d2",
+          "turnIndex": 4,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 4419,
+          "totalTurnMs": 4419,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-099ff5d2",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:44:51.042582+00:00",
+              "monotonicTimestamp": 17562.735758,
+              "elapsedFromCallStartMs": 23325
+            }
+          ]
+        }
+      ],
+      "traces": [
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_start",
+          "timestamp": "2026-09-11T19:44:28.098959+00:00",
+          "monotonicTimestamp": 17539.792142,
+          "elapsedFromCallStartMs": 381
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T19:44:28.572517+00:00",
+          "monotonicTimestamp": 17540.265702,
+          "elapsedFromCallStartMs": 855
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T19:44:28.590990+00:00",
+          "monotonicTimestamp": 17540.283883,
+          "elapsedFromCallStartMs": 873
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.063125+00:00",
+          "monotonicTimestamp": 17540.756301,
+          "elapsedFromCallStartMs": 1345
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.066321+00:00",
+          "monotonicTimestamp": 17540.759491,
+          "elapsedFromCallStartMs": 1349
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.103947+00:00",
+          "monotonicTimestamp": 17540.797126,
+          "elapsedFromCallStartMs": 1386
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.163004+00:00",
+          "monotonicTimestamp": 17540.856182,
+          "elapsedFromCallStartMs": 1445
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.239170+00:00",
+          "monotonicTimestamp": 17540.932345,
+          "elapsedFromCallStartMs": 1521
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.285975+00:00",
+          "monotonicTimestamp": 17540.979154,
+          "elapsedFromCallStartMs": 1568
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.362514+00:00",
+          "monotonicTimestamp": 17541.055694,
+          "elapsedFromCallStartMs": 1645
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.423710+00:00",
+          "monotonicTimestamp": 17541.116889,
+          "elapsedFromCallStartMs": 1706
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.481519+00:00",
+          "monotonicTimestamp": 17541.1747,
+          "elapsedFromCallStartMs": 1764
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.551717+00:00",
+          "monotonicTimestamp": 17541.244884,
+          "elapsedFromCallStartMs": 1834
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.615975+00:00",
+          "monotonicTimestamp": 17541.309154,
+          "elapsedFromCallStartMs": 1898
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.679625+00:00",
+          "monotonicTimestamp": 17541.372803,
+          "elapsedFromCallStartMs": 1962
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.728741+00:00",
+          "monotonicTimestamp": 17541.42192,
+          "elapsedFromCallStartMs": 2011
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:29.729754+00:00",
+          "monotonicTimestamp": 17541.422932,
+          "elapsedFromCallStartMs": 2012
+        },
+        {
+          "turnId": "turn-f54529e1",
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T19:44:29.780384+00:00",
+          "monotonicTimestamp": 17541.473437,
+          "elapsedFromCallStartMs": 2062
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "user_speech_stop",
+          "timestamp": "2026-09-11T19:44:39.738144+00:00",
+          "monotonicTimestamp": 17551.431318,
+          "elapsedFromCallStartMs": 12020
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "stt_utterance_end",
+          "timestamp": "2026-09-11T19:44:39.893995+00:00",
+          "monotonicTimestamp": 17551.58717,
+          "elapsedFromCallStartMs": 12176
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "user_aggregated",
+          "timestamp": "2026-09-11T19:44:40.151195+00:00",
+          "monotonicTimestamp": 17551.844367,
+          "elapsedFromCallStartMs": 12433
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "llm_request_created",
+          "timestamp": "2026-09-11T19:44:40.153488+00:00",
+          "monotonicTimestamp": 17551.846662,
+          "elapsedFromCallStartMs": 12436
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "llm_http_request_started",
+          "timestamp": "2026-09-11T19:44:40.153810+00:00",
+          "monotonicTimestamp": 17551.846662,
+          "elapsedFromCallStartMs": 12436
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "llm_first_provider_response",
+          "timestamp": "2026-09-11T19:44:40.744669+00:00",
+          "monotonicTimestamp": 17552.437838,
+          "elapsedFromCallStartMs": 13027
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:44:40.746985+00:00",
+          "monotonicTimestamp": 17552.440148,
+          "elapsedFromCallStartMs": 13029
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "first_tool_call_delta",
+          "timestamp": "2026-09-11T19:44:41.045796+00:00",
+          "monotonicTimestamp": 17552.738951,
+          "elapsedFromCallStartMs": 13328
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "tool_call_complete",
+          "timestamp": "2026-09-11T19:44:41.686847+00:00",
+          "monotonicTimestamp": 17553.379996,
+          "elapsedFromCallStartMs": 13969
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "llm_response_complete",
+          "timestamp": "2026-09-11T19:44:41.687707+00:00",
+          "monotonicTimestamp": 17553.379996,
+          "elapsedFromCallStartMs": 13969
+        },
+        {
+          "turnId": "turn-bd77d93f",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:44:41.720766+00:00",
+          "monotonicTimestamp": 17553.413946,
+          "elapsedFromCallStartMs": 14003
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "tool_executed",
+          "timestamp": "2026-09-11T19:44:42.838019+00:00",
+          "monotonicTimestamp": 17554.530677,
+          "elapsedFromCallStartMs": 15120,
+          "tool": "query_knowledge_base",
+          "durationMs": 1123,
+          "success": true
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "post_tool_llm_context",
+          "timestamp": "2026-09-11T19:44:42.842919+00:00",
+          "monotonicTimestamp": 17554.536094,
+          "elapsedFromCallStartMs": 15125
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "post_tool_llm_request_created",
+          "timestamp": "2026-09-11T19:44:42.844049+00:00",
+          "monotonicTimestamp": 17554.537219,
+          "elapsedFromCallStartMs": 15126
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "post_tool_llm_http_request_started",
+          "timestamp": "2026-09-11T19:44:42.844417+00:00",
+          "monotonicTimestamp": 17554.537219,
+          "elapsedFromCallStartMs": 15126
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "post_tool_llm_first_provider_response",
+          "timestamp": "2026-09-11T19:44:43.571898+00:00",
+          "monotonicTimestamp": 17555.265074,
+          "elapsedFromCallStartMs": 15854
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "post_tool_llm_first_output",
+          "timestamp": "2026-09-11T19:44:43.575441+00:00",
+          "monotonicTimestamp": 17555.268602,
+          "elapsedFromCallStartMs": 15858
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:44:43.576961+00:00",
+          "monotonicTimestamp": 17555.26995,
+          "elapsedFromCallStartMs": 15859
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "tts_started",
+          "timestamp": "2026-09-11T19:44:44.139626+00:00",
+          "monotonicTimestamp": 17555.832801,
+          "elapsedFromCallStartMs": 16422
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "post_tool_llm_response_complete",
+          "timestamp": "2026-09-11T19:44:45.045507+00:00",
+          "monotonicTimestamp": 17556.738682,
+          "elapsedFromCallStartMs": 17328
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "tts_first_audio",
+          "timestamp": "2026-09-11T19:44:45.233001+00:00",
+          "monotonicTimestamp": 17556.926166,
+          "elapsedFromCallStartMs": 17515
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "tts_stopped",
+          "timestamp": "2026-09-11T19:44:46.621750+00:00",
+          "monotonicTimestamp": 17558.314922,
+          "elapsedFromCallStartMs": 18904
+        },
+        {
+          "turnId": "turn-66a2d3ff",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:44:46.622154+00:00",
+          "monotonicTimestamp": 17558.315333,
+          "elapsedFromCallStartMs": 18904
+        },
+        {
+          "turnId": "turn-e08345a1",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:44:46.623089+00:00",
+          "monotonicTimestamp": 17558.316275,
+          "elapsedFromCallStartMs": 18905
+        },
+        {
+          "turnId": "turn-099ff5d2",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:44:51.042582+00:00",
+          "monotonicTimestamp": 17562.735758,
+          "elapsedFromCallStartMs": 23325
+        }
+      ],
+      "startup": {
+        "streamId": "pstn-p21b-2-85ed8c07",
+        "websocketAcceptToPlivoStartMs": 2,
+        "plivoStartToRuntimeConfigMs": 17,
+        "runtimeConfigToCallSessionMs": 407,
+        "callSessionToPipelineMs": null,
+        "pipelineToSttReadyMs": null,
+        "pipelineToTtsReadyMs": 474,
+        "greetingQueueToFirstAudioMs": 483,
+        "totalCallStartupToFirstAudioMs": 1345
+      }
+    },
+    "pstn-p21b-3-2cf57fcb": {
+      "events": [],
+      "turn_metrics": [
+        {
+          "turnId": "turn-78be9bbd",
+          "turnIndex": 1,
+          "responseLatencyMs": 2920,
+          "speechDurationMs": 10458,
+          "vadStopToUtteranceEndMs": 141,
+          "aggregationToLlmStartMs": 2,
+          "aggregationToLLMStartMs": 2,
+          "aggregationToLLMRequestMs": 2,
+          "llmHttpRequestMs": 781,
+          "llmProviderToFirstOutputMs": 4,
+          "llmToFirstOutputMs": 785,
+          "llmStartToFirstOutputMs": 785,
+          "llmRequestToFirstOutputMs": 785,
+          "llmFirstOutputToTtsStartMs": 382,
+          "llmToTTSStartMs": 382,
+          "firstLLMOutputToFirstAudioMs": 1723,
+          "ttsStartToFirstAudioMs": 1341,
+          "userStopToFirstAudioMs": 2920,
+          "speechStopToFirstAudioMs": 2920,
+          "aggregationToFirstAudioMs": 2510,
+          "totalTurnDurationMs": 14145,
+          "totalTurnMs": 14145,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "user_speech_stop",
+              "timestamp": "2026-09-11T19:45:10.515590+00:00",
+              "monotonicTimestamp": 17582.208766,
+              "elapsedFromCallStartMs": 12660
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "stt_utterance_end",
+              "timestamp": "2026-09-11T19:45:10.656485+00:00",
+              "monotonicTimestamp": 17582.349658,
+              "elapsedFromCallStartMs": 12801
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "user_aggregated",
+              "timestamp": "2026-09-11T19:45:10.925612+00:00",
+              "monotonicTimestamp": 17582.618782,
+              "elapsedFromCallStartMs": 13070
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "llm_request_created",
+              "timestamp": "2026-09-11T19:45:10.927374+00:00",
+              "monotonicTimestamp": 17582.62055,
+              "elapsedFromCallStartMs": 13072
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "llm_http_request_started",
+              "timestamp": "2026-09-11T19:45:10.927592+00:00",
+              "monotonicTimestamp": 17582.62055,
+              "elapsedFromCallStartMs": 13072
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "llm_first_provider_response",
+              "timestamp": "2026-09-11T19:45:11.708743+00:00",
+              "monotonicTimestamp": 17583.401911,
+              "elapsedFromCallStartMs": 13853
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:45:11.712861+00:00",
+              "monotonicTimestamp": 17583.406035,
+              "elapsedFromCallStartMs": 13858
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "tts_started",
+              "timestamp": "2026-09-11T19:45:12.094764+00:00",
+              "monotonicTimestamp": 17583.787939,
+              "elapsedFromCallStartMs": 14239
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "llm_response_complete",
+              "timestamp": "2026-09-11T19:45:12.966937+00:00",
+              "monotonicTimestamp": 17584.660105,
+              "elapsedFromCallStartMs": 15112
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "tts_first_audio",
+              "timestamp": "2026-09-11T19:45:13.435419+00:00",
+              "monotonicTimestamp": 17585.128592,
+              "elapsedFromCallStartMs": 15580
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "tts_stopped",
+              "timestamp": "2026-09-11T19:45:14.201926+00:00",
+              "monotonicTimestamp": 17585.895103,
+              "elapsedFromCallStartMs": 16347
+            },
+            {
+              "turnId": "turn-78be9bbd",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:45:14.202130+00:00",
+              "monotonicTimestamp": 17585.895311,
+              "elapsedFromCallStartMs": 16347
+            }
+          ]
+        },
+        {
+          "turnId": "turn-a1a80219",
+          "turnIndex": 2,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 0,
+          "totalTurnMs": 0,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-a1a80219",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:45:14.202883+00:00",
+              "monotonicTimestamp": 17585.896063,
+              "elapsedFromCallStartMs": 16348
+            }
+          ]
+        },
+        {
+          "turnId": "turn-bc0d1aed",
+          "turnIndex": 3,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 6598,
+          "totalTurnMs": 6598,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-bc0d1aed",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:45:20.801002+00:00",
+              "monotonicTimestamp": 17592.494182,
+              "elapsedFromCallStartMs": 22946
+            }
+          ]
+        }
+      ],
+      "traces": [
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_start",
+          "timestamp": "2026-09-11T19:44:58.317851+00:00",
+          "monotonicTimestamp": 17570.011034,
+          "elapsedFromCallStartMs": 463
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T19:44:58.727683+00:00",
+          "monotonicTimestamp": 17570.420868,
+          "elapsedFromCallStartMs": 872
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T19:44:58.911030+00:00",
+          "monotonicTimestamp": 17570.603924,
+          "elapsedFromCallStartMs": 1055
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.296626+00:00",
+          "monotonicTimestamp": 17570.989797,
+          "elapsedFromCallStartMs": 1441
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.298176+00:00",
+          "monotonicTimestamp": 17570.991357,
+          "elapsedFromCallStartMs": 1443
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.338847+00:00",
+          "monotonicTimestamp": 17571.032,
+          "elapsedFromCallStartMs": 1484
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.403001+00:00",
+          "monotonicTimestamp": 17571.096177,
+          "elapsedFromCallStartMs": 1548
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.459845+00:00",
+          "monotonicTimestamp": 17571.153021,
+          "elapsedFromCallStartMs": 1605
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.524200+00:00",
+          "monotonicTimestamp": 17571.217378,
+          "elapsedFromCallStartMs": 1669
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.589364+00:00",
+          "monotonicTimestamp": 17571.282538,
+          "elapsedFromCallStartMs": 1734
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.655360+00:00",
+          "monotonicTimestamp": 17571.348535,
+          "elapsedFromCallStartMs": 1800
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.720969+00:00",
+          "monotonicTimestamp": 17571.414145,
+          "elapsedFromCallStartMs": 1866
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.789835+00:00",
+          "monotonicTimestamp": 17571.483011,
+          "elapsedFromCallStartMs": 1935
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.847752+00:00",
+          "monotonicTimestamp": 17571.540925,
+          "elapsedFromCallStartMs": 1992
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.905796+00:00",
+          "monotonicTimestamp": 17571.59896,
+          "elapsedFromCallStartMs": 2050
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:44:59.972705+00:00",
+          "monotonicTimestamp": 17571.665877,
+          "elapsedFromCallStartMs": 2117
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:00.038794+00:00",
+          "monotonicTimestamp": 17571.731954,
+          "elapsedFromCallStartMs": 2183
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:00.055910+00:00",
+          "monotonicTimestamp": 17571.749073,
+          "elapsedFromCallStartMs": 2201
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:00.056426+00:00",
+          "monotonicTimestamp": 17571.749605,
+          "elapsedFromCallStartMs": 2201
+        },
+        {
+          "turnId": "turn-0ef740ca",
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T19:45:00.056999+00:00",
+          "monotonicTimestamp": 17571.750037,
+          "elapsedFromCallStartMs": 2202
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "user_speech_stop",
+          "timestamp": "2026-09-11T19:45:10.515590+00:00",
+          "monotonicTimestamp": 17582.208766,
+          "elapsedFromCallStartMs": 12660
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "stt_utterance_end",
+          "timestamp": "2026-09-11T19:45:10.656485+00:00",
+          "monotonicTimestamp": 17582.349658,
+          "elapsedFromCallStartMs": 12801
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "user_aggregated",
+          "timestamp": "2026-09-11T19:45:10.925612+00:00",
+          "monotonicTimestamp": 17582.618782,
+          "elapsedFromCallStartMs": 13070
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "llm_request_created",
+          "timestamp": "2026-09-11T19:45:10.927374+00:00",
+          "monotonicTimestamp": 17582.62055,
+          "elapsedFromCallStartMs": 13072
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "llm_http_request_started",
+          "timestamp": "2026-09-11T19:45:10.927592+00:00",
+          "monotonicTimestamp": 17582.62055,
+          "elapsedFromCallStartMs": 13072
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "llm_first_provider_response",
+          "timestamp": "2026-09-11T19:45:11.708743+00:00",
+          "monotonicTimestamp": 17583.401911,
+          "elapsedFromCallStartMs": 13853
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:45:11.712861+00:00",
+          "monotonicTimestamp": 17583.406035,
+          "elapsedFromCallStartMs": 13858
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "tts_started",
+          "timestamp": "2026-09-11T19:45:12.094764+00:00",
+          "monotonicTimestamp": 17583.787939,
+          "elapsedFromCallStartMs": 14239
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "llm_response_complete",
+          "timestamp": "2026-09-11T19:45:12.966937+00:00",
+          "monotonicTimestamp": 17584.660105,
+          "elapsedFromCallStartMs": 15112
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "tts_first_audio",
+          "timestamp": "2026-09-11T19:45:13.435419+00:00",
+          "monotonicTimestamp": 17585.128592,
+          "elapsedFromCallStartMs": 15580
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "tts_stopped",
+          "timestamp": "2026-09-11T19:45:14.201926+00:00",
+          "monotonicTimestamp": 17585.895103,
+          "elapsedFromCallStartMs": 16347
+        },
+        {
+          "turnId": "turn-78be9bbd",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:45:14.202130+00:00",
+          "monotonicTimestamp": 17585.895311,
+          "elapsedFromCallStartMs": 16347
+        },
+        {
+          "turnId": "turn-a1a80219",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:45:14.202883+00:00",
+          "monotonicTimestamp": 17585.896063,
+          "elapsedFromCallStartMs": 16348
+        },
+        {
+          "turnId": "turn-bc0d1aed",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:45:20.801002+00:00",
+          "monotonicTimestamp": 17592.494182,
+          "elapsedFromCallStartMs": 22946
+        }
+      ],
+      "startup": {
+        "streamId": "pstn-p21b-3-2cf57fcb",
+        "websocketAcceptToPlivoStartMs": 1,
+        "plivoStartToRuntimeConfigMs": 26,
+        "runtimeConfigToCallSessionMs": 475,
+        "callSessionToPipelineMs": null,
+        "pipelineToSttReadyMs": null,
+        "pipelineToTtsReadyMs": 410,
+        "greetingQueueToFirstAudioMs": 393,
+        "totalCallStartupToFirstAudioMs": 1441
+      }
+    },
+    "pstn-p21b-4-0b6e1363": {
+      "events": [],
+      "turn_metrics": [
+        {
+          "turnId": "turn-edaa2eb9",
+          "turnIndex": 1,
+          "responseLatencyMs": null,
+          "speechDurationMs": 10092,
+          "vadStopToUtteranceEndMs": 172,
+          "aggregationToLlmStartMs": 58,
+          "aggregationToLLMStartMs": 58,
+          "aggregationToLLMRequestMs": 58,
+          "llmHttpRequestMs": 641,
+          "llmProviderToFirstOutputMs": 3,
+          "llmToFirstOutputMs": 644,
+          "llmStartToFirstOutputMs": 644,
+          "llmRequestToFirstOutputMs": 644,
+          "llmToFirstToolDeltaMs": 933,
+          "firstToolDeltaToToolCompleteMs": 730,
+          "totalTurnDurationMs": 12257,
+          "totalTurnMs": 12257,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "user_speech_stop",
+              "timestamp": "2026-09-11T19:45:39.246734+00:00",
+              "monotonicTimestamp": 17610.93989,
+              "elapsedFromCallStartMs": 12144
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "stt_utterance_end",
+              "timestamp": "2026-09-11T19:45:39.418915+00:00",
+              "monotonicTimestamp": 17611.112082,
+              "elapsedFromCallStartMs": 12317
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "user_aggregated",
+              "timestamp": "2026-09-11T19:45:39.679844+00:00",
+              "monotonicTimestamp": 17611.373,
+              "elapsedFromCallStartMs": 12578
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "llm_request_created",
+              "timestamp": "2026-09-11T19:45:39.737606+00:00",
+              "monotonicTimestamp": 17611.430771,
+              "elapsedFromCallStartMs": 12635
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "llm_http_request_started",
+              "timestamp": "2026-09-11T19:45:39.737987+00:00",
+              "monotonicTimestamp": 17611.430771,
+              "elapsedFromCallStartMs": 12635
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "llm_first_provider_response",
+              "timestamp": "2026-09-11T19:45:40.378797+00:00",
+              "monotonicTimestamp": 17612.071958,
+              "elapsedFromCallStartMs": 13276
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:45:40.381929+00:00",
+              "monotonicTimestamp": 17612.075087,
+              "elapsedFromCallStartMs": 13280
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "first_tool_call_delta",
+              "timestamp": "2026-09-11T19:45:40.670627+00:00",
+              "monotonicTimestamp": 17612.363771,
+              "elapsedFromCallStartMs": 13568
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "tool_call_complete",
+              "timestamp": "2026-09-11T19:45:41.400449+00:00",
+              "monotonicTimestamp": 17613.093608,
+              "elapsedFromCallStartMs": 14298
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "llm_response_complete",
+              "timestamp": "2026-09-11T19:45:41.400800+00:00",
+              "monotonicTimestamp": 17613.093608,
+              "elapsedFromCallStartMs": 14298
+            },
+            {
+              "turnId": "turn-edaa2eb9",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:45:41.412508+00:00",
+              "monotonicTimestamp": 17613.105668,
+              "elapsedFromCallStartMs": 14310
+            }
+          ]
+        },
+        {
+          "turnId": "turn-7720de69",
+          "turnIndex": 2,
+          "responseLatencyMs": null,
+          "llmFirstOutputToTtsStartMs": 484,
+          "llmToTTSStartMs": 484,
+          "firstLLMOutputToFirstAudioMs": 1212,
+          "toolDurationMs": 722,
+          "toolExecutionMs": 722,
+          "tools": [
+            {
+              "name": "query_knowledge_base",
+              "durationMs": 722,
+              "success": true
+            }
+          ],
+          "toolResultToPostToolLlmStartMs": 8,
+          "toolResultToPostToolLLMMs": 8,
+          "postToolLlmToFirstOutputMs": 669,
+          "postToolLlmMs": 669,
+          "postToolLLMToTTSMs": 525,
+          "postToolOutputToTTSMs": 525,
+          "postToolTTSToFirstAudioMs": 728,
+          "toolResultToFirstAudioMs": 1930,
+          "ttsStartToFirstAudioMs": 728,
+          "totalTurnDurationMs": 3763,
+          "totalTurnMs": 3763,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-7720de69",
+              "event": "tool_executed",
+              "timestamp": "2026-09-11T19:45:42.125669+00:00",
+              "monotonicTimestamp": 17613.818794,
+              "elapsedFromCallStartMs": 15023,
+              "tool": "query_knowledge_base",
+              "durationMs": 722,
+              "success": true
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "post_tool_llm_context",
+              "timestamp": "2026-09-11T19:45:42.131247+00:00",
+              "monotonicTimestamp": 17613.824411,
+              "elapsedFromCallStartMs": 15029
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "post_tool_llm_request_created",
+              "timestamp": "2026-09-11T19:45:42.133152+00:00",
+              "monotonicTimestamp": 17613.82632,
+              "elapsedFromCallStartMs": 15031
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "post_tool_llm_http_request_started",
+              "timestamp": "2026-09-11T19:45:42.133448+00:00",
+              "monotonicTimestamp": 17613.82632,
+              "elapsedFromCallStartMs": 15031
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "post_tool_llm_first_provider_response",
+              "timestamp": "2026-09-11T19:45:42.798621+00:00",
+              "monotonicTimestamp": 17614.491776,
+              "elapsedFromCallStartMs": 15696
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "post_tool_llm_first_output",
+              "timestamp": "2026-09-11T19:45:42.802304+00:00",
+              "monotonicTimestamp": 17614.495459,
+              "elapsedFromCallStartMs": 15700
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:45:42.843550+00:00",
+              "monotonicTimestamp": 17614.536708,
+              "elapsedFromCallStartMs": 15741
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "tts_started",
+              "timestamp": "2026-09-11T19:45:43.327622+00:00",
+              "monotonicTimestamp": 17615.020778,
+              "elapsedFromCallStartMs": 16225
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "tts_first_audio",
+              "timestamp": "2026-09-11T19:45:44.055424+00:00",
+              "monotonicTimestamp": 17615.748591,
+              "elapsedFromCallStartMs": 16953
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "post_tool_llm_response_complete",
+              "timestamp": "2026-09-11T19:45:44.148243+00:00",
+              "monotonicTimestamp": 17615.841407,
+              "elapsedFromCallStartMs": 17046
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "tts_stopped",
+              "timestamp": "2026-09-11T19:45:45.176041+00:00",
+              "monotonicTimestamp": 17616.869214,
+              "elapsedFromCallStartMs": 18074
+            },
+            {
+              "turnId": "turn-7720de69",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:45:45.176314+00:00",
+              "monotonicTimestamp": 17616.869492,
+              "elapsedFromCallStartMs": 18074
+            }
+          ]
+        },
+        {
+          "turnId": "turn-43900e6e",
+          "turnIndex": 3,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 0,
+          "totalTurnMs": 0,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-43900e6e",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:45:45.177006+00:00",
+              "monotonicTimestamp": 17616.870185,
+              "elapsedFromCallStartMs": 18075
+            }
+          ]
+        },
+        {
+          "turnId": "turn-98f1e8c1",
+          "turnIndex": 4,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 4983,
+          "totalTurnMs": 4983,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-98f1e8c1",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:45:50.160006+00:00",
+              "monotonicTimestamp": 17621.853176,
+              "elapsedFromCallStartMs": 23058
+            }
+          ]
+        }
+      ],
+      "traces": [
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_start",
+          "timestamp": "2026-09-11T19:45:27.508160+00:00",
+          "monotonicTimestamp": 17599.201342,
+          "elapsedFromCallStartMs": 406
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T19:45:27.949547+00:00",
+          "monotonicTimestamp": 17599.642727,
+          "elapsedFromCallStartMs": 847
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T19:45:27.995475+00:00",
+          "monotonicTimestamp": 17599.688347,
+          "elapsedFromCallStartMs": 893
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.463197+00:00",
+          "monotonicTimestamp": 17600.156372,
+          "elapsedFromCallStartMs": 1361
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.471237+00:00",
+          "monotonicTimestamp": 17600.164411,
+          "elapsedFromCallStartMs": 1369
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.539280+00:00",
+          "monotonicTimestamp": 17600.232453,
+          "elapsedFromCallStartMs": 1437
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.544541+00:00",
+          "monotonicTimestamp": 17600.237713,
+          "elapsedFromCallStartMs": 1442
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.612065+00:00",
+          "monotonicTimestamp": 17600.305233,
+          "elapsedFromCallStartMs": 1510
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.681451+00:00",
+          "monotonicTimestamp": 17600.374618,
+          "elapsedFromCallStartMs": 1579
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.746130+00:00",
+          "monotonicTimestamp": 17600.439304,
+          "elapsedFromCallStartMs": 1644
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.815374+00:00",
+          "monotonicTimestamp": 17600.508544,
+          "elapsedFromCallStartMs": 1713
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.873682+00:00",
+          "monotonicTimestamp": 17600.566857,
+          "elapsedFromCallStartMs": 1771
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:28.944831+00:00",
+          "monotonicTimestamp": 17600.638002,
+          "elapsedFromCallStartMs": 1843
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:29.010183+00:00",
+          "monotonicTimestamp": 17600.703347,
+          "elapsedFromCallStartMs": 1908
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:29.077328+00:00",
+          "monotonicTimestamp": 17600.770504,
+          "elapsedFromCallStartMs": 1975
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:29.145029+00:00",
+          "monotonicTimestamp": 17600.838203,
+          "elapsedFromCallStartMs": 2043
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:29.153764+00:00",
+          "monotonicTimestamp": 17600.846935,
+          "elapsedFromCallStartMs": 2051
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:45:29.154462+00:00",
+          "monotonicTimestamp": 17600.847635,
+          "elapsedFromCallStartMs": 2052
+        },
+        {
+          "turnId": "turn-4a0ce0bf",
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T19:45:29.154988+00:00",
+          "monotonicTimestamp": 17600.848084,
+          "elapsedFromCallStartMs": 2053
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "user_speech_stop",
+          "timestamp": "2026-09-11T19:45:39.246734+00:00",
+          "monotonicTimestamp": 17610.93989,
+          "elapsedFromCallStartMs": 12144
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "stt_utterance_end",
+          "timestamp": "2026-09-11T19:45:39.418915+00:00",
+          "monotonicTimestamp": 17611.112082,
+          "elapsedFromCallStartMs": 12317
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "user_aggregated",
+          "timestamp": "2026-09-11T19:45:39.679844+00:00",
+          "monotonicTimestamp": 17611.373,
+          "elapsedFromCallStartMs": 12578
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "llm_request_created",
+          "timestamp": "2026-09-11T19:45:39.737606+00:00",
+          "monotonicTimestamp": 17611.430771,
+          "elapsedFromCallStartMs": 12635
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "llm_http_request_started",
+          "timestamp": "2026-09-11T19:45:39.737987+00:00",
+          "monotonicTimestamp": 17611.430771,
+          "elapsedFromCallStartMs": 12635
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "llm_first_provider_response",
+          "timestamp": "2026-09-11T19:45:40.378797+00:00",
+          "monotonicTimestamp": 17612.071958,
+          "elapsedFromCallStartMs": 13276
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:45:40.381929+00:00",
+          "monotonicTimestamp": 17612.075087,
+          "elapsedFromCallStartMs": 13280
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "first_tool_call_delta",
+          "timestamp": "2026-09-11T19:45:40.670627+00:00",
+          "monotonicTimestamp": 17612.363771,
+          "elapsedFromCallStartMs": 13568
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "tool_call_complete",
+          "timestamp": "2026-09-11T19:45:41.400449+00:00",
+          "monotonicTimestamp": 17613.093608,
+          "elapsedFromCallStartMs": 14298
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "llm_response_complete",
+          "timestamp": "2026-09-11T19:45:41.400800+00:00",
+          "monotonicTimestamp": 17613.093608,
+          "elapsedFromCallStartMs": 14298
+        },
+        {
+          "turnId": "turn-edaa2eb9",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:45:41.412508+00:00",
+          "monotonicTimestamp": 17613.105668,
+          "elapsedFromCallStartMs": 14310
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "tool_executed",
+          "timestamp": "2026-09-11T19:45:42.125669+00:00",
+          "monotonicTimestamp": 17613.818794,
+          "elapsedFromCallStartMs": 15023,
+          "tool": "query_knowledge_base",
+          "durationMs": 722,
+          "success": true
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "post_tool_llm_context",
+          "timestamp": "2026-09-11T19:45:42.131247+00:00",
+          "monotonicTimestamp": 17613.824411,
+          "elapsedFromCallStartMs": 15029
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "post_tool_llm_request_created",
+          "timestamp": "2026-09-11T19:45:42.133152+00:00",
+          "monotonicTimestamp": 17613.82632,
+          "elapsedFromCallStartMs": 15031
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "post_tool_llm_http_request_started",
+          "timestamp": "2026-09-11T19:45:42.133448+00:00",
+          "monotonicTimestamp": 17613.82632,
+          "elapsedFromCallStartMs": 15031
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "post_tool_llm_first_provider_response",
+          "timestamp": "2026-09-11T19:45:42.798621+00:00",
+          "monotonicTimestamp": 17614.491776,
+          "elapsedFromCallStartMs": 15696
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "post_tool_llm_first_output",
+          "timestamp": "2026-09-11T19:45:42.802304+00:00",
+          "monotonicTimestamp": 17614.495459,
+          "elapsedFromCallStartMs": 15700
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:45:42.843550+00:00",
+          "monotonicTimestamp": 17614.536708,
+          "elapsedFromCallStartMs": 15741
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "tts_started",
+          "timestamp": "2026-09-11T19:45:43.327622+00:00",
+          "monotonicTimestamp": 17615.020778,
+          "elapsedFromCallStartMs": 16225
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "tts_first_audio",
+          "timestamp": "2026-09-11T19:45:44.055424+00:00",
+          "monotonicTimestamp": 17615.748591,
+          "elapsedFromCallStartMs": 16953
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "post_tool_llm_response_complete",
+          "timestamp": "2026-09-11T19:45:44.148243+00:00",
+          "monotonicTimestamp": 17615.841407,
+          "elapsedFromCallStartMs": 17046
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "tts_stopped",
+          "timestamp": "2026-09-11T19:45:45.176041+00:00",
+          "monotonicTimestamp": 17616.869214,
+          "elapsedFromCallStartMs": 18074
+        },
+        {
+          "turnId": "turn-7720de69",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:45:45.176314+00:00",
+          "monotonicTimestamp": 17616.869492,
+          "elapsedFromCallStartMs": 18074
+        },
+        {
+          "turnId": "turn-43900e6e",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:45:45.177006+00:00",
+          "monotonicTimestamp": 17616.870185,
+          "elapsedFromCallStartMs": 18075
+        },
+        {
+          "turnId": "turn-98f1e8c1",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:45:50.160006+00:00",
+          "monotonicTimestamp": 17621.853176,
+          "elapsedFromCallStartMs": 23058
+        }
+      ],
+      "startup": {
+        "streamId": "pstn-p21b-4-0b6e1363",
+        "websocketAcceptToPlivoStartMs": 1,
+        "plivoStartToRuntimeConfigMs": 50,
+        "runtimeConfigToCallSessionMs": 391,
+        "callSessionToPipelineMs": null,
+        "pipelineToSttReadyMs": null,
+        "pipelineToTtsReadyMs": 441,
+        "greetingQueueToFirstAudioMs": 473,
+        "totalCallStartupToFirstAudioMs": 1361
+      }
+    },
+    "pstn-p21b-5-72989937": {
+      "events": [],
+      "turn_metrics": [
+        {
+          "turnId": "turn-8d7edee6",
+          "turnIndex": 1,
+          "responseLatencyMs": null,
+          "speechDurationMs": 8846,
+          "vadStopToUtteranceEndMs": 380,
+          "aggregationToLlmStartMs": 3,
+          "aggregationToLLMStartMs": 3,
+          "aggregationToLLMRequestMs": 3,
+          "llmHttpRequestMs": 605,
+          "llmProviderToFirstOutputMs": 2,
+          "llmToFirstOutputMs": 608,
+          "llmStartToFirstOutputMs": 608,
+          "llmRequestToFirstOutputMs": 608,
+          "llmToFirstToolDeltaMs": 1009,
+          "firstToolDeltaToToolCompleteMs": 485,
+          "totalTurnDurationMs": 10997,
+          "totalTurnMs": 10997,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "user_speech_stop",
+              "timestamp": "2026-09-11T19:46:37.079841+00:00",
+              "monotonicTimestamp": 17668.772997,
+              "elapsedFromCallStartMs": 11427
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "stt_utterance_end",
+              "timestamp": "2026-09-11T19:46:37.460178+00:00",
+              "monotonicTimestamp": 17669.153336,
+              "elapsedFromCallStartMs": 11807
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "user_aggregated",
+              "timestamp": "2026-09-11T19:46:37.723458+00:00",
+              "monotonicTimestamp": 17669.416618,
+              "elapsedFromCallStartMs": 12070
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "llm_request_created",
+              "timestamp": "2026-09-11T19:46:37.726008+00:00",
+              "monotonicTimestamp": 17669.419172,
+              "elapsedFromCallStartMs": 12073
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "llm_http_request_started",
+              "timestamp": "2026-09-11T19:46:37.726389+00:00",
+              "monotonicTimestamp": 17669.419172,
+              "elapsedFromCallStartMs": 12073
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "llm_first_provider_response",
+              "timestamp": "2026-09-11T19:46:38.331364+00:00",
+              "monotonicTimestamp": 17670.024517,
+              "elapsedFromCallStartMs": 12678
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:46:38.333580+00:00",
+              "monotonicTimestamp": 17670.026739,
+              "elapsedFromCallStartMs": 12680
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "first_tool_call_delta",
+              "timestamp": "2026-09-11T19:46:38.735444+00:00",
+              "monotonicTimestamp": 17670.428584,
+              "elapsedFromCallStartMs": 13082
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "tool_call_complete",
+              "timestamp": "2026-09-11T19:46:39.220492+00:00",
+              "monotonicTimestamp": 17670.913655,
+              "elapsedFromCallStartMs": 13567
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "llm_response_complete",
+              "timestamp": "2026-09-11T19:46:39.221124+00:00",
+              "monotonicTimestamp": 17670.913655,
+              "elapsedFromCallStartMs": 13567
+            },
+            {
+              "turnId": "turn-8d7edee6",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:46:39.230898+00:00",
+              "monotonicTimestamp": 17670.924061,
+              "elapsedFromCallStartMs": 13578
+            }
+          ]
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "turnIndex": 2,
+          "responseLatencyMs": null,
+          "llmFirstOutputToTtsStartMs": 438,
+          "llmToTTSStartMs": 438,
+          "firstLLMOutputToFirstAudioMs": 2143,
+          "toolDurationMs": 700,
+          "toolExecutionMs": 700,
+          "tools": [
+            {
+              "name": "query_knowledge_base",
+              "durationMs": 700,
+              "success": true
+            }
+          ],
+          "toolResultToPostToolLlmStartMs": 6,
+          "toolResultToPostToolLLMMs": 6,
+          "postToolLlmToFirstOutputMs": 588,
+          "postToolLlmMs": 588,
+          "postToolLLMToTTSMs": 469,
+          "postToolOutputToTTSMs": 469,
+          "postToolTTSToFirstAudioMs": 1706,
+          "toolResultToFirstAudioMs": 2769,
+          "ttsStartToFirstAudioMs": 1706,
+          "ttsConnectionMs": 5282,
+          "totalTurnDurationMs": 5304,
+          "totalTurnMs": 5304,
+          "interrupted": true,
+          "events": [
+            {
+              "turnId": "turn-1041feb4",
+              "event": "tool_executed",
+              "timestamp": "2026-09-11T19:46:39.922958+00:00",
+              "monotonicTimestamp": 17671.616108,
+              "elapsedFromCallStartMs": 14270,
+              "tool": "query_knowledge_base",
+              "durationMs": 700,
+              "success": true
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "post_tool_llm_context",
+              "timestamp": "2026-09-11T19:46:39.928111+00:00",
+              "monotonicTimestamp": 17671.621274,
+              "elapsedFromCallStartMs": 14275
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "post_tool_llm_request_created",
+              "timestamp": "2026-09-11T19:46:39.929317+00:00",
+              "monotonicTimestamp": 17671.622485,
+              "elapsedFromCallStartMs": 14276
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "post_tool_llm_http_request_started",
+              "timestamp": "2026-09-11T19:46:39.929562+00:00",
+              "monotonicTimestamp": 17671.622485,
+              "elapsedFromCallStartMs": 14276
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "post_tool_llm_first_provider_response",
+              "timestamp": "2026-09-11T19:46:40.514032+00:00",
+              "monotonicTimestamp": 17672.20719,
+              "elapsedFromCallStartMs": 14861
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "post_tool_llm_first_output",
+              "timestamp": "2026-09-11T19:46:40.516900+00:00",
+              "monotonicTimestamp": 17672.210057,
+              "elapsedFromCallStartMs": 14864
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:46:40.548836+00:00",
+              "monotonicTimestamp": 17672.241929,
+              "elapsedFromCallStartMs": 14896
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "tts_started",
+              "timestamp": "2026-09-11T19:46:40.986357+00:00",
+              "monotonicTimestamp": 17672.679519,
+              "elapsedFromCallStartMs": 15333
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "post_tool_llm_response_complete",
+              "timestamp": "2026-09-11T19:46:42.311280+00:00",
+              "monotonicTimestamp": 17674.004434,
+              "elapsedFromCallStartMs": 16658
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "tts_first_audio",
+              "timestamp": "2026-09-11T19:46:42.691888+00:00",
+              "monotonicTimestamp": 17674.385044,
+              "elapsedFromCallStartMs": 17039
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "tts_connected",
+              "timestamp": "2026-09-11T19:46:44.514635+00:00",
+              "monotonicTimestamp": 17676.207806,
+              "elapsedFromCallStartMs": 18861
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "interrupted",
+              "timestamp": "2026-09-11T19:46:44.517954+00:00",
+              "monotonicTimestamp": 17676.211114,
+              "elapsedFromCallStartMs": 18865,
+              "reason": "user_barge_in"
+            },
+            {
+              "turnId": "turn-1041feb4",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:46:44.536482+00:00",
+              "monotonicTimestamp": 17676.229648,
+              "elapsedFromCallStartMs": 18883
+            }
+          ]
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "turnIndex": 3,
+          "responseLatencyMs": 2202,
+          "speechDurationMs": 2579,
+          "vadStopToUtteranceEndMs": 141,
+          "aggregationToLlmStartMs": 1,
+          "aggregationToLLMStartMs": 1,
+          "aggregationToLLMRequestMs": 1,
+          "llmHttpRequestMs": 643,
+          "llmProviderToFirstOutputMs": 2,
+          "llmToFirstOutputMs": 645,
+          "llmStartToFirstOutputMs": 645,
+          "llmRequestToFirstOutputMs": 645,
+          "llmFirstOutputToTtsStartMs": 459,
+          "llmToTTSStartMs": 459,
+          "firstLLMOutputToFirstAudioMs": 1161,
+          "ttsStartToFirstAudioMs": 701,
+          "userStopToFirstAudioMs": 2202,
+          "speechStopToFirstAudioMs": 2202,
+          "aggregationToFirstAudioMs": 1807,
+          "totalTurnDurationMs": 6074,
+          "totalTurnMs": 6074,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-8c541c17",
+              "event": "user_speech_stop",
+              "timestamp": "2026-09-11T19:46:47.180699+00:00",
+              "monotonicTimestamp": 17678.873857,
+              "elapsedFromCallStartMs": 21528
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "stt_utterance_end",
+              "timestamp": "2026-09-11T19:46:47.321471+00:00",
+              "monotonicTimestamp": 17679.014633,
+              "elapsedFromCallStartMs": 21668
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "user_aggregated",
+              "timestamp": "2026-09-11T19:46:47.576077+00:00",
+              "monotonicTimestamp": 17679.269241,
+              "elapsedFromCallStartMs": 21923
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "llm_request_created",
+              "timestamp": "2026-09-11T19:46:47.577545+00:00",
+              "monotonicTimestamp": 17679.270713,
+              "elapsedFromCallStartMs": 21924
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "llm_http_request_started",
+              "timestamp": "2026-09-11T19:46:47.577725+00:00",
+              "monotonicTimestamp": 17679.270713,
+              "elapsedFromCallStartMs": 21924
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "llm_first_provider_response",
+              "timestamp": "2026-09-11T19:46:48.220185+00:00",
+              "monotonicTimestamp": 17679.913346,
+              "elapsedFromCallStartMs": 22567
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "llm_first_text_output",
+              "timestamp": "2026-09-11T19:46:48.222263+00:00",
+              "monotonicTimestamp": 17679.915424,
+              "elapsedFromCallStartMs": 22569
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "tts_started",
+              "timestamp": "2026-09-11T19:46:48.681455+00:00",
+              "monotonicTimestamp": 17680.374614,
+              "elapsedFromCallStartMs": 23028
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "tts_first_audio",
+              "timestamp": "2026-09-11T19:46:49.382904+00:00",
+              "monotonicTimestamp": 17681.076063,
+              "elapsedFromCallStartMs": 23730
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "llm_response_complete",
+              "timestamp": "2026-09-11T19:46:50.037446+00:00",
+              "monotonicTimestamp": 17681.730602,
+              "elapsedFromCallStartMs": 24384
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "tts_stopped",
+              "timestamp": "2026-09-11T19:46:50.675097+00:00",
+              "monotonicTimestamp": 17682.368264,
+              "elapsedFromCallStartMs": 25022
+            },
+            {
+              "turnId": "turn-8c541c17",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:46:50.675360+00:00",
+              "monotonicTimestamp": 17682.368532,
+              "elapsedFromCallStartMs": 25022
+            }
+          ]
+        },
+        {
+          "turnId": "turn-a383b811",
+          "turnIndex": 4,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 0,
+          "totalTurnMs": 0,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-a383b811",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:46:50.675996+00:00",
+              "monotonicTimestamp": 17682.369168,
+              "elapsedFromCallStartMs": 25023
+            }
+          ]
+        },
+        {
+          "turnId": "turn-56de250f",
+          "turnIndex": 5,
+          "responseLatencyMs": null,
+          "totalTurnDurationMs": 7540,
+          "totalTurnMs": 7540,
+          "interrupted": false,
+          "events": [
+            {
+              "turnId": "turn-56de250f",
+              "event": "turn_completed",
+              "timestamp": "2026-09-11T19:46:58.216550+00:00",
+              "monotonicTimestamp": 17689.909715,
+              "elapsedFromCallStartMs": 32563
+            }
+          ]
+        }
+      ],
+      "traces": [
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_start",
+          "timestamp": "2026-09-11T19:46:26.467497+00:00",
+          "monotonicTimestamp": 17658.160666,
+          "elapsedFromCallStartMs": 814
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T19:46:27.054468+00:00",
+          "monotonicTimestamp": 17658.74764,
+          "elapsedFromCallStartMs": 1401
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T19:46:27.074241+00:00",
+          "monotonicTimestamp": 17658.767023,
+          "elapsedFromCallStartMs": 1421
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.522317+00:00",
+          "monotonicTimestamp": 17659.21548,
+          "elapsedFromCallStartMs": 1869
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.524091+00:00",
+          "monotonicTimestamp": 17659.21726,
+          "elapsedFromCallStartMs": 1871
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.585239+00:00",
+          "monotonicTimestamp": 17659.278398,
+          "elapsedFromCallStartMs": 1932
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.649301+00:00",
+          "monotonicTimestamp": 17659.342461,
+          "elapsedFromCallStartMs": 1996
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.715309+00:00",
+          "monotonicTimestamp": 17659.40847,
+          "elapsedFromCallStartMs": 2062
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.776689+00:00",
+          "monotonicTimestamp": 17659.469852,
+          "elapsedFromCallStartMs": 2124
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.841990+00:00",
+          "monotonicTimestamp": 17659.53515,
+          "elapsedFromCallStartMs": 2189
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.916536+00:00",
+          "monotonicTimestamp": 17659.6097,
+          "elapsedFromCallStartMs": 2263
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:27.973048+00:00",
+          "monotonicTimestamp": 17659.666206,
+          "elapsedFromCallStartMs": 2320
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:28.040005+00:00",
+          "monotonicTimestamp": 17659.733167,
+          "elapsedFromCallStartMs": 2387
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:28.103527+00:00",
+          "monotonicTimestamp": 17659.796685,
+          "elapsedFromCallStartMs": 2450
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:28.164650+00:00",
+          "monotonicTimestamp": 17659.857811,
+          "elapsedFromCallStartMs": 2511
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:28.187031+00:00",
+          "monotonicTimestamp": 17659.880193,
+          "elapsedFromCallStartMs": 2534
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T19:46:28.188629+00:00",
+          "monotonicTimestamp": 17659.88179,
+          "elapsedFromCallStartMs": 2535
+        },
+        {
+          "turnId": "turn-c78af9e7",
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T19:46:28.234037+00:00",
+          "monotonicTimestamp": 17659.926965,
+          "elapsedFromCallStartMs": 2581
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "user_speech_stop",
+          "timestamp": "2026-09-11T19:46:37.079841+00:00",
+          "monotonicTimestamp": 17668.772997,
+          "elapsedFromCallStartMs": 11427
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "stt_utterance_end",
+          "timestamp": "2026-09-11T19:46:37.460178+00:00",
+          "monotonicTimestamp": 17669.153336,
+          "elapsedFromCallStartMs": 11807
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "user_aggregated",
+          "timestamp": "2026-09-11T19:46:37.723458+00:00",
+          "monotonicTimestamp": 17669.416618,
+          "elapsedFromCallStartMs": 12070
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "llm_request_created",
+          "timestamp": "2026-09-11T19:46:37.726008+00:00",
+          "monotonicTimestamp": 17669.419172,
+          "elapsedFromCallStartMs": 12073
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "llm_http_request_started",
+          "timestamp": "2026-09-11T19:46:37.726389+00:00",
+          "monotonicTimestamp": 17669.419172,
+          "elapsedFromCallStartMs": 12073
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "llm_first_provider_response",
+          "timestamp": "2026-09-11T19:46:38.331364+00:00",
+          "monotonicTimestamp": 17670.024517,
+          "elapsedFromCallStartMs": 12678
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:46:38.333580+00:00",
+          "monotonicTimestamp": 17670.026739,
+          "elapsedFromCallStartMs": 12680
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "first_tool_call_delta",
+          "timestamp": "2026-09-11T19:46:38.735444+00:00",
+          "monotonicTimestamp": 17670.428584,
+          "elapsedFromCallStartMs": 13082
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "tool_call_complete",
+          "timestamp": "2026-09-11T19:46:39.220492+00:00",
+          "monotonicTimestamp": 17670.913655,
+          "elapsedFromCallStartMs": 13567
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "llm_response_complete",
+          "timestamp": "2026-09-11T19:46:39.221124+00:00",
+          "monotonicTimestamp": 17670.913655,
+          "elapsedFromCallStartMs": 13567
+        },
+        {
+          "turnId": "turn-8d7edee6",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:46:39.230898+00:00",
+          "monotonicTimestamp": 17670.924061,
+          "elapsedFromCallStartMs": 13578
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "tool_executed",
+          "timestamp": "2026-09-11T19:46:39.922958+00:00",
+          "monotonicTimestamp": 17671.616108,
+          "elapsedFromCallStartMs": 14270,
+          "tool": "query_knowledge_base",
+          "durationMs": 700,
+          "success": true
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "post_tool_llm_context",
+          "timestamp": "2026-09-11T19:46:39.928111+00:00",
+          "monotonicTimestamp": 17671.621274,
+          "elapsedFromCallStartMs": 14275
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "post_tool_llm_request_created",
+          "timestamp": "2026-09-11T19:46:39.929317+00:00",
+          "monotonicTimestamp": 17671.622485,
+          "elapsedFromCallStartMs": 14276
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "post_tool_llm_http_request_started",
+          "timestamp": "2026-09-11T19:46:39.929562+00:00",
+          "monotonicTimestamp": 17671.622485,
+          "elapsedFromCallStartMs": 14276
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "post_tool_llm_first_provider_response",
+          "timestamp": "2026-09-11T19:46:40.514032+00:00",
+          "monotonicTimestamp": 17672.20719,
+          "elapsedFromCallStartMs": 14861
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "post_tool_llm_first_output",
+          "timestamp": "2026-09-11T19:46:40.516900+00:00",
+          "monotonicTimestamp": 17672.210057,
+          "elapsedFromCallStartMs": 14864
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:46:40.548836+00:00",
+          "monotonicTimestamp": 17672.241929,
+          "elapsedFromCallStartMs": 14896
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "tts_started",
+          "timestamp": "2026-09-11T19:46:40.986357+00:00",
+          "monotonicTimestamp": 17672.679519,
+          "elapsedFromCallStartMs": 15333
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "post_tool_llm_response_complete",
+          "timestamp": "2026-09-11T19:46:42.311280+00:00",
+          "monotonicTimestamp": 17674.004434,
+          "elapsedFromCallStartMs": 16658
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "tts_first_audio",
+          "timestamp": "2026-09-11T19:46:42.691888+00:00",
+          "monotonicTimestamp": 17674.385044,
+          "elapsedFromCallStartMs": 17039
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T19:46:44.514635+00:00",
+          "monotonicTimestamp": 17676.207806,
+          "elapsedFromCallStartMs": 18861
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "interrupted",
+          "timestamp": "2026-09-11T19:46:44.517954+00:00",
+          "monotonicTimestamp": 17676.211114,
+          "elapsedFromCallStartMs": 18865,
+          "reason": "user_barge_in"
+        },
+        {
+          "turnId": "turn-1041feb4",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:46:44.536482+00:00",
+          "monotonicTimestamp": 17676.229648,
+          "elapsedFromCallStartMs": 18883
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "user_speech_stop",
+          "timestamp": "2026-09-11T19:46:47.180699+00:00",
+          "monotonicTimestamp": 17678.873857,
+          "elapsedFromCallStartMs": 21528
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "stt_utterance_end",
+          "timestamp": "2026-09-11T19:46:47.321471+00:00",
+          "monotonicTimestamp": 17679.014633,
+          "elapsedFromCallStartMs": 21668
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "user_aggregated",
+          "timestamp": "2026-09-11T19:46:47.576077+00:00",
+          "monotonicTimestamp": 17679.269241,
+          "elapsedFromCallStartMs": 21923
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "llm_request_created",
+          "timestamp": "2026-09-11T19:46:47.577545+00:00",
+          "monotonicTimestamp": 17679.270713,
+          "elapsedFromCallStartMs": 21924
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "llm_http_request_started",
+          "timestamp": "2026-09-11T19:46:47.577725+00:00",
+          "monotonicTimestamp": 17679.270713,
+          "elapsedFromCallStartMs": 21924
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "llm_first_provider_response",
+          "timestamp": "2026-09-11T19:46:48.220185+00:00",
+          "monotonicTimestamp": 17679.913346,
+          "elapsedFromCallStartMs": 22567
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "llm_first_text_output",
+          "timestamp": "2026-09-11T19:46:48.222263+00:00",
+          "monotonicTimestamp": 17679.915424,
+          "elapsedFromCallStartMs": 22569
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "tts_started",
+          "timestamp": "2026-09-11T19:46:48.681455+00:00",
+          "monotonicTimestamp": 17680.374614,
+          "elapsedFromCallStartMs": 23028
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "tts_first_audio",
+          "timestamp": "2026-09-11T19:46:49.382904+00:00",
+          "monotonicTimestamp": 17681.076063,
+          "elapsedFromCallStartMs": 23730
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "llm_response_complete",
+          "timestamp": "2026-09-11T19:46:50.037446+00:00",
+          "monotonicTimestamp": 17681.730602,
+          "elapsedFromCallStartMs": 24384
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "tts_stopped",
+          "timestamp": "2026-09-11T19:46:50.675097+00:00",
+          "monotonicTimestamp": 17682.368264,
+          "elapsedFromCallStartMs": 25022
+        },
+        {
+          "turnId": "turn-8c541c17",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:46:50.675360+00:00",
+          "monotonicTimestamp": 17682.368532,
+          "elapsedFromCallStartMs": 25022
+        },
+        {
+          "turnId": "turn-a383b811",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:46:50.675996+00:00",
+          "monotonicTimestamp": 17682.369168,
+          "elapsedFromCallStartMs": 25023
+        },
+        {
+          "turnId": "turn-56de250f",
+          "event": "turn_completed",
+          "timestamp": "2026-09-11T19:46:58.216550+00:00",
+          "monotonicTimestamp": 17689.909715,
+          "elapsedFromCallStartMs": 32563
+        }
+      ],
+      "startup": {
+        "streamId": "pstn-p21b-5-72989937",
+        "websocketAcceptToPlivoStartMs": 2,
+        "plivoStartToRuntimeConfigMs": 24,
+        "runtimeConfigToCallSessionMs": 838,
+        "callSessionToPipelineMs": null,
+        "pipelineToSttReadyMs": null,
+        "pipelineToTtsReadyMs": 588,
+        "greetingQueueToFirstAudioMs": 458,
+        "totalCallStartupToFirstAudioMs": 1869
+      }
+    }
+  }
+}

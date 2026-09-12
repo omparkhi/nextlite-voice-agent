@@ -1,0 +1,741 @@
+{
+  "summary": {
+    "baseline_p50": 842.2,
+    "cand_p50": 468.6,
+    "delta_p50": -373.6,
+    "baseline_p90": 1211.1,
+    "cand_p90": 702.6,
+    "delta_p90": -508.5,
+    "baseline_mean": 807.8249999999999,
+    "cand_mean": 463.735,
+    "delta_mean": -344.1
+  },
+  "baseline_turns": [
+    {
+      "turn_id": "turn_01",
+      "turn_type": "short_greeting",
+      "first_chunk_delay_ms": 1549.6,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        70,
+        25
+      ],
+      "chunk_words": [
+        12,
+        6
+      ],
+      "emitted_chunks": [
+        "Hello, thank you for calling NextLite Dental Clinic, my name is Priya.",
+        "How can I help you today?"
+      ],
+      "first_chunk": "Hello, thank you for calling NextLite Dental Clinic, my name is Priya."
+    },
+    {
+      "turn_id": "turn_02",
+      "turn_type": "confirmation",
+      "first_chunk_delay_ms": 232.6,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        24,
+        44
+      ],
+      "chunk_words": [
+        3,
+        9
+      ],
+      "emitted_chunks": [
+        "I understand completely.",
+        "Let me check the schedule for you right now."
+      ],
+      "first_chunk": "I understand completely."
+    },
+    {
+      "turn_id": "turn_03",
+      "turn_type": "numbers",
+      "first_chunk_delay_ms": 1170.1,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        112
+      ],
+      "chunk_words": [
+        18
+      ],
+      "emitted_chunks": [
+        "The consultation fee is 1,500 rupees, and root canal treatment starts from 10,000 rupees depending on the tooth."
+      ],
+      "first_chunk": "The consultation fee is 1,500 rupees, and root canal treatment starts from 10,000 rupees depending on the tooth."
+    },
+    {
+      "turn_id": "turn_04",
+      "turn_type": "name_date",
+      "first_chunk_delay_ms": 747.8,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        74
+      ],
+      "chunk_words": [
+        14
+      ],
+      "emitted_chunks": [
+        "Dr. Sharma is available on 15/09/2026 at 4:30 PM, would that work for you?"
+      ],
+      "first_chunk": "Dr. Sharma is available on 15/09/2026 at 4:30 PM, would that work for you?"
+    },
+    {
+      "turn_id": "turn_05",
+      "turn_type": "id_phone",
+      "first_chunk_delay_ms": 840.0,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        87
+      ],
+      "chunk_words": [
+        15
+      ],
+      "emitted_chunks": [
+        "Your appointment ID is APT-1042, and we have sent a confirmation SMS to +91 9876543210."
+      ],
+      "first_chunk": "Your appointment ID is APT-1042, and we have sent a confirmation SMS to +91 9876543210."
+    },
+    {
+      "turn_id": "turn_06",
+      "turn_type": "multi_sentence",
+      "first_chunk_delay_ms": 327.7,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        33,
+        101
+      ],
+      "chunk_words": [
+        6,
+        14
+      ],
+      "emitted_chunks": [
+        "Yes, we do offer teeth whitening.",
+        "The procedure takes approximately 45 minutes, and our specialists use advanced LED enamel technology."
+      ],
+      "first_chunk": "Yes, we do offer teeth whitening."
+    },
+    {
+      "turn_id": "turn_07",
+      "turn_type": "short_answer",
+      "first_chunk_delay_ms": 138.7,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        16,
+        33
+      ],
+      "chunk_words": [
+        2,
+        7
+      ],
+      "emitted_chunks": [
+        "Yes, absolutely.",
+        "We are open on Saturdays as well."
+      ],
+      "first_chunk": "Yes, absolutely."
+    },
+    {
+      "turn_id": "turn_08",
+      "turn_type": "question",
+      "first_chunk_delay_ms": 1029.1,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        104
+      ],
+      "chunk_words": [
+        18
+      ],
+      "emitted_chunks": [
+        "Could you please tell me if you are currently experiencing any swelling, or is it just mild sensitivity?"
+      ],
+      "first_chunk": "Could you please tell me if you are currently experiencing any swelling, or is it just mild sensitivity?"
+    },
+    {
+      "turn_id": "turn_09",
+      "turn_type": "hindi_greeting",
+      "first_chunk_delay_ms": 842.2,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        84
+      ],
+      "chunk_words": [
+        15
+      ],
+      "emitted_chunks": [
+        "\u0928\u092e\u0938\u094d\u0924\u0947, \u0928\u0947\u0915\u094d\u0938\u094d\u091f\u0932\u093e\u0907\u091f \u0921\u0947\u0902\u091f\u0932 \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0947\u0902 \u0906\u092a\u0915\u093e \u0938\u094d\u0935\u093e\u0917\u0924 \u0939\u0948, \u092e\u0948\u0902 \u0906\u092a\u0915\u0940 \u0915\u094d\u092f\u093e \u092e\u0926\u0926 \u0915\u0930 \u0938\u0915\u0924\u0940 \u0939\u0942\u0901?"
+      ],
+      "first_chunk": "\u0928\u092e\u0938\u094d\u0924\u0947, \u0928\u0947\u0915\u094d\u0938\u094d\u091f\u0932\u093e\u0907\u091f \u0921\u0947\u0902\u091f\u0932 \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0947\u0902 \u0906\u092a\u0915\u093e \u0938\u094d\u0935\u093e\u0917\u0924 \u0939\u0948, \u092e\u0948\u0902 \u0906\u092a\u0915\u0940 \u0915\u094d\u092f\u093e \u092e\u0926\u0926 \u0915\u0930 \u0938\u0915\u0924\u0940 \u0939\u0942\u0901?"
+    },
+    {
+      "turn_id": "turn_10",
+      "turn_type": "hindi_doctor",
+      "first_chunk_delay_ms": 139.5,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        11,
+        72
+      ],
+      "chunk_words": [
+        3,
+        14
+      ],
+      "emitted_chunks": [
+        "\u091c\u0940 \u0939\u093e\u0901, \u0921\u0949.",
+        "\u0936\u0930\u094d\u092e\u093e \u0915\u0932 \u0926\u094b\u092a\u0939\u0930 2:00 \u092c\u091c\u0947 \u0909\u092a\u0932\u092c\u094d\u0927 \u0939\u0948\u0902, \u0915\u094d\u092f\u093e \u092e\u0948\u0902 \u0906\u092a\u0915\u0940 \u0905\u092a\u0949\u0907\u0902\u091f\u092e\u0947\u0902\u091f \u092c\u0941\u0915 \u0915\u0930 \u0926\u0942\u0901?"
+      ],
+      "first_chunk": "\u091c\u0940 \u0939\u093e\u0901, \u0921\u0949."
+    },
+    {
+      "turn_id": "turn_11",
+      "turn_type": "hindi_multi",
+      "first_chunk_delay_ms": 798.9,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        72,
+        23
+      ],
+      "chunk_words": [
+        13,
+        6
+      ],
+      "emitted_chunks": [
+        "\u0939\u092e\u093e\u0930\u0947 \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0947\u0902 \u0926\u093e\u0901\u0924\u094b\u0902 \u0915\u0940 \u0938\u092b\u093e\u0908 \u0914\u0930 \u0930\u0942\u091f \u0915\u0948\u0928\u093e\u0932 \u0926\u094b\u0928\u094b\u0902 \u0938\u0941\u0935\u093f\u0927\u093e\u090f\u0902 \u0909\u092a\u0932\u092c\u094d\u0927 \u0939\u0948\u0902\u0964",
+        "\u0906\u092a \u091c\u092c \u091a\u093e\u0939\u0947\u0902 \u0906 \u0938\u0915\u0924\u0947 \u0939\u0948\u0902\u0964"
+      ],
+      "first_chunk": "\u0939\u092e\u093e\u0930\u0947 \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0947\u0902 \u0926\u093e\u0901\u0924\u094b\u0902 \u0915\u0940 \u0938\u092b\u093e\u0908 \u0914\u0930 \u0930\u0942\u091f \u0915\u0948\u0928\u093e\u0932 \u0926\u094b\u0928\u094b\u0902 \u0938\u0941\u0935\u093f\u0927\u093e\u090f\u0902 \u0909\u092a\u0932\u092c\u094d\u0927 \u0939\u0948\u0902\u0964"
+    },
+    {
+      "turn_id": "turn_12",
+      "turn_type": "marathi_greeting",
+      "first_chunk_delay_ms": 791.3,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        81
+      ],
+      "chunk_words": [
+        13
+      ],
+      "emitted_chunks": [
+        "\u0928\u092e\u0938\u094d\u0915\u093e\u0930, \u0928\u0947\u0915\u094d\u0938\u094d\u091f\u0932\u093e\u0907\u091f \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0927\u094d\u092f\u0947 \u0906\u092a\u0932\u0947 \u0938\u094d\u0935\u093e\u0917\u0924 \u0906\u0939\u0947, \u092e\u0940 \u0924\u0941\u092e\u094d\u0939\u093e\u0932\u093e \u0915\u0936\u0940 \u092e\u0926\u0924 \u0915\u0930\u0942 \u0936\u0915\u0924\u094b?"
+      ],
+      "first_chunk": "\u0928\u092e\u0938\u094d\u0915\u093e\u0930, \u0928\u0947\u0915\u094d\u0938\u094d\u091f\u0932\u093e\u0907\u091f \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0927\u094d\u092f\u0947 \u0906\u092a\u0932\u0947 \u0938\u094d\u0935\u093e\u0917\u0924 \u0906\u0939\u0947, \u092e\u0940 \u0924\u0941\u092e\u094d\u0939\u093e\u0932\u093e \u0915\u0936\u0940 \u092e\u0926\u0924 \u0915\u0930\u0942 \u0936\u0915\u0924\u094b?"
+    },
+    {
+      "turn_id": "turn_13",
+      "turn_type": "marathi_timing",
+      "first_chunk_delay_ms": 651.4,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        77
+      ],
+      "chunk_words": [
+        13
+      ],
+      "emitted_chunks": [
+        "\u0939\u094b\u092f, \u0906\u092e\u094d\u0939\u0940 \u0909\u0926\u094d\u092f\u093e \u0938\u0915\u093e\u0933\u0940 10:00 \u0935\u093e\u091c\u0924\u093e \u0909\u092a\u0932\u092c\u094d\u0927 \u0906\u0939\u094b\u0924, \u0906\u092a\u0932\u0940 \u0905\u092a\u0949\u0907\u0902\u091f\u092e\u0947\u0902\u091f \u0928\u0915\u094d\u0915\u0940 \u0915\u0930\u0942 \u0915\u093e?"
+      ],
+      "first_chunk": "\u0939\u094b\u092f, \u0906\u092e\u094d\u0939\u0940 \u0909\u0926\u094d\u092f\u093e \u0938\u0915\u093e\u0933\u0940 10:00 \u0935\u093e\u091c\u0924\u093e \u0909\u092a\u0932\u092c\u094d\u0927 \u0906\u0939\u094b\u0924, \u0906\u092a\u0932\u0940 \u0905\u092a\u0949\u0907\u0902\u091f\u092e\u0947\u0902\u091f \u0928\u0915\u094d\u0915\u0940 \u0915\u0930\u0942 \u0915\u093e?"
+    },
+    {
+      "turn_id": "turn_14",
+      "turn_type": "hinglish",
+      "first_chunk_delay_ms": 933.4,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        98
+      ],
+      "chunk_words": [
+        17
+      ],
+      "emitted_chunks": [
+        "Sure sir, main aapka appointment book kar deti hoon, aap please apna full name confirm kar dijiye."
+      ],
+      "first_chunk": "Sure sir, main aapka appointment book kar deti hoon, aap please apna full name confirm kar dijiye."
+    },
+    {
+      "turn_id": "turn_15",
+      "turn_type": "minglish",
+      "first_chunk_delay_ms": 935.9,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        88
+      ],
+      "chunk_words": [
+        13
+      ],
+      "emitted_chunks": [
+        "Nakki sir, mi tumchi booking confirm karto, doctor udya afternoon madhe available aahet."
+      ],
+      "first_chunk": "Nakki sir, mi tumchi booking confirm karto, doctor udya afternoon madhe available aahet."
+    },
+    {
+      "turn_id": "turn_16",
+      "turn_type": "decimal_time",
+      "first_chunk_delay_ms": 1338.4,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        106
+      ],
+      "chunk_words": [
+        19
+      ],
+      "emitted_chunks": [
+        "Our clinic has an average rating of 4.9 stars, and our team has treated over 25,000 patients across India."
+      ],
+      "first_chunk": "Our clinic has an average rating of 4.9 stars, and our team has treated over 25,000 patients across India."
+    },
+    {
+      "turn_id": "turn_17",
+      "turn_type": "url_contact",
+      "first_chunk_delay_ms": 747.2,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        90
+      ],
+      "chunk_words": [
+        12
+      ],
+      "emitted_chunks": [
+        "You can also visit nextlite.ai for detailed pricing, or email support@nextlite.ai anytime."
+      ],
+      "first_chunk": "You can also visit nextlite.ai for detailed pricing, or email support@nextlite.ai anytime."
+    },
+    {
+      "turn_id": "turn_18",
+      "turn_type": "emergency",
+      "first_chunk_delay_ms": 1211.1,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        122
+      ],
+      "chunk_words": [
+        19
+      ],
+      "emitted_chunks": [
+        "If you are experiencing severe bleeding or pain, please visit our emergency room immediately, or call our 24-hour hotline."
+      ],
+      "first_chunk": "If you are experiencing severe bleeding or pain, please visit our emergency room immediately, or call our 24-hour hotline."
+    },
+    {
+      "turn_id": "turn_19",
+      "turn_type": "reschedule",
+      "first_chunk_delay_ms": 887.1,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        81
+      ],
+      "chunk_words": [
+        16
+      ],
+      "emitted_chunks": [
+        "No problem at all, I can reschedule your visit from Friday to Monday at 11:00 AM."
+      ],
+      "first_chunk": "No problem at all, I can reschedule your visit from Friday to Monday at 11:00 AM."
+    },
+    {
+      "turn_id": "turn_20",
+      "turn_type": "closing",
+      "first_chunk_delay_ms": 844.5,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        82
+      ],
+      "chunk_words": [
+        15
+      ],
+      "emitted_chunks": [
+        "Thank you for choosing NextLite, have a wonderful day and take care of your smile!"
+      ],
+      "first_chunk": "Thank you for choosing NextLite, have a wonderful day and take care of your smile!"
+    }
+  ],
+  "cand_turns": [
+    {
+      "turn_id": "turn_01",
+      "turn_type": "short_greeting",
+      "first_chunk_delay_ms": 562.3,
+      "chunk_count": 3,
+      "chunk_lengths": [
+        52,
+        17,
+        25
+      ],
+      "chunk_words": [
+        8,
+        4,
+        6
+      ],
+      "emitted_chunks": [
+        "Hello, thank you for calling NextLite Dental Clinic,",
+        "my name is Priya.",
+        "How can I help you today?"
+      ],
+      "first_chunk": "Hello, thank you for calling NextLite Dental Clinic,"
+    },
+    {
+      "turn_id": "turn_02",
+      "turn_type": "confirmation",
+      "first_chunk_delay_ms": 235.9,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        24,
+        44
+      ],
+      "chunk_words": [
+        3,
+        9
+      ],
+      "emitted_chunks": [
+        "I understand completely.",
+        "Let me check the schedule for you right now."
+      ],
+      "first_chunk": "I understand completely."
+    },
+    {
+      "turn_id": "turn_03",
+      "turn_type": "numbers",
+      "first_chunk_delay_ms": 324.3,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        37,
+        74
+      ],
+      "chunk_words": [
+        6,
+        12
+      ],
+      "emitted_chunks": [
+        "The consultation fee is 1,500 rupees,",
+        "and root canal treatment starts from 10,000 rupees depending on the tooth."
+      ],
+      "first_chunk": "The consultation fee is 1,500 rupees,"
+    },
+    {
+      "turn_id": "turn_04",
+      "turn_type": "name_date",
+      "first_chunk_delay_ms": 514.2,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        49,
+        24
+      ],
+      "chunk_words": [
+        9,
+        5
+      ],
+      "emitted_chunks": [
+        "Dr. Sharma is available on 15/09/2026 at 4:30 PM,",
+        "would that work for you?"
+      ],
+      "first_chunk": "Dr. Sharma is available on 15/09/2026 at 4:30 PM,"
+    },
+    {
+      "turn_id": "turn_05",
+      "turn_type": "id_phone",
+      "first_chunk_delay_ms": 282.0,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        32,
+        54
+      ],
+      "chunk_words": [
+        5,
+        10
+      ],
+      "emitted_chunks": [
+        "Your appointment ID is APT-1042,",
+        "and we have sent a confirmation SMS to +91 9876543210."
+      ],
+      "first_chunk": "Your appointment ID is APT-1042,"
+    },
+    {
+      "turn_id": "turn_06",
+      "turn_type": "multi_sentence",
+      "first_chunk_delay_ms": 327.0,
+      "chunk_count": 3,
+      "chunk_lengths": [
+        33,
+        45,
+        55
+      ],
+      "chunk_words": [
+        6,
+        6,
+        8
+      ],
+      "emitted_chunks": [
+        "Yes, we do offer teeth whitening.",
+        "The procedure takes approximately 45 minutes,",
+        "and our specialists use advanced LED enamel technology."
+      ],
+      "first_chunk": "Yes, we do offer teeth whitening."
+    },
+    {
+      "turn_id": "turn_07",
+      "turn_type": "short_answer",
+      "first_chunk_delay_ms": 140.7,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        16,
+        33
+      ],
+      "chunk_words": [
+        2,
+        7
+      ],
+      "emitted_chunks": [
+        "Yes, absolutely.",
+        "We are open on Saturdays as well."
+      ],
+      "first_chunk": "Yes, absolutely."
+    },
+    {
+      "turn_id": "turn_08",
+      "turn_type": "question",
+      "first_chunk_delay_ms": 702.6,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        72,
+        31
+      ],
+      "chunk_words": [
+        12,
+        6
+      ],
+      "emitted_chunks": [
+        "Could you please tell me if you are currently experiencing any swelling,",
+        "or is it just mild sensitivity?"
+      ],
+      "first_chunk": "Could you please tell me if you are currently experiencing any swelling,"
+    },
+    {
+      "turn_id": "turn_09",
+      "turn_type": "hindi_greeting",
+      "first_chunk_delay_ms": 516.8,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        53,
+        30
+      ],
+      "chunk_words": [
+        8,
+        7
+      ],
+      "emitted_chunks": [
+        "\u0928\u092e\u0938\u094d\u0924\u0947, \u0928\u0947\u0915\u094d\u0938\u094d\u091f\u0932\u093e\u0907\u091f \u0921\u0947\u0902\u091f\u0932 \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0947\u0902 \u0906\u092a\u0915\u093e \u0938\u094d\u0935\u093e\u0917\u0924 \u0939\u0948,",
+        "\u092e\u0948\u0902 \u0906\u092a\u0915\u0940 \u0915\u094d\u092f\u093e \u092e\u0926\u0926 \u0915\u0930 \u0938\u0915\u0924\u0940 \u0939\u0942\u0901?"
+      ],
+      "first_chunk": "\u0928\u092e\u0938\u094d\u0924\u0947, \u0928\u0947\u0915\u094d\u0938\u094d\u091f\u0932\u093e\u0907\u091f \u0921\u0947\u0902\u091f\u0932 \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0947\u0902 \u0906\u092a\u0915\u093e \u0938\u094d\u0935\u093e\u0917\u0924 \u0939\u0948,"
+    },
+    {
+      "turn_id": "turn_10",
+      "turn_type": "hindi_doctor",
+      "first_chunk_delay_ms": 536.8,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        47,
+        36
+      ],
+      "chunk_words": [
+        10,
+        7
+      ],
+      "emitted_chunks": [
+        "\u091c\u0940 \u0939\u093e\u0901, \u0921\u0949. \u0936\u0930\u094d\u092e\u093e \u0915\u0932 \u0926\u094b\u092a\u0939\u0930 2:00 \u092c\u091c\u0947 \u0909\u092a\u0932\u092c\u094d\u0927 \u0939\u0948\u0902,",
+        "\u0915\u094d\u092f\u093e \u092e\u0948\u0902 \u0906\u092a\u0915\u0940 \u0905\u092a\u0949\u0907\u0902\u091f\u092e\u0947\u0902\u091f \u092c\u0941\u0915 \u0915\u0930 \u0926\u0942\u0901?"
+      ],
+      "first_chunk": "\u091c\u0940 \u0939\u093e\u0901, \u0921\u0949. \u0936\u0930\u094d\u092e\u093e \u0915\u0932 \u0926\u094b\u092a\u0939\u0930 2:00 \u092c\u091c\u0947 \u0909\u092a\u0932\u092c\u094d\u0927 \u0939\u0948\u0902,"
+    },
+    {
+      "turn_id": "turn_11",
+      "turn_type": "hindi_multi",
+      "first_chunk_delay_ms": 745.2,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        72,
+        23
+      ],
+      "chunk_words": [
+        13,
+        6
+      ],
+      "emitted_chunks": [
+        "\u0939\u092e\u093e\u0930\u0947 \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0947\u0902 \u0926\u093e\u0901\u0924\u094b\u0902 \u0915\u0940 \u0938\u092b\u093e\u0908 \u0914\u0930 \u0930\u0942\u091f \u0915\u0948\u0928\u093e\u0932 \u0926\u094b\u0928\u094b\u0902 \u0938\u0941\u0935\u093f\u0927\u093e\u090f\u0902 \u0909\u092a\u0932\u092c\u094d\u0927 \u0939\u0948\u0902\u0964",
+        "\u0906\u092a \u091c\u092c \u091a\u093e\u0939\u0947\u0902 \u0906 \u0938\u0915\u0924\u0947 \u0939\u0948\u0902\u0964"
+      ],
+      "first_chunk": "\u0939\u092e\u093e\u0930\u0947 \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0947\u0902 \u0926\u093e\u0901\u0924\u094b\u0902 \u0915\u0940 \u0938\u092b\u093e\u0908 \u0914\u0930 \u0930\u0942\u091f \u0915\u0948\u0928\u093e\u0932 \u0926\u094b\u0928\u094b\u0902 \u0938\u0941\u0935\u093f\u0927\u093e\u090f\u0902 \u0909\u092a\u0932\u092c\u094d\u0927 \u0939\u0948\u0902\u0964"
+    },
+    {
+      "turn_id": "turn_12",
+      "turn_type": "marathi_greeting",
+      "first_chunk_delay_ms": 469.0,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        51,
+        29
+      ],
+      "chunk_words": [
+        7,
+        6
+      ],
+      "emitted_chunks": [
+        "\u0928\u092e\u0938\u094d\u0915\u093e\u0930, \u0928\u0947\u0915\u094d\u0938\u094d\u091f\u0932\u093e\u0907\u091f \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0927\u094d\u092f\u0947 \u0906\u092a\u0932\u0947 \u0938\u094d\u0935\u093e\u0917\u0924 \u0906\u0939\u0947,",
+        "\u092e\u0940 \u0924\u0941\u092e\u094d\u0939\u093e\u0932\u093e \u0915\u0936\u0940 \u092e\u0926\u0924 \u0915\u0930\u0942 \u0936\u0915\u0924\u094b?"
+      ],
+      "first_chunk": "\u0928\u092e\u0938\u094d\u0915\u093e\u0930, \u0928\u0947\u0915\u094d\u0938\u094d\u091f\u0932\u093e\u0907\u091f \u0915\u094d\u0932\u093f\u0928\u093f\u0915 \u092e\u0927\u094d\u092f\u0947 \u0906\u092a\u0932\u0947 \u0938\u094d\u0935\u093e\u0917\u0924 \u0906\u0939\u0947,"
+    },
+    {
+      "turn_id": "turn_13",
+      "turn_type": "marathi_timing",
+      "first_chunk_delay_ms": 372.2,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        47,
+        29
+      ],
+      "chunk_words": [
+        8,
+        5
+      ],
+      "emitted_chunks": [
+        "\u0939\u094b\u092f, \u0906\u092e\u094d\u0939\u0940 \u0909\u0926\u094d\u092f\u093e \u0938\u0915\u093e\u0933\u0940 10:00 \u0935\u093e\u091c\u0924\u093e \u0909\u092a\u0932\u092c\u094d\u0927 \u0906\u0939\u094b\u0924,",
+        "\u0906\u092a\u0932\u0940 \u0905\u092a\u0949\u0907\u0902\u091f\u092e\u0947\u0902\u091f \u0928\u0915\u094d\u0915\u0940 \u0915\u0930\u0942 \u0915\u093e?"
+      ],
+      "first_chunk": "\u0939\u094b\u092f, \u0906\u092e\u094d\u0939\u0940 \u0909\u0926\u094d\u092f\u093e \u0938\u0915\u093e\u0933\u0940 10:00 \u0935\u093e\u091c\u0924\u093e \u0909\u092a\u0932\u092c\u094d\u0927 \u0906\u0939\u094b\u0924,"
+    },
+    {
+      "turn_id": "turn_14",
+      "turn_type": "hinglish",
+      "first_chunk_delay_ms": 418.6,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        52,
+        45
+      ],
+      "chunk_words": [
+        9,
+        8
+      ],
+      "emitted_chunks": [
+        "Sure sir, main aapka appointment book kar deti hoon,",
+        "aap please apna full name confirm kar dijiye."
+      ],
+      "first_chunk": "Sure sir, main aapka appointment book kar deti hoon,"
+    },
+    {
+      "turn_id": "turn_15",
+      "turn_type": "minglish",
+      "first_chunk_delay_ms": 468.6,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        43,
+        44
+      ],
+      "chunk_words": [
+        7,
+        6
+      ],
+      "emitted_chunks": [
+        "Nakki sir, mi tumchi booking confirm karto,",
+        "doctor udya afternoon madhe available aahet."
+      ],
+      "first_chunk": "Nakki sir, mi tumchi booking confirm karto,"
+    },
+    {
+      "turn_id": "turn_16",
+      "turn_type": "decimal_time",
+      "first_chunk_delay_ms": 558.4,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        46,
+        59
+      ],
+      "chunk_words": [
+        9,
+        10
+      ],
+      "emitted_chunks": [
+        "Our clinic has an average rating of 4.9 stars,",
+        "and our team has treated over 25,000 patients across India."
+      ],
+      "first_chunk": "Our clinic has an average rating of 4.9 stars,"
+    },
+    {
+      "turn_id": "turn_17",
+      "turn_type": "url_contact",
+      "first_chunk_delay_ms": 466.7,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        52,
+        37
+      ],
+      "chunk_words": [
+        8,
+        4
+      ],
+      "emitted_chunks": [
+        "You can also visit nextlite.ai for detailed pricing,",
+        "or email support@nextlite.ai anytime."
+      ],
+      "first_chunk": "You can also visit nextlite.ai for detailed pricing,"
+    },
+    {
+      "turn_id": "turn_18",
+      "turn_type": "emergency",
+      "first_chunk_delay_ms": 467.2,
+      "chunk_count": 3,
+      "chunk_lengths": [
+        48,
+        44,
+        28
+      ],
+      "chunk_words": [
+        8,
+        6,
+        5
+      ],
+      "emitted_chunks": [
+        "If you are experiencing severe bleeding or pain,",
+        "please visit our emergency room immediately,",
+        "or call our 24-hour hotline."
+      ],
+      "first_chunk": "If you are experiencing severe bleeding or pain,"
+    },
+    {
+      "turn_id": "turn_19",
+      "turn_type": "reschedule",
+      "first_chunk_delay_ms": 886.7,
+      "chunk_count": 1,
+      "chunk_lengths": [
+        81
+      ],
+      "chunk_words": [
+        16
+      ],
+      "emitted_chunks": [
+        "No problem at all, I can reschedule your visit from Friday to Monday at 11:00 AM."
+      ],
+      "first_chunk": "No problem at all, I can reschedule your visit from Friday to Monday at 11:00 AM."
+    },
+    {
+      "turn_id": "turn_20",
+      "turn_type": "closing",
+      "first_chunk_delay_ms": 279.5,
+      "chunk_count": 2,
+      "chunk_lengths": [
+        32,
+        49
+      ],
+      "chunk_words": [
+        5,
+        10
+      ],
+      "emitted_chunks": [
+        "Thank you for choosing NextLite,",
+        "have a wonderful day and take care of your smile!"
+      ],
+      "first_chunk": "Thank you for choosing NextLite,"
+    }
+  ]
+}

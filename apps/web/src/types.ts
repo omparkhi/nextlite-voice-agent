@@ -379,6 +379,88 @@ export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CLOSED';
 export type AppointmentStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
 export type FollowUpStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED';
 
+export interface StartupMetricsBreakdown {
+  pickupToWebsocketMs?: number | null;
+  websocketToStartFrameMs?: number | null;
+  startFrameToRuntimeConfigMs?: number | null;
+  runtimeConfigToCallSessionMs?: number | null;
+  callSessionToServicesMs?: number | null;
+  servicesToPipelineMs?: number | null;
+  callSessionToPipelineMs?: number | null;
+  pipelineToSTTReadyMs?: number | null;
+  pipelineToTTSReadyMs?: number | null;
+  ttsReadyToGreetingQueuedMs?: number | null;
+  greetingQueuedToFirstAudioMs?: number | null;
+  pickupToFirstGreetingAudioMs?: number | null;
+}
+
+export interface TurnTimingStageMetrics {
+  turnId: string;
+  turnIndex?: number;
+  responseLatencyMs?: number | null;
+  speechDurationMs?: number | null;
+  vadStopToUtteranceEndMs?: number | null;
+  utteranceEndToSttFinalMs?: number | null;
+  vadStopToSttFinalMs?: number | null;
+  speechStopToFinalTranscriptMs?: number | null;
+  sttFinalToAggregationMs?: number | null;
+  finalTranscriptToAggregationMs?: number | null;
+  aggregationToLlmStartMs?: number | null;
+  aggregationToLLMStartMs?: number | null;
+  aggregationToLLMRequestMs?: number | null;
+  llmHttpRequestMs?: number | null;
+  llmProviderToFirstOutputMs?: number | null;
+  llmToFirstToolDeltaMs?: number | null;
+  firstToolDeltaToToolCompleteMs?: number | null;
+  llmToFirstOutputMs?: number | null;
+  llmStartToFirstOutputMs?: number | null;
+  llmContextToRequestMs?: number | null;
+  llmRequestToFirstOutputMs?: number | null;
+  llmFirstOutputToTtsStartMs?: number | null;
+  llmToTTSStartMs?: number | null;
+  firstLLMOutputToFirstAudioMs?: number | null;
+  toolDurationMs?: number | null;
+  toolExecutionMs?: number | null;
+  tools?: Array<{ name: string; durationMs?: number | null; success?: boolean }> | null;
+  firstOutputToToolStartMs?: number | null;
+  toolResultToPostToolLlmStartMs?: number | null;
+  toolResultToPostToolLLMMs?: number | null;
+  postToolLlmToFirstOutputMs?: number | null;
+  postToolLlmMs?: number | null;
+  postToolLLMToTTSMs?: number | null;
+  postToolTTSToFirstAudioMs?: number | null;
+  toolResultToFirstAudioMs?: number | null;
+  ttsStartToFirstAudioMs?: number | null;
+  ttsConnectionMs?: number | null;
+  userStopToFirstAudioMs?: number | null;
+  speechStopToFirstAudioMs?: number | null;
+  aggregationToFirstAudioMs?: number | null;
+  totalTurnDurationMs?: number | null;
+  totalTurnMs?: number | null;
+  interrupted?: boolean;
+  events?: CallTimelineEvent[];
+  phoneTrace?: SafePhoneTraceInfo | null;
+}
+
+export interface CallTimelineEvent {
+  type?: 'STARTUP' | 'TURN' | string;
+  turnId?: string;
+  event: string;
+  timestamp?: string;
+  monotonicTimestamp?: number;
+  elapsedFromCallStartMs?: number;
+  [key: string]: any;
+}
+
+export interface SafePhoneTraceInfo {
+  phoneObserved: boolean;
+  digits: number;
+  last4?: string | null;
+  representation?: string;
+  turnId?: string;
+  boundary?: string;
+}
+
 export interface CallSession {
   id: string;
   tenantId: string;
@@ -394,13 +476,63 @@ export interface CallSession {
   endedAt?: string | null;
   transcriptText?: string | null;
   turnsJson?: Array<{
-    speaker: 'AI' | 'Caller' | 'Agent' | string;
-    text: string;
+    turnId?: number | string;
+    startTime?: string;
+    endTime?: string;
+    user?: {
+      transcript: string;
+      detectedLanguage?: string | null;
+      timestamp?: string;
+    };
+    agent?: {
+      response: string;
+      activeLanguage?: string;
+      interrupted?: boolean;
+      timestamp?: string;
+      ttftMs?: number;
+      durationMs?: number;
+    };
+    tools?: Array<{
+      toolName: string;
+      callId?: string;
+      args?: any;
+      success?: boolean;
+      executedAt?: string;
+    }>;
+    speaker?: 'AI' | 'Caller' | 'Agent' | string;
+    text?: string;
     timestamp?: number | string;
     durationMs?: number;
   }> | null;
   toolsUsed?: Array<string | { toolName?: string; name?: string; parameters?: any; result?: any }> | null;
   metricsJson?: {
+    totalTurns?: number;
+    executedToolsCount?: number;
+    errorsCount?: number;
+    timing?: Record<string, any>;
+    startupMetrics?: Record<string, any>;
+    startupBreakdown?: StartupMetricsBreakdown;
+    callBaseline?: {
+      totalTurns?: number;
+      successfulTurns?: number;
+      interruptedTurns?: number;
+      toolTurns?: number;
+      responseLatencyP50Ms?: number | null;
+      responseLatencyP90Ms?: number | null;
+      responseLatencyMaxMs?: number | null;
+      toolLatencyP50Ms?: number | null;
+      toolLatencyP90Ms?: number | null;
+      toolLatencyMaxMs?: number | null;
+      nonToolLatencyP50Ms?: number | null;
+      nonToolLatencyP90Ms?: number | null;
+      nonToolLatencyMaxMs?: number | null;
+      totalCallDurationMs?: number | null;
+    };
+    latestTurnMetrics?: TurnTimingStageMetrics;
+    turns?: TurnTimingStageMetrics[];
+    timeline?: CallTimelineEvent[];
+    phoneTraces?: SafePhoneTraceInfo[];
+    errors?: Array<{ timestamp: string; message: string; source?: string }>;
     turnLatencyMs?: number;
     e2eLatencyMs?: number;
     sttLatencyMs?: number;

@@ -15,6 +15,7 @@ import testConversationRoutes from './routes/test-conversation';
 import configAssistantRoutes from './routes/config-assistant';
 import clientRoutes from './routes/client';
 import internalRoutes from './routes/internal';
+import receptionistRoutes from './routes/receptionist';
 import { logger } from './lib/logger';
 
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/admin', knowledgeRoutes);
 app.use('/api/admin', testConversationRoutes);
 app.use('/api/admin', configAssistantRoutes);
 app.use('/api/client', clientRoutes);
+app.use('/api/appointments', receptionistRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
@@ -65,13 +67,15 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Start server
-const PORT = env.PORT;
+if (env.NODE_ENV !== 'test') {
+  const PORT = env.PORT;
 
-const server = app.listen(PORT, () => {
-  logger.info(`🚀 NextLite Voice API running on port ${PORT}`);
-  logger.info(`📊 Environment: ${env.NODE_ENV}`);
-  logger.info(`🔗 Health check: http://localhost:${PORT}/api/health`);
-});
+  const server = app.listen(PORT, () => {
+    logger.info(`🚀 NextLite Voice API running on port ${PORT}`);
+    logger.info(`📊 Environment: ${env.NODE_ENV}`);
+    logger.info(`🔗 Health check: http://localhost:${PORT}/api/health`);
+  });
+}
 
 export default app;
 

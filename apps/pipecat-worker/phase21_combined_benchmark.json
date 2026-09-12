@@ -1,0 +1,32 @@
+{
+  "normal_turns": {
+    "count": 30,
+    "baseline": {
+      "p50": 465.2,
+      "p90": 578.6,
+      "mean": 472.0
+    },
+    "optimized": {
+      "p50": 255.1,
+      "p90": 550.8,
+      "mean": 309.8
+    },
+    "delta_p50_ms": -210.1,
+    "pct_improvement": -45.2
+  },
+  "tool_turns": {
+    "count": 10,
+    "baseline": {
+      "p50": 527.3,
+      "p90": 590.8,
+      "mean": 469.5
+    },
+    "optimized": {
+      "p50": 203.2,
+      "p90": 483.3,
+      "mean": 246.4
+    },
+    "delta_p50_ms": -324.1,
+    "pct_improvement": -61.5
+  }
+}

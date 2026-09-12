@@ -9,7 +9,7 @@ interface Turn {
 
 interface TranscriptViewerProps {
   transcriptText?: string | null;
-  turnsJson?: Turn[] | null;
+  turnsJson?: any[] | null;
   agentName?: string;
   callerNumber?: string | null;
 }
@@ -23,7 +23,32 @@ export function TranscriptViewer({
   const [searchQuery, setSearchQuery] = useState('');
 
   const parsedTurns: Turn[] = Array.isArray(turnsJson) && turnsJson.length > 0
-    ? turnsJson
+    ? turnsJson.flatMap((t: any) => {
+        if (t.speaker && t.text) {
+          return [{
+            speaker: t.speaker,
+            text: t.text,
+            timestamp: t.timestamp,
+            durationMs: t.durationMs,
+          }];
+        }
+        const list: Turn[] = [];
+        if (t.user?.transcript) {
+          list.push({
+            speaker: 'Caller',
+            text: t.user.transcript,
+            timestamp: t.user.timestamp || t.startTime,
+          });
+        }
+        if (t.agent?.response) {
+          list.push({
+            speaker: 'AI',
+            text: t.agent.response,
+            timestamp: t.agent.timestamp || t.endTime,
+          });
+        }
+        return list;
+      })
     : transcriptText
     ? transcriptText.split('\n').filter(Boolean).map((line) => {
         const isAgent = line.startsWith('AI:') || line.startsWith('Agent:') || line.startsWith('Assistant:');

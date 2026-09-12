@@ -136,19 +136,25 @@ export const api = {
     }),
 
   // Client - Calls
-  getClientCalls: (params?: { limit?: number; offset?: number; agentId?: string; status?: string }) => {
+  getClientCalls: (params?: { limit?: number; offset?: number; agentId?: string; status?: string; tenantId?: string }) => {
     const stringParams: Record<string, string> = {};
     if (params?.limit !== undefined) stringParams.limit = String(params.limit);
     if (params?.offset !== undefined) stringParams.offset = String(params.offset);
     if (params?.agentId) stringParams.agentId = params.agentId;
     if (params?.status) stringParams.status = params.status;
+    if (params?.tenantId) stringParams.tenantId = params.tenantId;
     return request<{ calls: CallSession[]; total: number; limit: number; offset: number }>('/api/client/calls', {
       params: stringParams,
     });
   },
 
-  getClientCall: (id: string) =>
-    request<CallSession>(`/api/client/calls/${id}`),
+  getClientCall: (id: string, tenantId?: string) => {
+    const stringParams: Record<string, string> = {};
+    if (tenantId) stringParams.tenantId = tenantId;
+    return request<CallSession>(`/api/client/calls/${id}`, {
+      params: stringParams,
+    });
+  },
 
   // Client - Leads
   getClientLeads: (params?: { limit?: number; offset?: number; agentId?: string; status?: string }) => {

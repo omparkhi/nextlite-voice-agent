@@ -36,6 +36,9 @@ export function Home() {
               <a href="#voices" className="hover:text-[#0c0a09] transition-colors">Voice Library</a>
               <a href="#agents" className="hover:text-[#0c0a09] transition-colors">AI Agents</a>
               <a href="#pricing" className="hover:text-[#0c0a09] transition-colors">Pricing</a>
+              <Link to="/receptionist" className="hover:text-emerald-700 text-emerald-800 font-semibold transition-colors text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 border border-emerald-200">
+                Hospital Receptionist Demo
+              </Link>
               <Link to="/admin" className="hover:text-[#0c0a09] transition-colors text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-[#e7e5e4]/60">
                 Admin Portal
               </Link>

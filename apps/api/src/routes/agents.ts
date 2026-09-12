@@ -8,7 +8,9 @@ import { validate } from '../middleware/validate';
 import { createChildLogger } from '../lib/logger';
 import { templateService, KNOWN_PLATFORM_TOOL_IDS } from '../services/template';
 import { agentService } from '../services/agent';
-import { livekitService } from '../services/livekit';
+import { livekitService, isValidE164 } from '../services/livekit';
+import { plivoService } from '../services/plivo';
+import { env } from '../config/env';
 import { getPlatformToolCatalog } from '../services/toolCatalog';
 
 const logger = createChildLogger({ module: 'agent-routes' });
@@ -605,6 +607,39 @@ router.post('/clients/:clientId/agents/:agentId/phone-test', validate(phoneTestS
       return;
     }
 
+    const normalizedPhone = (phoneNumber || '').trim();
+    if (!isValidE164(normalizedPhone)) {
+      res.status(400).json({ error: 'Invalid phone number: Must be in E.164 format (e.g. +919876543210)' });
+      return;
+    }
+
+    // Phase 8A: Pipecat Plivo Direct Outbound Path
+    if (env.PIPECAT_URL) {
+      const agent = await agentService.getAgent(agentId, clientId);
+      if (!agent) {
+        res.status(404).json({ error: 'Agent not found' });
+        return;
+      }
+
+      const testDeployment = await agentService.getActiveDeployment(agentId, clientId, 'TEST');
+      if (!testDeployment) {
+        res.status(400).json({ error: 'No active TEST deployment found for this agent' });
+        return;
+      }
+
+      const answerUrl = `${env.PIPECAT_URL}/plivo/test-xml?deploymentId=${testDeployment.id}`;
+      
+      const result = await plivoService.createOutboundPhoneCall(normalizedPhone, answerUrl);
+      
+      res.json({
+        success: true,
+        callId: result.request_uuid,
+        deploymentId: testDeployment.id,
+      });
+      return;
+    }
+
+    // Fallback: LiveKit SIP Outbound Path
     const result = await livekitService.createOutboundPhoneCall(agentId, clientId, phoneNumber);
     res.json(result);
   } catch (error: any) {
@@ -623,7 +658,10 @@ router.post('/clients/:clientId/agents/:agentId/phone-test', validate(phoneTestS
     if (
       error?.message === 'LiveKit service is not configured' ||
       error?.message === 'LiveKit credentials are not configured' ||
-      error?.message === 'LiveKit SIP trunk is not configured'
+      error?.message === 'LiveKit SIP trunk is not configured' ||
+      error?.message === 'Plivo credentials (PLIVO_AUTH_ID, PLIVO_AUTH_TOKEN) are not configured' ||
+      error?.message === 'Plivo AUTH_ID is required to create a call' ||
+      error?.message === 'Plivo Caller ID is not configured (env.PLIVO_CALLER_ID)'
     ) {
       res.status(503).json({ error: error.message });
       return;
@@ -631,7 +669,9 @@ router.post('/clients/:clientId/agents/:agentId/phone-test', validate(phoneTestS
     if (
       error?.message === 'Failed to dispatch LiveKit agent worker' ||
       error?.message === 'Failed to create LiveKit room for phone test' ||
-      error?.message === 'Failed to initiate SIP outbound call'
+      error?.message === 'Failed to initiate SIP outbound call' ||
+      error?.message === 'Failed to initiate outbound phone call.' ||
+      error?.name === 'PlivoServiceError'
     ) {
       res.status(502).json({ error: error.message });
       return;

@@ -175,7 +175,18 @@ router.put('/profile', requireMutationRole, validate(updateProfileSchema), async
 // GET /api/client/calls
 router.get('/calls', async (req: Request, res: Response): Promise<void> => {
   try {
-    const tenantId = resolveTenantId(req);
+    let tenantId = resolveTenantId(req);
+    if (!tenantId && req.user?.role === 'ADMIN' && req.query.agentId) {
+      const [agent] = await db
+        .select({ tenantId: agents.tenantId })
+        .from(agents)
+        .where(eq(agents.id, req.query.agentId as string))
+        .limit(1);
+      if (agent?.tenantId) {
+        tenantId = agent.tenantId;
+      }
+    }
+
     if (!tenantId) {
       res.status(403).json({ error: 'No tenant context' });
       return;
@@ -203,13 +214,23 @@ router.get('/calls', async (req: Request, res: Response): Promise<void> => {
 // GET /api/client/calls/:id
 router.get('/calls/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const tenantId = resolveTenantId(req);
+    let tenantId = resolveTenantId(req);
+    const { id } = req.params;
+
+    if (!tenantId && req.user?.role === 'ADMIN') {
+      const existing = await db.query.callSessions.findFirst({
+        where: eq(callSessions.id, id),
+      });
+      if (existing?.tenantId) {
+        tenantId = existing.tenantId;
+      }
+    }
+
     if (!tenantId) {
       res.status(403).json({ error: 'No tenant context' });
       return;
     }
 
-    const { id } = req.params;
     const session = await callSessionService.getCallSession(id, tenantId);
     if (!session) {
       res.status(404).json({ error: 'Call session not found' });

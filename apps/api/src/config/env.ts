@@ -40,6 +40,9 @@ const envSchema = z.object({
   WORKER_API_SECRET: z.string().optional(),
   LIVEKIT_WORKER_SECRET: z.string().optional(),
 
+  // Pipecat Server configuration
+  PIPECAT_URL: z.string().url().optional(),
+
   // LiveKit Server configuration
   LIVEKIT_URL: z.string().optional(),
   LIVEKIT_API_KEY: z.string().optional(),

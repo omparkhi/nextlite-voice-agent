@@ -1,0 +1,4165 @@
+[
+  {
+    "callIndex": 1,
+    "streamId": "pstn-19b-c1-mtxa34o6",
+    "callId": "call-19b-c1-mtxa34o6",
+    "sessionId": "d2f66c26-0f78-4482-a459-3ef283dbf4c1",
+    "status": "MISSED",
+    "audioChunkCount": 65,
+    "totalAudioBytes": 27820,
+    "startupTimeline": {
+      "callSessionMs": 29,
+      "runtimeConfigMs": 12,
+      "pickupToWebsocketMs": 0,
+      "pipelineToSTTReadyMs": null,
+      "pipelineToTTSReadyMs": 564,
+      "servicesToPipelineMs": 456,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "websocketToStartFrameMs": 11,
+      "pipeline_to_tts_ready_ms": 564,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 5,
+      "ttsReadyToGreetingQueuedMs": 183,
+      "startFrameToRuntimeConfigMs": 12,
+      "greetingQueuedToFirstAudioMs": 409,
+      "pickupToFirstGreetingAudioMs": 1636,
+      "runtimeConfigToCallSessionMs": 487,
+      "runtime_config_to_pipeline_ms": 457,
+      "websocketAcceptToPlivoStartMs": 11,
+      "greetingTTSStartToFirstAudioMs": 404,
+      "tts_ready_to_greeting_queue_ms": 183,
+      "greeting_queue_to_first_audio_ms": 409,
+      "plivo_start_to_runtime_config_ms": 12,
+      "websocket_accept_to_plivo_start_ms": 11,
+      "call_start_to_first_greeting_audio_ms": 1637,
+      "plivo_start_to_first_greeting_audio_ms": 1626,
+      "websocket_accept_to_first_greeting_audio_ms": 1636
+    },
+    "startupMetrics": {
+      "events": [
+        {
+          "event": "websocket_handler_entered",
+          "timestamp": "2026-09-11T18:17:03.852747+00:00",
+          "monotonicTimestamp": 12295.545968,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "call_start",
+          "timestamp": "2026-09-11T18:17:03.852916+00:00",
+          "monotonicTimestamp": 12295.545968,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "websocket_accepted",
+          "timestamp": "2026-09-11T18:17:03.853282+00:00",
+          "monotonicTimestamp": 12295.546446,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "websocket_waiting_first_msg",
+          "timestamp": "2026-09-11T18:17:03.853381+00:00",
+          "monotonicTimestamp": 12295.546628,
+          "elapsedFromCallStartMs": 1
+        },
+        {
+          "event": "plivo_start_received",
+          "timestamp": "2026-09-11T18:17:03.863885+00:00",
+          "monotonicTimestamp": 12295.556965,
+          "elapsedFromCallStartMs": 11
+        },
+        {
+          "event": "start_frame_received",
+          "timestamp": "2026-09-11T18:17:03.863936+00:00",
+          "monotonicTimestamp": 12295.556965,
+          "elapsedFromCallStartMs": 11
+        },
+        {
+          "event": "deployment_id_resolved",
+          "timestamp": "2026-09-11T18:17:03.864023+00:00",
+          "monotonicTimestamp": 12295.557271,
+          "elapsedFromCallStartMs": 11
+        },
+        {
+          "event": "runtime_config_start",
+          "timestamp": "2026-09-11T18:17:03.864076+00:00",
+          "monotonicTimestamp": 12295.557323,
+          "elapsedFromCallStartMs": 11
+        },
+        {
+          "event": "runtime_config_request_start",
+          "timestamp": "2026-09-11T18:17:03.864099+00:00",
+          "monotonicTimestamp": 12295.557346,
+          "elapsedFromCallStartMs": 11
+        },
+        {
+          "event": "runtime_config_resolved",
+          "timestamp": "2026-09-11T18:17:03.875977+00:00",
+          "monotonicTimestamp": 12295.569216,
+          "elapsedFromCallStartMs": 23
+        },
+        {
+          "event": "runtime_config_response",
+          "timestamp": "2026-09-11T18:17:03.876124+00:00",
+          "monotonicTimestamp": 12295.569368,
+          "elapsedFromCallStartMs": 23
+        },
+        {
+          "event": "temporal_context_start",
+          "timestamp": "2026-09-11T18:17:03.876200+00:00",
+          "monotonicTimestamp": 12295.569446,
+          "elapsedFromCallStartMs": 23
+        },
+        {
+          "event": "temporal_context_ready",
+          "timestamp": "2026-09-11T18:17:03.876343+00:00",
+          "monotonicTimestamp": 12295.569589,
+          "elapsedFromCallStartMs": 24
+        },
+        {
+          "event": "tts_service_create_start",
+          "timestamp": "2026-09-11T18:17:03.876567+00:00",
+          "monotonicTimestamp": 12295.569809,
+          "elapsedFromCallStartMs": 24
+        },
+        {
+          "event": "tts_service_created",
+          "timestamp": "2026-09-11T18:17:03.877105+00:00",
+          "monotonicTimestamp": 12295.570346,
+          "elapsedFromCallStartMs": 24
+        },
+        {
+          "event": "stt_service_create_start",
+          "timestamp": "2026-09-11T18:17:03.877634+00:00",
+          "monotonicTimestamp": 12295.570874,
+          "elapsedFromCallStartMs": 25
+        },
+        {
+          "event": "stt_service_created",
+          "timestamp": "2026-09-11T18:17:04.117102+00:00",
+          "monotonicTimestamp": 12295.810345,
+          "elapsedFromCallStartMs": 264
+        },
+        {
+          "event": "tool_registry_start",
+          "timestamp": "2026-09-11T18:17:04.117162+00:00",
+          "monotonicTimestamp": 12295.810409,
+          "elapsedFromCallStartMs": 264
+        },
+        {
+          "event": "tool_registry_resolved",
+          "timestamp": "2026-09-11T18:17:04.117278+00:00",
+          "monotonicTimestamp": 12295.810524,
+          "elapsedFromCallStartMs": 265
+        },
+        {
+          "event": "llm_service_create_start",
+          "timestamp": "2026-09-11T18:17:04.117879+00:00",
+          "monotonicTimestamp": 12295.811121,
+          "elapsedFromCallStartMs": 265
+        },
+        {
+          "event": "llm_service_created",
+          "timestamp": "2026-09-11T18:17:04.332864+00:00",
+          "monotonicTimestamp": 12296.026105,
+          "elapsedFromCallStartMs": 480
+        },
+        {
+          "event": "pipeline_construct_start",
+          "timestamp": "2026-09-11T18:17:04.333061+00:00",
+          "monotonicTimestamp": 12296.026306,
+          "elapsedFromCallStartMs": 480
+        },
+        {
+          "event": "pipeline_created",
+          "timestamp": "2026-09-11T18:17:04.333220+00:00",
+          "monotonicTimestamp": 12296.026467,
+          "elapsedFromCallStartMs": 480
+        },
+        {
+          "event": "greeting_queue_start",
+          "timestamp": "2026-09-11T18:17:04.333598+00:00",
+          "monotonicTimestamp": 12296.026845,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "pipeline_start",
+          "timestamp": "2026-09-11T18:17:04.333755+00:00",
+          "monotonicTimestamp": 12296.027002,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "tts_connection_start",
+          "timestamp": "2026-09-11T18:17:04.333790+00:00",
+          "monotonicTimestamp": 12296.027037,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "pipeline_started",
+          "timestamp": "2026-09-11T18:17:04.333894+00:00",
+          "monotonicTimestamp": 12296.027141,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "pipeline_runner_started",
+          "timestamp": "2026-09-11T18:17:04.333923+00:00",
+          "monotonicTimestamp": 12296.02717,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "call_session_start",
+          "timestamp": "2026-09-11T18:17:04.334162+00:00",
+          "monotonicTimestamp": 12296.027408,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "call_session_request_start",
+          "timestamp": "2026-09-11T18:17:04.334203+00:00",
+          "monotonicTimestamp": 12296.027451,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "call_session_created",
+          "timestamp": "2026-09-11T18:17:04.363353+00:00",
+          "monotonicTimestamp": 12296.056592,
+          "elapsedFromCallStartMs": 511
+        },
+        {
+          "event": "call_session_resolved",
+          "timestamp": "2026-09-11T18:17:04.363511+00:00",
+          "monotonicTimestamp": 12296.056757,
+          "elapsedFromCallStartMs": 511
+        },
+        {
+          "event": "call_session_response",
+          "timestamp": "2026-09-11T18:17:04.363557+00:00",
+          "monotonicTimestamp": 12296.056804,
+          "elapsedFromCallStartMs": 511
+        },
+        {
+          "event": "tts_ready",
+          "timestamp": "2026-09-11T18:17:04.897029+00:00",
+          "monotonicTimestamp": 12296.590253,
+          "elapsedFromCallStartMs": 1044
+        },
+        {
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T18:17:04.897522+00:00",
+          "monotonicTimestamp": 12296.590765,
+          "elapsedFromCallStartMs": 1045
+        },
+        {
+          "event": "greeting_queued",
+          "timestamp": "2026-09-11T18:17:05.080338+00:00",
+          "monotonicTimestamp": 12296.773575,
+          "elapsedFromCallStartMs": 1228
+        },
+        {
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T18:17:05.085592+00:00",
+          "monotonicTimestamp": 12296.778827,
+          "elapsedFromCallStartMs": 1233
+        },
+        {
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T18:17:05.489783+00:00",
+          "monotonicTimestamp": 12297.182826,
+          "elapsedFromCallStartMs": 1637
+        },
+        {
+          "event": "caller_ready",
+          "timestamp": "2026-09-11T18:17:05.489849+00:00",
+          "monotonicTimestamp": 12297.182826,
+          "elapsedFromCallStartMs": 1637
+        },
+        {
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T18:17:06.507273+00:00",
+          "monotonicTimestamp": 12298.200512,
+          "elapsedFromCallStartMs": 2655
+        }
+      ],
+      "stages": {
+        "sttReady": null,
+        "ttsReady": 12296.5902528,
+        "callStart": 12295.5459675,
+        "callerReady": 12297.1828264,
+        "sttConnected": null,
+        "ttsConnected": 12296.5902528,
+        "pipelineStart": 12296.0270024,
+        "greetingQueued": 12296.7735749,
+        "pipelineCreated": 12296.0264669,
+        "pipelineStarted": 12296.0271412,
+        "ttsConnectStart": null,
+        "websocketAccept": 12295.5464457,
+        "outputAudioFrame": null,
+        "greetingCompleted": 12298.2005119,
+        "llmServiceCreated": 12296.0261053,
+        "sttServiceCreated": 12295.8103453,
+        "toolRegistryStart": 12295.8104094,
+        "ttsServiceCreated": 12295.5703464,
+        "websocketAccepted": 12295.5464457,
+        "callSessionCreated": 12296.056592,
+        "firstGreetingAudio": 12297.1828264,
+        "greetingFirstAudio": 12297.1828264,
+        "greetingQueueStart": 12296.0268451,
+        "greetingTtsStarted": 12296.7788266,
+        "plivoStartReceived": 12295.5569651,
+        "startFrameReceived": 12295.5569651,
+        "ttsConnectionStart": 12296.027037,
+        "callSessionResponse": 12296.0568042,
+        "deploymentIdResolved": 12295.557271,
+        "temporalContextReady": 12295.569589,
+        "temporalContextStart": 12295.5694459,
+        "toolRegistryResolved": 12295.8105244,
+        "llmServiceCreateStart": 12295.8111209,
+        "pipelineRunnerStarted": 12296.0271703,
+        "runtimeConfigResolved": 12295.5692164,
+        "runtimeConfigResponse": 12295.5693683,
+        "sttServiceCreateStart": 12295.570874,
+        "ttsServiceCreateStart": 12295.5698092,
+        "pipelineConstructStart": 12296.0263063,
+        "callSessionRequestStart": 12296.0274506,
+        "websocketHandlerEntered": 12295.5459675,
+        "runtimeConfigRequestStart": 12295.5573461,
+        "websocketOutputWriteIfAvailable": null
+      },
+      "streamId": "pstn-19b-c1-mtxa34o6",
+      "breakdown": {
+        "callSessionMs": 29,
+        "runtimeConfigMs": 12,
+        "pickupToWebsocketMs": 0,
+        "pipelineToSTTReadyMs": null,
+        "pipelineToTTSReadyMs": 564,
+        "servicesToPipelineMs": 456,
+        "pipelineConstructionMs": 0,
+        "callSessionToPipelineMs": null,
+        "callSessionToServicesMs": null,
+        "websocketToStartFrameMs": 11,
+        "pipeline_to_tts_ready_ms": 564,
+        "plivoStartToStartFrameMs": 0,
+        "greetingQueuedToTTSStartMs": 5,
+        "ttsReadyToGreetingQueuedMs": 183,
+        "startFrameToRuntimeConfigMs": 12,
+        "greetingQueuedToFirstAudioMs": 409,
+        "pickupToFirstGreetingAudioMs": 1636,
+        "runtimeConfigToCallSessionMs": 487,
+        "runtime_config_to_pipeline_ms": 457,
+        "websocketAcceptToPlivoStartMs": 11,
+        "greetingTTSStartToFirstAudioMs": 404,
+        "tts_ready_to_greeting_queue_ms": 183,
+        "greeting_queue_to_first_audio_ms": 409,
+        "plivo_start_to_runtime_config_ms": 12,
+        "websocket_accept_to_plivo_start_ms": 11,
+        "call_start_to_first_greeting_audio_ms": 1637,
+        "plivo_start_to_first_greeting_audio_ms": 1626,
+        "websocket_accept_to_first_greeting_audio_ms": 1636
+      },
+      "callSessionMs": 29,
+      "runtimeConfigMs": 12,
+      "pipelineToSttReadyMs": null,
+      "pipelineToTtsReadyMs": 564,
+      "servicesToPipelineMs": 456,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "pipeline_to_tts_ready_ms": 564,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 5,
+      "ttsReadyToGreetingQueuedMs": 183,
+      "greetingQueueToFirstAudioMs": 409,
+      "startFrameToRuntimeConfigMs": 12,
+      "pickupToFirstGreetingAudioMs": 1636,
+      "runtimeConfigToCallSessionMs": 487,
+      "runtime_config_to_pipeline_ms": 457,
+      "websocketAcceptToPlivoStartMs": 11,
+      "greetingTTSStartToFirstAudioMs": 404,
+      "totalCallStartupToFirstAudioMs": 1636,
+      "tts_ready_to_greeting_queue_ms": 183,
+      "greeting_queue_to_first_audio_ms": 409,
+      "plivo_start_to_runtime_config_ms": 12,
+      "websocket_accept_to_plivo_start_ms": 11,
+      "call_start_to_first_greeting_audio_ms": 1637,
+      "plivo_start_to_first_greeting_audio_ms": 1626,
+      "websocket_accept_to_first_greeting_audio_ms": 1636
+    },
+    "timeline": [
+      {
+        "type": "STARTUP",
+        "event": "websocket_handler_entered",
+        "timestamp": "2026-09-11T18:17:03.852747+00:00",
+        "monotonicTimestamp": 12295.545968,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_start",
+        "timestamp": "2026-09-11T18:17:03.852916+00:00",
+        "monotonicTimestamp": 12295.545968,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_accepted",
+        "timestamp": "2026-09-11T18:17:03.853282+00:00",
+        "monotonicTimestamp": 12295.546446,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_waiting_first_msg",
+        "timestamp": "2026-09-11T18:17:03.853381+00:00",
+        "monotonicTimestamp": 12295.546628,
+        "elapsedFromCallStartMs": 1
+      },
+      {
+        "type": "STARTUP",
+        "event": "plivo_start_received",
+        "timestamp": "2026-09-11T18:17:03.863885+00:00",
+        "monotonicTimestamp": 12295.556965,
+        "elapsedFromCallStartMs": 11
+      },
+      {
+        "type": "STARTUP",
+        "event": "start_frame_received",
+        "timestamp": "2026-09-11T18:17:03.863936+00:00",
+        "monotonicTimestamp": 12295.556965,
+        "elapsedFromCallStartMs": 11
+      },
+      {
+        "type": "STARTUP",
+        "event": "deployment_id_resolved",
+        "timestamp": "2026-09-11T18:17:03.864023+00:00",
+        "monotonicTimestamp": 12295.557271,
+        "elapsedFromCallStartMs": 11
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_start",
+        "timestamp": "2026-09-11T18:17:03.864076+00:00",
+        "monotonicTimestamp": 12295.557323,
+        "elapsedFromCallStartMs": 11
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_request_start",
+        "timestamp": "2026-09-11T18:17:03.864099+00:00",
+        "monotonicTimestamp": 12295.557346,
+        "elapsedFromCallStartMs": 11
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_resolved",
+        "timestamp": "2026-09-11T18:17:03.875977+00:00",
+        "monotonicTimestamp": 12295.569216,
+        "elapsedFromCallStartMs": 23
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_response",
+        "timestamp": "2026-09-11T18:17:03.876124+00:00",
+        "monotonicTimestamp": 12295.569368,
+        "elapsedFromCallStartMs": 23
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_start",
+        "timestamp": "2026-09-11T18:17:03.876200+00:00",
+        "monotonicTimestamp": 12295.569446,
+        "elapsedFromCallStartMs": 23
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_ready",
+        "timestamp": "2026-09-11T18:17:03.876343+00:00",
+        "monotonicTimestamp": 12295.569589,
+        "elapsedFromCallStartMs": 24
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_create_start",
+        "timestamp": "2026-09-11T18:17:03.876567+00:00",
+        "monotonicTimestamp": 12295.569809,
+        "elapsedFromCallStartMs": 24
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_created",
+        "timestamp": "2026-09-11T18:17:03.877105+00:00",
+        "monotonicTimestamp": 12295.570346,
+        "elapsedFromCallStartMs": 24
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_create_start",
+        "timestamp": "2026-09-11T18:17:03.877634+00:00",
+        "monotonicTimestamp": 12295.570874,
+        "elapsedFromCallStartMs": 25
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_created",
+        "timestamp": "2026-09-11T18:17:04.117102+00:00",
+        "monotonicTimestamp": 12295.810345,
+        "elapsedFromCallStartMs": 264
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_start",
+        "timestamp": "2026-09-11T18:17:04.117162+00:00",
+        "monotonicTimestamp": 12295.810409,
+        "elapsedFromCallStartMs": 264
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_resolved",
+        "timestamp": "2026-09-11T18:17:04.117278+00:00",
+        "monotonicTimestamp": 12295.810524,
+        "elapsedFromCallStartMs": 265
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_create_start",
+        "timestamp": "2026-09-11T18:17:04.117879+00:00",
+        "monotonicTimestamp": 12295.811121,
+        "elapsedFromCallStartMs": 265
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_created",
+        "timestamp": "2026-09-11T18:17:04.332864+00:00",
+        "monotonicTimestamp": 12296.026105,
+        "elapsedFromCallStartMs": 480
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_construct_start",
+        "timestamp": "2026-09-11T18:17:04.333061+00:00",
+        "monotonicTimestamp": 12296.026306,
+        "elapsedFromCallStartMs": 480
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_created",
+        "timestamp": "2026-09-11T18:17:04.333220+00:00",
+        "monotonicTimestamp": 12296.026467,
+        "elapsedFromCallStartMs": 480
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queue_start",
+        "timestamp": "2026-09-11T18:17:04.333598+00:00",
+        "monotonicTimestamp": 12296.026845,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_start",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:04.333647+00:00",
+        "monotonicTimestamp": 12296.026893,
+        "elapsedFromCallStartMs": 480
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_start",
+        "timestamp": "2026-09-11T18:17:04.333755+00:00",
+        "monotonicTimestamp": 12296.027002,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connection_start",
+        "timestamp": "2026-09-11T18:17:04.333790+00:00",
+        "monotonicTimestamp": 12296.027037,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_started",
+        "timestamp": "2026-09-11T18:17:04.333894+00:00",
+        "monotonicTimestamp": 12296.027141,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_runner_started",
+        "timestamp": "2026-09-11T18:17:04.333923+00:00",
+        "monotonicTimestamp": 12296.02717,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_start",
+        "timestamp": "2026-09-11T18:17:04.334162+00:00",
+        "monotonicTimestamp": 12296.027408,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_request_start",
+        "timestamp": "2026-09-11T18:17:04.334203+00:00",
+        "monotonicTimestamp": 12296.027451,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_created",
+        "timestamp": "2026-09-11T18:17:04.363353+00:00",
+        "monotonicTimestamp": 12296.056592,
+        "elapsedFromCallStartMs": 511
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_resolved",
+        "timestamp": "2026-09-11T18:17:04.363511+00:00",
+        "monotonicTimestamp": 12296.056757,
+        "elapsedFromCallStartMs": 511
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_response",
+        "timestamp": "2026-09-11T18:17:04.363557+00:00",
+        "monotonicTimestamp": 12296.056804,
+        "elapsedFromCallStartMs": 511
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_ready",
+        "timestamp": "2026-09-11T18:17:04.897029+00:00",
+        "monotonicTimestamp": 12296.590253,
+        "elapsedFromCallStartMs": 1044
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connected",
+        "timestamp": "2026-09-11T18:17:04.897522+00:00",
+        "monotonicTimestamp": 12296.590765,
+        "elapsedFromCallStartMs": 1045
+      },
+      {
+        "type": "TURN",
+        "event": "tts_connected",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:04.897705+00:00",
+        "monotonicTimestamp": 12296.590948,
+        "elapsedFromCallStartMs": 1045
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queued",
+        "timestamp": "2026-09-11T18:17:05.080338+00:00",
+        "monotonicTimestamp": 12296.773575,
+        "elapsedFromCallStartMs": 1228
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_tts_started",
+        "timestamp": "2026-09-11T18:17:05.085592+00:00",
+        "monotonicTimestamp": 12296.778827,
+        "elapsedFromCallStartMs": 1233
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_tts_started",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.085777+00:00",
+        "monotonicTimestamp": 12296.778827,
+        "elapsedFromCallStartMs": 1232
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_first_audio",
+        "timestamp": "2026-09-11T18:17:05.489783+00:00",
+        "monotonicTimestamp": 12297.182826,
+        "elapsedFromCallStartMs": 1637
+      },
+      {
+        "type": "STARTUP",
+        "event": "caller_ready",
+        "timestamp": "2026-09-11T18:17:05.489849+00:00",
+        "monotonicTimestamp": 12297.182826,
+        "elapsedFromCallStartMs": 1637
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.489589+00:00",
+        "monotonicTimestamp": 12297.182826,
+        "elapsedFromCallStartMs": 1636
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.497897+00:00",
+        "monotonicTimestamp": 12297.191127,
+        "elapsedFromCallStartMs": 1645
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.552558+00:00",
+        "monotonicTimestamp": 12297.245799,
+        "elapsedFromCallStartMs": 1699
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.624983+00:00",
+        "monotonicTimestamp": 12297.318218,
+        "elapsedFromCallStartMs": 1772
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.702680+00:00",
+        "monotonicTimestamp": 12297.39592,
+        "elapsedFromCallStartMs": 1849
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.759907+00:00",
+        "monotonicTimestamp": 12297.453138,
+        "elapsedFromCallStartMs": 1907
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.828368+00:00",
+        "monotonicTimestamp": 12297.521605,
+        "elapsedFromCallStartMs": 1975
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.901582+00:00",
+        "monotonicTimestamp": 12297.594817,
+        "elapsedFromCallStartMs": 2048
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:05.970915+00:00",
+        "monotonicTimestamp": 12297.664155,
+        "elapsedFromCallStartMs": 2118
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.036634+00:00",
+        "monotonicTimestamp": 12297.729869,
+        "elapsedFromCallStartMs": 2183
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.120976+00:00",
+        "monotonicTimestamp": 12297.814216,
+        "elapsedFromCallStartMs": 2268
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.186098+00:00",
+        "monotonicTimestamp": 12297.879339,
+        "elapsedFromCallStartMs": 2333
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.275938+00:00",
+        "monotonicTimestamp": 12297.969171,
+        "elapsedFromCallStartMs": 2423
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.317692+00:00",
+        "monotonicTimestamp": 12298.010933,
+        "elapsedFromCallStartMs": 2464
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.505166+00:00",
+        "monotonicTimestamp": 12298.198403,
+        "elapsedFromCallStartMs": 2652
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.506621+00:00",
+        "monotonicTimestamp": 12298.199859,
+        "elapsedFromCallStartMs": 2653
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.506925+00:00",
+        "monotonicTimestamp": 12298.200169,
+        "elapsedFromCallStartMs": 2654
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_completed",
+        "timestamp": "2026-09-11T18:17:06.507273+00:00",
+        "monotonicTimestamp": 12298.200512,
+        "elapsedFromCallStartMs": 2655
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_completed",
+        "turnId": "turn-ed78b8e3",
+        "timestamp": "2026-09-11T18:17:06.507367+00:00",
+        "monotonicTimestamp": 12298.200512,
+        "elapsedFromCallStartMs": 2654
+      },
+      {
+        "type": "TURN",
+        "event": "turn_completed",
+        "turnId": "turn-02e21a6a",
+        "timestamp": "2026-09-11T18:17:08.022657+00:00",
+        "monotonicTimestamp": 12299.715899,
+        "elapsedFromCallStartMs": 4169
+      }
+    ],
+    "ttsConnectedEventsCount": 3,
+    "reconnectOccurred": false,
+    "turnsCount": 1
+  },
+  {
+    "callIndex": 2,
+    "streamId": "pstn-19b-c2-mtxa3a2f",
+    "callId": "call-19b-c2-mtxa3a2f",
+    "sessionId": "f0f91c94-9f17-4869-8014-7f333dd868cc",
+    "status": "MISSED",
+    "audioChunkCount": 65,
+    "totalAudioBytes": 27820,
+    "startupTimeline": {
+      "callSessionMs": 13,
+      "runtimeConfigMs": 24,
+      "pickupToWebsocketMs": 1,
+      "pipelineToSTTReadyMs": null,
+      "pipelineToTTSReadyMs": 514,
+      "servicesToPipelineMs": 452,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "websocketToStartFrameMs": 2,
+      "pipeline_to_tts_ready_ms": 514,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 13,
+      "ttsReadyToGreetingQueuedMs": 194,
+      "startFrameToRuntimeConfigMs": 24,
+      "greetingQueuedToFirstAudioMs": 402,
+      "pickupToFirstGreetingAudioMs": 1591,
+      "runtimeConfigToCallSessionMs": 468,
+      "runtime_config_to_pipeline_ms": 454,
+      "websocketAcceptToPlivoStartMs": 2,
+      "greetingTTSStartToFirstAudioMs": 389,
+      "tts_ready_to_greeting_queue_ms": 194,
+      "greeting_queue_to_first_audio_ms": 402,
+      "plivo_start_to_runtime_config_ms": 24,
+      "websocket_accept_to_plivo_start_ms": 2,
+      "call_start_to_first_greeting_audio_ms": 1592,
+      "plivo_start_to_first_greeting_audio_ms": 1589,
+      "websocket_accept_to_first_greeting_audio_ms": 1591
+    },
+    "startupMetrics": {
+      "events": [
+        {
+          "event": "websocket_handler_entered",
+          "timestamp": "2026-09-11T18:17:10.844980+00:00",
+          "monotonicTimestamp": 12302.53819,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "call_start",
+          "timestamp": "2026-09-11T18:17:10.845254+00:00",
+          "monotonicTimestamp": 12302.53819,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "websocket_accepted",
+          "timestamp": "2026-09-11T18:17:10.845986+00:00",
+          "monotonicTimestamp": 12302.539035,
+          "elapsedFromCallStartMs": 1
+        },
+        {
+          "event": "websocket_waiting_first_msg",
+          "timestamp": "2026-09-11T18:17:10.846186+00:00",
+          "monotonicTimestamp": 12302.539431,
+          "elapsedFromCallStartMs": 1
+        },
+        {
+          "event": "plivo_start_received",
+          "timestamp": "2026-09-11T18:17:10.848425+00:00",
+          "monotonicTimestamp": 12302.541418,
+          "elapsedFromCallStartMs": 3
+        },
+        {
+          "event": "start_frame_received",
+          "timestamp": "2026-09-11T18:17:10.848533+00:00",
+          "monotonicTimestamp": 12302.541418,
+          "elapsedFromCallStartMs": 3
+        },
+        {
+          "event": "deployment_id_resolved",
+          "timestamp": "2026-09-11T18:17:10.848677+00:00",
+          "monotonicTimestamp": 12302.541924,
+          "elapsedFromCallStartMs": 4
+        },
+        {
+          "event": "runtime_config_start",
+          "timestamp": "2026-09-11T18:17:10.848753+00:00",
+          "monotonicTimestamp": 12302.542,
+          "elapsedFromCallStartMs": 4
+        },
+        {
+          "event": "runtime_config_request_start",
+          "timestamp": "2026-09-11T18:17:10.848786+00:00",
+          "monotonicTimestamp": 12302.542033,
+          "elapsedFromCallStartMs": 4
+        },
+        {
+          "event": "runtime_config_resolved",
+          "timestamp": "2026-09-11T18:17:10.872392+00:00",
+          "monotonicTimestamp": 12302.565633,
+          "elapsedFromCallStartMs": 27
+        },
+        {
+          "event": "runtime_config_response",
+          "timestamp": "2026-09-11T18:17:10.872550+00:00",
+          "monotonicTimestamp": 12302.565794,
+          "elapsedFromCallStartMs": 28
+        },
+        {
+          "event": "temporal_context_start",
+          "timestamp": "2026-09-11T18:17:10.872686+00:00",
+          "monotonicTimestamp": 12302.56593,
+          "elapsedFromCallStartMs": 28
+        },
+        {
+          "event": "temporal_context_ready",
+          "timestamp": "2026-09-11T18:17:10.873465+00:00",
+          "monotonicTimestamp": 12302.566702,
+          "elapsedFromCallStartMs": 29
+        },
+        {
+          "event": "tts_service_create_start",
+          "timestamp": "2026-09-11T18:17:10.873894+00:00",
+          "monotonicTimestamp": 12302.567137,
+          "elapsedFromCallStartMs": 29
+        },
+        {
+          "event": "tts_service_created",
+          "timestamp": "2026-09-11T18:17:10.874537+00:00",
+          "monotonicTimestamp": 12302.567777,
+          "elapsedFromCallStartMs": 30
+        },
+        {
+          "event": "stt_service_create_start",
+          "timestamp": "2026-09-11T18:17:10.875169+00:00",
+          "monotonicTimestamp": 12302.568408,
+          "elapsedFromCallStartMs": 30
+        },
+        {
+          "event": "stt_service_created",
+          "timestamp": "2026-09-11T18:17:11.111862+00:00",
+          "monotonicTimestamp": 12302.805091,
+          "elapsedFromCallStartMs": 267
+        },
+        {
+          "event": "tool_registry_start",
+          "timestamp": "2026-09-11T18:17:11.111934+00:00",
+          "monotonicTimestamp": 12302.805181,
+          "elapsedFromCallStartMs": 267
+        },
+        {
+          "event": "tool_registry_resolved",
+          "timestamp": "2026-09-11T18:17:11.112042+00:00",
+          "monotonicTimestamp": 12302.80529,
+          "elapsedFromCallStartMs": 267
+        },
+        {
+          "event": "llm_service_create_start",
+          "timestamp": "2026-09-11T18:17:11.112605+00:00",
+          "monotonicTimestamp": 12302.805848,
+          "elapsedFromCallStartMs": 268
+        },
+        {
+          "event": "llm_service_created",
+          "timestamp": "2026-09-11T18:17:11.325709+00:00",
+          "monotonicTimestamp": 12303.018949,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "pipeline_construct_start",
+          "timestamp": "2026-09-11T18:17:11.325952+00:00",
+          "monotonicTimestamp": 12303.019196,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "pipeline_created",
+          "timestamp": "2026-09-11T18:17:11.326137+00:00",
+          "monotonicTimestamp": 12303.019384,
+          "elapsedFromCallStartMs": 481
+        },
+        {
+          "event": "greeting_queue_start",
+          "timestamp": "2026-09-11T18:17:11.326545+00:00",
+          "monotonicTimestamp": 12303.019791,
+          "elapsedFromCallStartMs": 482
+        },
+        {
+          "event": "pipeline_start",
+          "timestamp": "2026-09-11T18:17:11.326727+00:00",
+          "monotonicTimestamp": 12303.019975,
+          "elapsedFromCallStartMs": 482
+        },
+        {
+          "event": "tts_connection_start",
+          "timestamp": "2026-09-11T18:17:11.326758+00:00",
+          "monotonicTimestamp": 12303.020006,
+          "elapsedFromCallStartMs": 482
+        },
+        {
+          "event": "pipeline_started",
+          "timestamp": "2026-09-11T18:17:11.326892+00:00",
+          "monotonicTimestamp": 12303.020139,
+          "elapsedFromCallStartMs": 482
+        },
+        {
+          "event": "pipeline_runner_started",
+          "timestamp": "2026-09-11T18:17:11.326958+00:00",
+          "monotonicTimestamp": 12303.020204,
+          "elapsedFromCallStartMs": 482
+        },
+        {
+          "event": "call_session_start",
+          "timestamp": "2026-09-11T18:17:11.327227+00:00",
+          "monotonicTimestamp": 12303.020474,
+          "elapsedFromCallStartMs": 482
+        },
+        {
+          "event": "call_session_request_start",
+          "timestamp": "2026-09-11T18:17:11.327276+00:00",
+          "monotonicTimestamp": 12303.020524,
+          "elapsedFromCallStartMs": 482
+        },
+        {
+          "event": "call_session_created",
+          "timestamp": "2026-09-11T18:17:11.339797+00:00",
+          "monotonicTimestamp": 12303.033036,
+          "elapsedFromCallStartMs": 495
+        },
+        {
+          "event": "call_session_resolved",
+          "timestamp": "2026-09-11T18:17:11.340001+00:00",
+          "monotonicTimestamp": 12303.033245,
+          "elapsedFromCallStartMs": 495
+        },
+        {
+          "event": "call_session_response",
+          "timestamp": "2026-09-11T18:17:11.340707+00:00",
+          "monotonicTimestamp": 12303.033945,
+          "elapsedFromCallStartMs": 496
+        },
+        {
+          "event": "tts_ready",
+          "timestamp": "2026-09-11T18:17:11.840497+00:00",
+          "monotonicTimestamp": 12303.53373,
+          "elapsedFromCallStartMs": 996
+        },
+        {
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T18:17:11.840845+00:00",
+          "monotonicTimestamp": 12303.534087,
+          "elapsedFromCallStartMs": 996
+        },
+        {
+          "event": "greeting_queued",
+          "timestamp": "2026-09-11T18:17:12.034846+00:00",
+          "monotonicTimestamp": 12303.728077,
+          "elapsedFromCallStartMs": 1190
+        },
+        {
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T18:17:12.048008+00:00",
+          "monotonicTimestamp": 12303.741227,
+          "elapsedFromCallStartMs": 1203
+        },
+        {
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T18:17:12.437233+00:00",
+          "monotonicTimestamp": 12304.13017,
+          "elapsedFromCallStartMs": 1592
+        },
+        {
+          "event": "caller_ready",
+          "timestamp": "2026-09-11T18:17:12.437337+00:00",
+          "monotonicTimestamp": 12304.13017,
+          "elapsedFromCallStartMs": 1592
+        },
+        {
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T18:17:13.188683+00:00",
+          "monotonicTimestamp": 12304.881911,
+          "elapsedFromCallStartMs": 2344
+        }
+      ],
+      "stages": {
+        "sttReady": null,
+        "ttsReady": 12303.5337296,
+        "callStart": 12302.53819,
+        "callerReady": 12304.1301698,
+        "sttConnected": null,
+        "ttsConnected": 12303.5337296,
+        "pipelineStart": 12303.0199746,
+        "greetingQueued": 12303.7280766,
+        "pipelineCreated": 12303.0193838,
+        "pipelineStarted": 12303.0201391,
+        "ttsConnectStart": null,
+        "websocketAccept": 12302.5390349,
+        "outputAudioFrame": null,
+        "greetingCompleted": 12304.8819114,
+        "llmServiceCreated": 12303.0189487,
+        "sttServiceCreated": 12302.8050913,
+        "toolRegistryStart": 12302.8051811,
+        "ttsServiceCreated": 12302.5677774,
+        "websocketAccepted": 12302.5390349,
+        "callSessionCreated": 12303.0330359,
+        "firstGreetingAudio": 12304.1301698,
+        "greetingFirstAudio": 12304.1301698,
+        "greetingQueueStart": 12303.0197908,
+        "greetingTtsStarted": 12303.7412266,
+        "plivoStartReceived": 12302.5414177,
+        "startFrameReceived": 12302.5414177,
+        "ttsConnectionStart": 12303.0200057,
+        "callSessionResponse": 12303.0339446,
+        "deploymentIdResolved": 12302.5419238,
+        "temporalContextReady": 12302.566702,
+        "temporalContextStart": 12302.56593,
+        "toolRegistryResolved": 12302.8052896,
+        "llmServiceCreateStart": 12302.8058483,
+        "pipelineRunnerStarted": 12303.0202041,
+        "runtimeConfigResolved": 12302.5656326,
+        "runtimeConfigResponse": 12302.5657938,
+        "sttServiceCreateStart": 12302.5684083,
+        "ttsServiceCreateStart": 12302.5671372,
+        "pipelineConstructStart": 12303.0191961,
+        "callSessionRequestStart": 12303.0205237,
+        "websocketHandlerEntered": 12302.53819,
+        "runtimeConfigRequestStart": 12302.542033,
+        "websocketOutputWriteIfAvailable": null
+      },
+      "streamId": "pstn-19b-c2-mtxa3a2f",
+      "breakdown": {
+        "callSessionMs": 13,
+        "runtimeConfigMs": 24,
+        "pickupToWebsocketMs": 1,
+        "pipelineToSTTReadyMs": null,
+        "pipelineToTTSReadyMs": 514,
+        "servicesToPipelineMs": 452,
+        "pipelineConstructionMs": 0,
+        "callSessionToPipelineMs": null,
+        "callSessionToServicesMs": null,
+        "websocketToStartFrameMs": 2,
+        "pipeline_to_tts_ready_ms": 514,
+        "plivoStartToStartFrameMs": 0,
+        "greetingQueuedToTTSStartMs": 13,
+        "ttsReadyToGreetingQueuedMs": 194,
+        "startFrameToRuntimeConfigMs": 24,
+        "greetingQueuedToFirstAudioMs": 402,
+        "pickupToFirstGreetingAudioMs": 1591,
+        "runtimeConfigToCallSessionMs": 468,
+        "runtime_config_to_pipeline_ms": 454,
+        "websocketAcceptToPlivoStartMs": 2,
+        "greetingTTSStartToFirstAudioMs": 389,
+        "tts_ready_to_greeting_queue_ms": 194,
+        "greeting_queue_to_first_audio_ms": 402,
+        "plivo_start_to_runtime_config_ms": 24,
+        "websocket_accept_to_plivo_start_ms": 2,
+        "call_start_to_first_greeting_audio_ms": 1592,
+        "plivo_start_to_first_greeting_audio_ms": 1589,
+        "websocket_accept_to_first_greeting_audio_ms": 1591
+      },
+      "callSessionMs": 13,
+      "runtimeConfigMs": 24,
+      "pipelineToSttReadyMs": null,
+      "pipelineToTtsReadyMs": 514,
+      "servicesToPipelineMs": 452,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "pipeline_to_tts_ready_ms": 514,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 13,
+      "ttsReadyToGreetingQueuedMs": 194,
+      "greetingQueueToFirstAudioMs": 402,
+      "startFrameToRuntimeConfigMs": 24,
+      "pickupToFirstGreetingAudioMs": 1591,
+      "runtimeConfigToCallSessionMs": 468,
+      "runtime_config_to_pipeline_ms": 454,
+      "websocketAcceptToPlivoStartMs": 2,
+      "greetingTTSStartToFirstAudioMs": 389,
+      "totalCallStartupToFirstAudioMs": 1591,
+      "tts_ready_to_greeting_queue_ms": 194,
+      "greeting_queue_to_first_audio_ms": 402,
+      "plivo_start_to_runtime_config_ms": 24,
+      "websocket_accept_to_plivo_start_ms": 2,
+      "call_start_to_first_greeting_audio_ms": 1592,
+      "plivo_start_to_first_greeting_audio_ms": 1589,
+      "websocket_accept_to_first_greeting_audio_ms": 1591
+    },
+    "timeline": [
+      {
+        "type": "STARTUP",
+        "event": "websocket_handler_entered",
+        "timestamp": "2026-09-11T18:17:10.844980+00:00",
+        "monotonicTimestamp": 12302.53819,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_start",
+        "timestamp": "2026-09-11T18:17:10.845254+00:00",
+        "monotonicTimestamp": 12302.53819,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_accepted",
+        "timestamp": "2026-09-11T18:17:10.845986+00:00",
+        "monotonicTimestamp": 12302.539035,
+        "elapsedFromCallStartMs": 1
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_waiting_first_msg",
+        "timestamp": "2026-09-11T18:17:10.846186+00:00",
+        "monotonicTimestamp": 12302.539431,
+        "elapsedFromCallStartMs": 1
+      },
+      {
+        "type": "STARTUP",
+        "event": "plivo_start_received",
+        "timestamp": "2026-09-11T18:17:10.848425+00:00",
+        "monotonicTimestamp": 12302.541418,
+        "elapsedFromCallStartMs": 3
+      },
+      {
+        "type": "STARTUP",
+        "event": "start_frame_received",
+        "timestamp": "2026-09-11T18:17:10.848533+00:00",
+        "monotonicTimestamp": 12302.541418,
+        "elapsedFromCallStartMs": 3
+      },
+      {
+        "type": "STARTUP",
+        "event": "deployment_id_resolved",
+        "timestamp": "2026-09-11T18:17:10.848677+00:00",
+        "monotonicTimestamp": 12302.541924,
+        "elapsedFromCallStartMs": 4
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_start",
+        "timestamp": "2026-09-11T18:17:10.848753+00:00",
+        "monotonicTimestamp": 12302.542,
+        "elapsedFromCallStartMs": 4
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_request_start",
+        "timestamp": "2026-09-11T18:17:10.848786+00:00",
+        "monotonicTimestamp": 12302.542033,
+        "elapsedFromCallStartMs": 4
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_resolved",
+        "timestamp": "2026-09-11T18:17:10.872392+00:00",
+        "monotonicTimestamp": 12302.565633,
+        "elapsedFromCallStartMs": 27
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_response",
+        "timestamp": "2026-09-11T18:17:10.872550+00:00",
+        "monotonicTimestamp": 12302.565794,
+        "elapsedFromCallStartMs": 28
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_start",
+        "timestamp": "2026-09-11T18:17:10.872686+00:00",
+        "monotonicTimestamp": 12302.56593,
+        "elapsedFromCallStartMs": 28
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_ready",
+        "timestamp": "2026-09-11T18:17:10.873465+00:00",
+        "monotonicTimestamp": 12302.566702,
+        "elapsedFromCallStartMs": 29
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_create_start",
+        "timestamp": "2026-09-11T18:17:10.873894+00:00",
+        "monotonicTimestamp": 12302.567137,
+        "elapsedFromCallStartMs": 29
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_created",
+        "timestamp": "2026-09-11T18:17:10.874537+00:00",
+        "monotonicTimestamp": 12302.567777,
+        "elapsedFromCallStartMs": 30
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_create_start",
+        "timestamp": "2026-09-11T18:17:10.875169+00:00",
+        "monotonicTimestamp": 12302.568408,
+        "elapsedFromCallStartMs": 30
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_created",
+        "timestamp": "2026-09-11T18:17:11.111862+00:00",
+        "monotonicTimestamp": 12302.805091,
+        "elapsedFromCallStartMs": 267
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_start",
+        "timestamp": "2026-09-11T18:17:11.111934+00:00",
+        "monotonicTimestamp": 12302.805181,
+        "elapsedFromCallStartMs": 267
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_resolved",
+        "timestamp": "2026-09-11T18:17:11.112042+00:00",
+        "monotonicTimestamp": 12302.80529,
+        "elapsedFromCallStartMs": 267
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_create_start",
+        "timestamp": "2026-09-11T18:17:11.112605+00:00",
+        "monotonicTimestamp": 12302.805848,
+        "elapsedFromCallStartMs": 268
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_created",
+        "timestamp": "2026-09-11T18:17:11.325709+00:00",
+        "monotonicTimestamp": 12303.018949,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_construct_start",
+        "timestamp": "2026-09-11T18:17:11.325952+00:00",
+        "monotonicTimestamp": 12303.019196,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_created",
+        "timestamp": "2026-09-11T18:17:11.326137+00:00",
+        "monotonicTimestamp": 12303.019384,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queue_start",
+        "timestamp": "2026-09-11T18:17:11.326545+00:00",
+        "monotonicTimestamp": 12303.019791,
+        "elapsedFromCallStartMs": 482
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_start",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:11.326613+00:00",
+        "monotonicTimestamp": 12303.019852,
+        "elapsedFromCallStartMs": 481
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_start",
+        "timestamp": "2026-09-11T18:17:11.326727+00:00",
+        "monotonicTimestamp": 12303.019975,
+        "elapsedFromCallStartMs": 482
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connection_start",
+        "timestamp": "2026-09-11T18:17:11.326758+00:00",
+        "monotonicTimestamp": 12303.020006,
+        "elapsedFromCallStartMs": 482
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_started",
+        "timestamp": "2026-09-11T18:17:11.326892+00:00",
+        "monotonicTimestamp": 12303.020139,
+        "elapsedFromCallStartMs": 482
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_runner_started",
+        "timestamp": "2026-09-11T18:17:11.326958+00:00",
+        "monotonicTimestamp": 12303.020204,
+        "elapsedFromCallStartMs": 482
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_start",
+        "timestamp": "2026-09-11T18:17:11.327227+00:00",
+        "monotonicTimestamp": 12303.020474,
+        "elapsedFromCallStartMs": 482
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_request_start",
+        "timestamp": "2026-09-11T18:17:11.327276+00:00",
+        "monotonicTimestamp": 12303.020524,
+        "elapsedFromCallStartMs": 482
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_created",
+        "timestamp": "2026-09-11T18:17:11.339797+00:00",
+        "monotonicTimestamp": 12303.033036,
+        "elapsedFromCallStartMs": 495
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_resolved",
+        "timestamp": "2026-09-11T18:17:11.340001+00:00",
+        "monotonicTimestamp": 12303.033245,
+        "elapsedFromCallStartMs": 495
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_response",
+        "timestamp": "2026-09-11T18:17:11.340707+00:00",
+        "monotonicTimestamp": 12303.033945,
+        "elapsedFromCallStartMs": 496
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_ready",
+        "timestamp": "2026-09-11T18:17:11.840497+00:00",
+        "monotonicTimestamp": 12303.53373,
+        "elapsedFromCallStartMs": 996
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connected",
+        "timestamp": "2026-09-11T18:17:11.840845+00:00",
+        "monotonicTimestamp": 12303.534087,
+        "elapsedFromCallStartMs": 996
+      },
+      {
+        "type": "TURN",
+        "event": "tts_connected",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:11.841012+00:00",
+        "monotonicTimestamp": 12303.534256,
+        "elapsedFromCallStartMs": 995
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queued",
+        "timestamp": "2026-09-11T18:17:12.034846+00:00",
+        "monotonicTimestamp": 12303.728077,
+        "elapsedFromCallStartMs": 1190
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_tts_started",
+        "timestamp": "2026-09-11T18:17:12.048008+00:00",
+        "monotonicTimestamp": 12303.741227,
+        "elapsedFromCallStartMs": 1203
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_tts_started",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.048504+00:00",
+        "monotonicTimestamp": 12303.741227,
+        "elapsedFromCallStartMs": 1202
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_first_audio",
+        "timestamp": "2026-09-11T18:17:12.437233+00:00",
+        "monotonicTimestamp": 12304.13017,
+        "elapsedFromCallStartMs": 1592
+      },
+      {
+        "type": "STARTUP",
+        "event": "caller_ready",
+        "timestamp": "2026-09-11T18:17:12.437337+00:00",
+        "monotonicTimestamp": 12304.13017,
+        "elapsedFromCallStartMs": 1592
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.436932+00:00",
+        "monotonicTimestamp": 12304.13017,
+        "elapsedFromCallStartMs": 1591
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.438104+00:00",
+        "monotonicTimestamp": 12304.131348,
+        "elapsedFromCallStartMs": 1592
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.502044+00:00",
+        "monotonicTimestamp": 12304.195285,
+        "elapsedFromCallStartMs": 1656
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.561617+00:00",
+        "monotonicTimestamp": 12304.254853,
+        "elapsedFromCallStartMs": 1716
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.734693+00:00",
+        "monotonicTimestamp": 12304.427934,
+        "elapsedFromCallStartMs": 1889
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.739281+00:00",
+        "monotonicTimestamp": 12304.432514,
+        "elapsedFromCallStartMs": 1893
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.827365+00:00",
+        "monotonicTimestamp": 12304.520605,
+        "elapsedFromCallStartMs": 1982
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.847744+00:00",
+        "monotonicTimestamp": 12304.540983,
+        "elapsedFromCallStartMs": 2002
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.910402+00:00",
+        "monotonicTimestamp": 12304.603642,
+        "elapsedFromCallStartMs": 2065
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:12.975256+00:00",
+        "monotonicTimestamp": 12304.668485,
+        "elapsedFromCallStartMs": 2129
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:13.053338+00:00",
+        "monotonicTimestamp": 12304.746577,
+        "elapsedFromCallStartMs": 2208
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:13.118427+00:00",
+        "monotonicTimestamp": 12304.811668,
+        "elapsedFromCallStartMs": 2273
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:13.175640+00:00",
+        "monotonicTimestamp": 12304.868873,
+        "elapsedFromCallStartMs": 2330
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:13.176363+00:00",
+        "monotonicTimestamp": 12304.8696,
+        "elapsedFromCallStartMs": 2331
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_completed",
+        "timestamp": "2026-09-11T18:17:13.188683+00:00",
+        "monotonicTimestamp": 12304.881911,
+        "elapsedFromCallStartMs": 2344
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_completed",
+        "turnId": "turn-b6cfe68a",
+        "timestamp": "2026-09-11T18:17:13.188874+00:00",
+        "monotonicTimestamp": 12304.881911,
+        "elapsedFromCallStartMs": 2343
+      },
+      {
+        "type": "TURN",
+        "event": "turn_completed",
+        "turnId": "turn-40f5d28f",
+        "timestamp": "2026-09-11T18:17:14.981700+00:00",
+        "monotonicTimestamp": 12306.67494,
+        "elapsedFromCallStartMs": 4136
+      }
+    ],
+    "ttsConnectedEventsCount": 3,
+    "reconnectOccurred": false,
+    "turnsCount": 1
+  },
+  {
+    "callIndex": 3,
+    "streamId": "pstn-19b-c3-mtxa3f7d",
+    "callId": "call-19b-c3-mtxa3f7d",
+    "sessionId": "00586d25-f0eb-438c-a51c-bd4c920560dc",
+    "status": "MISSED",
+    "audioChunkCount": 65,
+    "totalAudioBytes": 27820,
+    "startupTimeline": {
+      "callSessionMs": 26,
+      "runtimeConfigMs": 40,
+      "pickupToWebsocketMs": 1,
+      "pipelineToSTTReadyMs": null,
+      "pipelineToTTSReadyMs": 598,
+      "servicesToPipelineMs": 556,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "websocketToStartFrameMs": 3,
+      "pipeline_to_tts_ready_ms": 598,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 5,
+      "ttsReadyToGreetingQueuedMs": 5,
+      "startFrameToRuntimeConfigMs": 41,
+      "greetingQueuedToFirstAudioMs": 456,
+      "pickupToFirstGreetingAudioMs": 1660,
+      "runtimeConfigToCallSessionMs": 586,
+      "runtime_config_to_pipeline_ms": 557,
+      "websocketAcceptToPlivoStartMs": 3,
+      "greetingTTSStartToFirstAudioMs": 451,
+      "tts_ready_to_greeting_queue_ms": 5,
+      "greeting_queue_to_first_audio_ms": 456,
+      "plivo_start_to_runtime_config_ms": 41,
+      "websocket_accept_to_plivo_start_ms": 3,
+      "call_start_to_first_greeting_audio_ms": 1660,
+      "plivo_start_to_first_greeting_audio_ms": 1657,
+      "websocket_accept_to_first_greeting_audio_ms": 1660
+    },
+    "startupMetrics": {
+      "events": [
+        {
+          "event": "websocket_handler_entered",
+          "timestamp": "2026-09-11T18:17:17.501012+00:00",
+          "monotonicTimestamp": 12309.194227,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "call_start",
+          "timestamp": "2026-09-11T18:17:17.501250+00:00",
+          "monotonicTimestamp": 12309.194227,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "websocket_accepted",
+          "timestamp": "2026-09-11T18:17:17.501932+00:00",
+          "monotonicTimestamp": 12309.194999,
+          "elapsedFromCallStartMs": 1
+        },
+        {
+          "event": "websocket_waiting_first_msg",
+          "timestamp": "2026-09-11T18:17:17.502046+00:00",
+          "monotonicTimestamp": 12309.195293,
+          "elapsedFromCallStartMs": 1
+        },
+        {
+          "event": "plivo_start_received",
+          "timestamp": "2026-09-11T18:17:17.504875+00:00",
+          "monotonicTimestamp": 12309.197776,
+          "elapsedFromCallStartMs": 4
+        },
+        {
+          "event": "start_frame_received",
+          "timestamp": "2026-09-11T18:17:17.505026+00:00",
+          "monotonicTimestamp": 12309.197776,
+          "elapsedFromCallStartMs": 4
+        },
+        {
+          "event": "deployment_id_resolved",
+          "timestamp": "2026-09-11T18:17:17.505319+00:00",
+          "monotonicTimestamp": 12309.198562,
+          "elapsedFromCallStartMs": 4
+        },
+        {
+          "event": "runtime_config_start",
+          "timestamp": "2026-09-11T18:17:17.505529+00:00",
+          "monotonicTimestamp": 12309.198774,
+          "elapsedFromCallStartMs": 5
+        },
+        {
+          "event": "runtime_config_request_start",
+          "timestamp": "2026-09-11T18:17:17.505600+00:00",
+          "monotonicTimestamp": 12309.198845,
+          "elapsedFromCallStartMs": 5
+        },
+        {
+          "event": "runtime_config_resolved",
+          "timestamp": "2026-09-11T18:17:17.545619+00:00",
+          "monotonicTimestamp": 12309.23886,
+          "elapsedFromCallStartMs": 45
+        },
+        {
+          "event": "runtime_config_response",
+          "timestamp": "2026-09-11T18:17:17.545685+00:00",
+          "monotonicTimestamp": 12309.238931,
+          "elapsedFromCallStartMs": 45
+        },
+        {
+          "event": "temporal_context_start",
+          "timestamp": "2026-09-11T18:17:17.545738+00:00",
+          "monotonicTimestamp": 12309.238985,
+          "elapsedFromCallStartMs": 45
+        },
+        {
+          "event": "temporal_context_ready",
+          "timestamp": "2026-09-11T18:17:17.545844+00:00",
+          "monotonicTimestamp": 12309.23909,
+          "elapsedFromCallStartMs": 45
+        },
+        {
+          "event": "tts_service_create_start",
+          "timestamp": "2026-09-11T18:17:17.546006+00:00",
+          "monotonicTimestamp": 12309.239252,
+          "elapsedFromCallStartMs": 45
+        },
+        {
+          "event": "tts_service_created",
+          "timestamp": "2026-09-11T18:17:17.546428+00:00",
+          "monotonicTimestamp": 12309.239672,
+          "elapsedFromCallStartMs": 45
+        },
+        {
+          "event": "stt_service_create_start",
+          "timestamp": "2026-09-11T18:17:17.546788+00:00",
+          "monotonicTimestamp": 12309.240033,
+          "elapsedFromCallStartMs": 46
+        },
+        {
+          "event": "stt_service_created",
+          "timestamp": "2026-09-11T18:17:17.859075+00:00",
+          "monotonicTimestamp": 12309.552317,
+          "elapsedFromCallStartMs": 358
+        },
+        {
+          "event": "tool_registry_start",
+          "timestamp": "2026-09-11T18:17:17.859160+00:00",
+          "monotonicTimestamp": 12309.552405,
+          "elapsedFromCallStartMs": 358
+        },
+        {
+          "event": "tool_registry_resolved",
+          "timestamp": "2026-09-11T18:17:17.859353+00:00",
+          "monotonicTimestamp": 12309.552599,
+          "elapsedFromCallStartMs": 358
+        },
+        {
+          "event": "llm_service_create_start",
+          "timestamp": "2026-09-11T18:17:17.860022+00:00",
+          "monotonicTimestamp": 12309.553263,
+          "elapsedFromCallStartMs": 359
+        },
+        {
+          "event": "llm_service_created",
+          "timestamp": "2026-09-11T18:17:18.101749+00:00",
+          "monotonicTimestamp": 12309.794987,
+          "elapsedFromCallStartMs": 601
+        },
+        {
+          "event": "pipeline_construct_start",
+          "timestamp": "2026-09-11T18:17:18.102058+00:00",
+          "monotonicTimestamp": 12309.795301,
+          "elapsedFromCallStartMs": 601
+        },
+        {
+          "event": "pipeline_created",
+          "timestamp": "2026-09-11T18:17:18.102388+00:00",
+          "monotonicTimestamp": 12309.79563,
+          "elapsedFromCallStartMs": 601
+        },
+        {
+          "event": "greeting_queue_start",
+          "timestamp": "2026-09-11T18:17:18.103363+00:00",
+          "monotonicTimestamp": 12309.796603,
+          "elapsedFromCallStartMs": 602
+        },
+        {
+          "event": "pipeline_start",
+          "timestamp": "2026-09-11T18:17:18.104083+00:00",
+          "monotonicTimestamp": 12309.797322,
+          "elapsedFromCallStartMs": 603
+        },
+        {
+          "event": "tts_connection_start",
+          "timestamp": "2026-09-11T18:17:18.104265+00:00",
+          "monotonicTimestamp": 12309.797506,
+          "elapsedFromCallStartMs": 603
+        },
+        {
+          "event": "pipeline_started",
+          "timestamp": "2026-09-11T18:17:18.104611+00:00",
+          "monotonicTimestamp": 12309.79785,
+          "elapsedFromCallStartMs": 604
+        },
+        {
+          "event": "pipeline_runner_started",
+          "timestamp": "2026-09-11T18:17:18.104963+00:00",
+          "monotonicTimestamp": 12309.7982,
+          "elapsedFromCallStartMs": 604
+        },
+        {
+          "event": "call_session_start",
+          "timestamp": "2026-09-11T18:17:18.105906+00:00",
+          "monotonicTimestamp": 12309.799144,
+          "elapsedFromCallStartMs": 605
+        },
+        {
+          "event": "call_session_request_start",
+          "timestamp": "2026-09-11T18:17:18.106436+00:00",
+          "monotonicTimestamp": 12309.799655,
+          "elapsedFromCallStartMs": 605
+        },
+        {
+          "event": "call_session_created",
+          "timestamp": "2026-09-11T18:17:18.131899+00:00",
+          "monotonicTimestamp": 12309.82514,
+          "elapsedFromCallStartMs": 631
+        },
+        {
+          "event": "call_session_resolved",
+          "timestamp": "2026-09-11T18:17:18.132046+00:00",
+          "monotonicTimestamp": 12309.825291,
+          "elapsedFromCallStartMs": 631
+        },
+        {
+          "event": "call_session_response",
+          "timestamp": "2026-09-11T18:17:18.132096+00:00",
+          "monotonicTimestamp": 12309.825343,
+          "elapsedFromCallStartMs": 631
+        },
+        {
+          "event": "tts_ready",
+          "timestamp": "2026-09-11T18:17:18.700154+00:00",
+          "monotonicTimestamp": 12310.393393,
+          "elapsedFromCallStartMs": 1199
+        },
+        {
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T18:17:18.700303+00:00",
+          "monotonicTimestamp": 12310.39355,
+          "elapsedFromCallStartMs": 1199
+        },
+        {
+          "event": "greeting_queued",
+          "timestamp": "2026-09-11T18:17:18.705224+00:00",
+          "monotonicTimestamp": 12310.398457,
+          "elapsedFromCallStartMs": 1204
+        },
+        {
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T18:17:18.710163+00:00",
+          "monotonicTimestamp": 12310.403401,
+          "elapsedFromCallStartMs": 1209
+        },
+        {
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T18:17:19.161688+00:00",
+          "monotonicTimestamp": 12310.854605,
+          "elapsedFromCallStartMs": 1660
+        },
+        {
+          "event": "caller_ready",
+          "timestamp": "2026-09-11T18:17:19.161798+00:00",
+          "monotonicTimestamp": 12310.854605,
+          "elapsedFromCallStartMs": 1660
+        },
+        {
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T18:17:19.978754+00:00",
+          "monotonicTimestamp": 12311.671996,
+          "elapsedFromCallStartMs": 2478
+        }
+      ],
+      "stages": {
+        "sttReady": null,
+        "ttsReady": 12310.3933928,
+        "callStart": 12309.194227,
+        "callerReady": 12310.8546051,
+        "sttConnected": null,
+        "ttsConnected": 12310.3933928,
+        "pipelineStart": 12309.7973222,
+        "greetingQueued": 12310.398457,
+        "pipelineCreated": 12309.7956304,
+        "pipelineStarted": 12309.7978503,
+        "ttsConnectStart": null,
+        "websocketAccept": 12309.1949992,
+        "outputAudioFrame": null,
+        "greetingCompleted": 12311.6719965,
+        "llmServiceCreated": 12309.794987,
+        "sttServiceCreated": 12309.5523175,
+        "toolRegistryStart": 12309.5524052,
+        "ttsServiceCreated": 12309.239672,
+        "websocketAccepted": 12309.1949992,
+        "callSessionCreated": 12309.8251397,
+        "firstGreetingAudio": 12310.8546051,
+        "greetingFirstAudio": 12310.8546051,
+        "greetingQueueStart": 12309.7966027,
+        "greetingTtsStarted": 12310.4034014,
+        "plivoStartReceived": 12309.1977758,
+        "startFrameReceived": 12309.1977758,
+        "ttsConnectionStart": 12309.7975061,
+        "callSessionResponse": 12309.8253427,
+        "deploymentIdResolved": 12309.1985619,
+        "temporalContextReady": 12309.2390901,
+        "temporalContextStart": 12309.2389848,
+        "toolRegistryResolved": 12309.5525987,
+        "llmServiceCreateStart": 12309.5532635,
+        "pipelineRunnerStarted": 12309.7982003,
+        "runtimeConfigResolved": 12309.2388598,
+        "runtimeConfigResponse": 12309.2389309,
+        "sttServiceCreateStart": 12309.240033,
+        "ttsServiceCreateStart": 12309.2392523,
+        "pipelineConstructStart": 12309.7953014,
+        "callSessionRequestStart": 12309.7996553,
+        "websocketHandlerEntered": 12309.194227,
+        "runtimeConfigRequestStart": 12309.1988452,
+        "websocketOutputWriteIfAvailable": null
+      },
+      "streamId": "pstn-19b-c3-mtxa3f7d",
+      "breakdown": {
+        "callSessionMs": 26,
+        "runtimeConfigMs": 40,
+        "pickupToWebsocketMs": 1,
+        "pipelineToSTTReadyMs": null,
+        "pipelineToTTSReadyMs": 598,
+        "servicesToPipelineMs": 556,
+        "pipelineConstructionMs": 0,
+        "callSessionToPipelineMs": null,
+        "callSessionToServicesMs": null,
+        "websocketToStartFrameMs": 3,
+        "pipeline_to_tts_ready_ms": 598,
+        "plivoStartToStartFrameMs": 0,
+        "greetingQueuedToTTSStartMs": 5,
+        "ttsReadyToGreetingQueuedMs": 5,
+        "startFrameToRuntimeConfigMs": 41,
+        "greetingQueuedToFirstAudioMs": 456,
+        "pickupToFirstGreetingAudioMs": 1660,
+        "runtimeConfigToCallSessionMs": 586,
+        "runtime_config_to_pipeline_ms": 557,
+        "websocketAcceptToPlivoStartMs": 3,
+        "greetingTTSStartToFirstAudioMs": 451,
+        "tts_ready_to_greeting_queue_ms": 5,
+        "greeting_queue_to_first_audio_ms": 456,
+        "plivo_start_to_runtime_config_ms": 41,
+        "websocket_accept_to_plivo_start_ms": 3,
+        "call_start_to_first_greeting_audio_ms": 1660,
+        "plivo_start_to_first_greeting_audio_ms": 1657,
+        "websocket_accept_to_first_greeting_audio_ms": 1660
+      },
+      "callSessionMs": 26,
+      "runtimeConfigMs": 40,
+      "pipelineToSttReadyMs": null,
+      "pipelineToTtsReadyMs": 598,
+      "servicesToPipelineMs": 556,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "pipeline_to_tts_ready_ms": 598,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 5,
+      "ttsReadyToGreetingQueuedMs": 5,
+      "greetingQueueToFirstAudioMs": 456,
+      "startFrameToRuntimeConfigMs": 41,
+      "pickupToFirstGreetingAudioMs": 1660,
+      "runtimeConfigToCallSessionMs": 586,
+      "runtime_config_to_pipeline_ms": 557,
+      "websocketAcceptToPlivoStartMs": 3,
+      "greetingTTSStartToFirstAudioMs": 451,
+      "totalCallStartupToFirstAudioMs": 1660,
+      "tts_ready_to_greeting_queue_ms": 5,
+      "greeting_queue_to_first_audio_ms": 456,
+      "plivo_start_to_runtime_config_ms": 41,
+      "websocket_accept_to_plivo_start_ms": 3,
+      "call_start_to_first_greeting_audio_ms": 1660,
+      "plivo_start_to_first_greeting_audio_ms": 1657,
+      "websocket_accept_to_first_greeting_audio_ms": 1660
+    },
+    "timeline": [
+      {
+        "type": "STARTUP",
+        "event": "websocket_handler_entered",
+        "timestamp": "2026-09-11T18:17:17.501012+00:00",
+        "monotonicTimestamp": 12309.194227,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_start",
+        "timestamp": "2026-09-11T18:17:17.501250+00:00",
+        "monotonicTimestamp": 12309.194227,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_accepted",
+        "timestamp": "2026-09-11T18:17:17.501932+00:00",
+        "monotonicTimestamp": 12309.194999,
+        "elapsedFromCallStartMs": 1
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_waiting_first_msg",
+        "timestamp": "2026-09-11T18:17:17.502046+00:00",
+        "monotonicTimestamp": 12309.195293,
+        "elapsedFromCallStartMs": 1
+      },
+      {
+        "type": "STARTUP",
+        "event": "plivo_start_received",
+        "timestamp": "2026-09-11T18:17:17.504875+00:00",
+        "monotonicTimestamp": 12309.197776,
+        "elapsedFromCallStartMs": 4
+      },
+      {
+        "type": "STARTUP",
+        "event": "start_frame_received",
+        "timestamp": "2026-09-11T18:17:17.505026+00:00",
+        "monotonicTimestamp": 12309.197776,
+        "elapsedFromCallStartMs": 4
+      },
+      {
+        "type": "STARTUP",
+        "event": "deployment_id_resolved",
+        "timestamp": "2026-09-11T18:17:17.505319+00:00",
+        "monotonicTimestamp": 12309.198562,
+        "elapsedFromCallStartMs": 4
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_start",
+        "timestamp": "2026-09-11T18:17:17.505529+00:00",
+        "monotonicTimestamp": 12309.198774,
+        "elapsedFromCallStartMs": 5
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_request_start",
+        "timestamp": "2026-09-11T18:17:17.505600+00:00",
+        "monotonicTimestamp": 12309.198845,
+        "elapsedFromCallStartMs": 5
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_resolved",
+        "timestamp": "2026-09-11T18:17:17.545619+00:00",
+        "monotonicTimestamp": 12309.23886,
+        "elapsedFromCallStartMs": 45
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_response",
+        "timestamp": "2026-09-11T18:17:17.545685+00:00",
+        "monotonicTimestamp": 12309.238931,
+        "elapsedFromCallStartMs": 45
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_start",
+        "timestamp": "2026-09-11T18:17:17.545738+00:00",
+        "monotonicTimestamp": 12309.238985,
+        "elapsedFromCallStartMs": 45
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_ready",
+        "timestamp": "2026-09-11T18:17:17.545844+00:00",
+        "monotonicTimestamp": 12309.23909,
+        "elapsedFromCallStartMs": 45
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_create_start",
+        "timestamp": "2026-09-11T18:17:17.546006+00:00",
+        "monotonicTimestamp": 12309.239252,
+        "elapsedFromCallStartMs": 45
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_created",
+        "timestamp": "2026-09-11T18:17:17.546428+00:00",
+        "monotonicTimestamp": 12309.239672,
+        "elapsedFromCallStartMs": 45
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_create_start",
+        "timestamp": "2026-09-11T18:17:17.546788+00:00",
+        "monotonicTimestamp": 12309.240033,
+        "elapsedFromCallStartMs": 46
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_created",
+        "timestamp": "2026-09-11T18:17:17.859075+00:00",
+        "monotonicTimestamp": 12309.552317,
+        "elapsedFromCallStartMs": 358
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_start",
+        "timestamp": "2026-09-11T18:17:17.859160+00:00",
+        "monotonicTimestamp": 12309.552405,
+        "elapsedFromCallStartMs": 358
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_resolved",
+        "timestamp": "2026-09-11T18:17:17.859353+00:00",
+        "monotonicTimestamp": 12309.552599,
+        "elapsedFromCallStartMs": 358
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_create_start",
+        "timestamp": "2026-09-11T18:17:17.860022+00:00",
+        "monotonicTimestamp": 12309.553263,
+        "elapsedFromCallStartMs": 359
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_created",
+        "timestamp": "2026-09-11T18:17:18.101749+00:00",
+        "monotonicTimestamp": 12309.794987,
+        "elapsedFromCallStartMs": 601
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_construct_start",
+        "timestamp": "2026-09-11T18:17:18.102058+00:00",
+        "monotonicTimestamp": 12309.795301,
+        "elapsedFromCallStartMs": 601
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_created",
+        "timestamp": "2026-09-11T18:17:18.102388+00:00",
+        "monotonicTimestamp": 12309.79563,
+        "elapsedFromCallStartMs": 601
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queue_start",
+        "timestamp": "2026-09-11T18:17:18.103363+00:00",
+        "monotonicTimestamp": 12309.796603,
+        "elapsedFromCallStartMs": 602
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_start",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:18.103526+00:00",
+        "monotonicTimestamp": 12309.79677,
+        "elapsedFromCallStartMs": 602
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_start",
+        "timestamp": "2026-09-11T18:17:18.104083+00:00",
+        "monotonicTimestamp": 12309.797322,
+        "elapsedFromCallStartMs": 603
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connection_start",
+        "timestamp": "2026-09-11T18:17:18.104265+00:00",
+        "monotonicTimestamp": 12309.797506,
+        "elapsedFromCallStartMs": 603
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_started",
+        "timestamp": "2026-09-11T18:17:18.104611+00:00",
+        "monotonicTimestamp": 12309.79785,
+        "elapsedFromCallStartMs": 604
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_runner_started",
+        "timestamp": "2026-09-11T18:17:18.104963+00:00",
+        "monotonicTimestamp": 12309.7982,
+        "elapsedFromCallStartMs": 604
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_start",
+        "timestamp": "2026-09-11T18:17:18.105906+00:00",
+        "monotonicTimestamp": 12309.799144,
+        "elapsedFromCallStartMs": 605
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_request_start",
+        "timestamp": "2026-09-11T18:17:18.106436+00:00",
+        "monotonicTimestamp": 12309.799655,
+        "elapsedFromCallStartMs": 605
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_created",
+        "timestamp": "2026-09-11T18:17:18.131899+00:00",
+        "monotonicTimestamp": 12309.82514,
+        "elapsedFromCallStartMs": 631
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_resolved",
+        "timestamp": "2026-09-11T18:17:18.132046+00:00",
+        "monotonicTimestamp": 12309.825291,
+        "elapsedFromCallStartMs": 631
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_response",
+        "timestamp": "2026-09-11T18:17:18.132096+00:00",
+        "monotonicTimestamp": 12309.825343,
+        "elapsedFromCallStartMs": 631
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_ready",
+        "timestamp": "2026-09-11T18:17:18.700154+00:00",
+        "monotonicTimestamp": 12310.393393,
+        "elapsedFromCallStartMs": 1199
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connected",
+        "timestamp": "2026-09-11T18:17:18.700303+00:00",
+        "monotonicTimestamp": 12310.39355,
+        "elapsedFromCallStartMs": 1199
+      },
+      {
+        "type": "TURN",
+        "event": "tts_connected",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:18.700354+00:00",
+        "monotonicTimestamp": 12310.3936,
+        "elapsedFromCallStartMs": 1199
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queued",
+        "timestamp": "2026-09-11T18:17:18.705224+00:00",
+        "monotonicTimestamp": 12310.398457,
+        "elapsedFromCallStartMs": 1204
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_tts_started",
+        "timestamp": "2026-09-11T18:17:18.710163+00:00",
+        "monotonicTimestamp": 12310.403401,
+        "elapsedFromCallStartMs": 1209
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_tts_started",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:18.710319+00:00",
+        "monotonicTimestamp": 12310.403401,
+        "elapsedFromCallStartMs": 1208
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_first_audio",
+        "timestamp": "2026-09-11T18:17:19.161688+00:00",
+        "monotonicTimestamp": 12310.854605,
+        "elapsedFromCallStartMs": 1660
+      },
+      {
+        "type": "STARTUP",
+        "event": "caller_ready",
+        "timestamp": "2026-09-11T18:17:19.161798+00:00",
+        "monotonicTimestamp": 12310.854605,
+        "elapsedFromCallStartMs": 1660
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.161369+00:00",
+        "monotonicTimestamp": 12310.854605,
+        "elapsedFromCallStartMs": 1660
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.162246+00:00",
+        "monotonicTimestamp": 12310.85549,
+        "elapsedFromCallStartMs": 1660
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.204041+00:00",
+        "monotonicTimestamp": 12310.897274,
+        "elapsedFromCallStartMs": 1702
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.272274+00:00",
+        "monotonicTimestamp": 12310.965506,
+        "elapsedFromCallStartMs": 1771
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.337556+00:00",
+        "monotonicTimestamp": 12311.030792,
+        "elapsedFromCallStartMs": 1836
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.406995+00:00",
+        "monotonicTimestamp": 12311.100236,
+        "elapsedFromCallStartMs": 1905
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.483691+00:00",
+        "monotonicTimestamp": 12311.176925,
+        "elapsedFromCallStartMs": 1982
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.535450+00:00",
+        "monotonicTimestamp": 12311.22869,
+        "elapsedFromCallStartMs": 2034
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.609420+00:00",
+        "monotonicTimestamp": 12311.302661,
+        "elapsedFromCallStartMs": 2108
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.670068+00:00",
+        "monotonicTimestamp": 12311.363306,
+        "elapsedFromCallStartMs": 2168
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.736063+00:00",
+        "monotonicTimestamp": 12311.429298,
+        "elapsedFromCallStartMs": 2234
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.806728+00:00",
+        "monotonicTimestamp": 12311.499961,
+        "elapsedFromCallStartMs": 2305
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.874774+00:00",
+        "monotonicTimestamp": 12311.568014,
+        "elapsedFromCallStartMs": 2373
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.943965+00:00",
+        "monotonicTimestamp": 12311.637206,
+        "elapsedFromCallStartMs": 2442
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.957839+00:00",
+        "monotonicTimestamp": 12311.651079,
+        "elapsedFromCallStartMs": 2456
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.978390+00:00",
+        "monotonicTimestamp": 12311.671629,
+        "elapsedFromCallStartMs": 2477
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_completed",
+        "timestamp": "2026-09-11T18:17:19.978754+00:00",
+        "monotonicTimestamp": 12311.671996,
+        "elapsedFromCallStartMs": 2478
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_completed",
+        "turnId": "turn-b796479a",
+        "timestamp": "2026-09-11T18:17:19.978830+00:00",
+        "monotonicTimestamp": 12311.671996,
+        "elapsedFromCallStartMs": 2477
+      },
+      {
+        "type": "TURN",
+        "event": "turn_completed",
+        "turnId": "turn-cf454867",
+        "timestamp": "2026-09-11T18:17:21.691280+00:00",
+        "monotonicTimestamp": 12313.384518,
+        "elapsedFromCallStartMs": 4190
+      }
+    ],
+    "ttsConnectedEventsCount": 3,
+    "reconnectOccurred": false,
+    "turnsCount": 1
+  },
+  {
+    "callIndex": 4,
+    "streamId": "pstn-19b-c4-mtxa3kdt",
+    "callId": "call-19b-c4-mtxa3kdt",
+    "sessionId": "cb814ea1-8cd8-4d4e-aca2-820c44ce77d2",
+    "status": "MISSED",
+    "audioChunkCount": 65,
+    "totalAudioBytes": 27820,
+    "startupTimeline": {
+      "callSessionMs": 19,
+      "runtimeConfigMs": 15,
+      "pickupToWebsocketMs": 1,
+      "pipelineToSTTReadyMs": null,
+      "pipelineToTTSReadyMs": 531,
+      "servicesToPipelineMs": 485,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "websocketToStartFrameMs": 3,
+      "pipeline_to_tts_ready_ms": 531,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 6,
+      "ttsReadyToGreetingQueuedMs": 7,
+      "startFrameToRuntimeConfigMs": 16,
+      "greetingQueuedToFirstAudioMs": 480,
+      "pickupToFirstGreetingAudioMs": 1525,
+      "runtimeConfigToCallSessionMs": 506,
+      "runtime_config_to_pipeline_ms": 486,
+      "websocketAcceptToPlivoStartMs": 3,
+      "greetingTTSStartToFirstAudioMs": 474,
+      "tts_ready_to_greeting_queue_ms": 7,
+      "greeting_queue_to_first_audio_ms": 480,
+      "plivo_start_to_runtime_config_ms": 16,
+      "websocket_accept_to_plivo_start_ms": 3,
+      "call_start_to_first_greeting_audio_ms": 1526,
+      "plivo_start_to_first_greeting_audio_ms": 1522,
+      "websocket_accept_to_first_greeting_audio_ms": 1525
+    },
+    "startupMetrics": {
+      "events": [
+        {
+          "event": "websocket_handler_entered",
+          "timestamp": "2026-09-11T18:17:24.215584+00:00",
+          "monotonicTimestamp": 12315.908781,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "call_start",
+          "timestamp": "2026-09-11T18:17:24.215861+00:00",
+          "monotonicTimestamp": 12315.908781,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "websocket_accepted",
+          "timestamp": "2026-09-11T18:17:24.216761+00:00",
+          "monotonicTimestamp": 12315.909805,
+          "elapsedFromCallStartMs": 1
+        },
+        {
+          "event": "websocket_waiting_first_msg",
+          "timestamp": "2026-09-11T18:17:24.216950+00:00",
+          "monotonicTimestamp": 12315.910195,
+          "elapsedFromCallStartMs": 1
+        },
+        {
+          "event": "plivo_start_received",
+          "timestamp": "2026-09-11T18:17:24.220498+00:00",
+          "monotonicTimestamp": 12315.913226,
+          "elapsedFromCallStartMs": 4
+        },
+        {
+          "event": "start_frame_received",
+          "timestamp": "2026-09-11T18:17:24.220726+00:00",
+          "monotonicTimestamp": 12315.913226,
+          "elapsedFromCallStartMs": 4
+        },
+        {
+          "event": "deployment_id_resolved",
+          "timestamp": "2026-09-11T18:17:24.221080+00:00",
+          "monotonicTimestamp": 12315.914324,
+          "elapsedFromCallStartMs": 6
+        },
+        {
+          "event": "runtime_config_start",
+          "timestamp": "2026-09-11T18:17:24.221306+00:00",
+          "monotonicTimestamp": 12315.914547,
+          "elapsedFromCallStartMs": 6
+        },
+        {
+          "event": "runtime_config_request_start",
+          "timestamp": "2026-09-11T18:17:24.221419+00:00",
+          "monotonicTimestamp": 12315.914664,
+          "elapsedFromCallStartMs": 6
+        },
+        {
+          "event": "runtime_config_resolved",
+          "timestamp": "2026-09-11T18:17:24.236065+00:00",
+          "monotonicTimestamp": 12315.929302,
+          "elapsedFromCallStartMs": 21
+        },
+        {
+          "event": "runtime_config_response",
+          "timestamp": "2026-09-11T18:17:24.236249+00:00",
+          "monotonicTimestamp": 12315.929492,
+          "elapsedFromCallStartMs": 21
+        },
+        {
+          "event": "temporal_context_start",
+          "timestamp": "2026-09-11T18:17:24.236385+00:00",
+          "monotonicTimestamp": 12315.929629,
+          "elapsedFromCallStartMs": 21
+        },
+        {
+          "event": "temporal_context_ready",
+          "timestamp": "2026-09-11T18:17:24.236613+00:00",
+          "monotonicTimestamp": 12315.929858,
+          "elapsedFromCallStartMs": 21
+        },
+        {
+          "event": "tts_service_create_start",
+          "timestamp": "2026-09-11T18:17:24.237107+00:00",
+          "monotonicTimestamp": 12315.930343,
+          "elapsedFromCallStartMs": 22
+        },
+        {
+          "event": "tts_service_created",
+          "timestamp": "2026-09-11T18:17:24.237889+00:00",
+          "monotonicTimestamp": 12315.93113,
+          "elapsedFromCallStartMs": 22
+        },
+        {
+          "event": "stt_service_create_start",
+          "timestamp": "2026-09-11T18:17:24.238468+00:00",
+          "monotonicTimestamp": 12315.931709,
+          "elapsedFromCallStartMs": 23
+        },
+        {
+          "event": "stt_service_created",
+          "timestamp": "2026-09-11T18:17:24.495947+00:00",
+          "monotonicTimestamp": 12316.18919,
+          "elapsedFromCallStartMs": 280
+        },
+        {
+          "event": "tool_registry_start",
+          "timestamp": "2026-09-11T18:17:24.496027+00:00",
+          "monotonicTimestamp": 12316.189274,
+          "elapsedFromCallStartMs": 280
+        },
+        {
+          "event": "tool_registry_resolved",
+          "timestamp": "2026-09-11T18:17:24.496164+00:00",
+          "monotonicTimestamp": 12316.189411,
+          "elapsedFromCallStartMs": 281
+        },
+        {
+          "event": "llm_service_create_start",
+          "timestamp": "2026-09-11T18:17:24.496690+00:00",
+          "monotonicTimestamp": 12316.189934,
+          "elapsedFromCallStartMs": 281
+        },
+        {
+          "event": "llm_service_created",
+          "timestamp": "2026-09-11T18:17:24.722023+00:00",
+          "monotonicTimestamp": 12316.415264,
+          "elapsedFromCallStartMs": 506
+        },
+        {
+          "event": "pipeline_construct_start",
+          "timestamp": "2026-09-11T18:17:24.722239+00:00",
+          "monotonicTimestamp": 12316.415484,
+          "elapsedFromCallStartMs": 507
+        },
+        {
+          "event": "pipeline_created",
+          "timestamp": "2026-09-11T18:17:24.722391+00:00",
+          "monotonicTimestamp": 12316.415638,
+          "elapsedFromCallStartMs": 507
+        },
+        {
+          "event": "greeting_queue_start",
+          "timestamp": "2026-09-11T18:17:24.722744+00:00",
+          "monotonicTimestamp": 12316.415989,
+          "elapsedFromCallStartMs": 507
+        },
+        {
+          "event": "pipeline_start",
+          "timestamp": "2026-09-11T18:17:24.722900+00:00",
+          "monotonicTimestamp": 12316.416148,
+          "elapsedFromCallStartMs": 507
+        },
+        {
+          "event": "tts_connection_start",
+          "timestamp": "2026-09-11T18:17:24.722932+00:00",
+          "monotonicTimestamp": 12316.416179,
+          "elapsedFromCallStartMs": 507
+        },
+        {
+          "event": "pipeline_started",
+          "timestamp": "2026-09-11T18:17:24.723031+00:00",
+          "monotonicTimestamp": 12316.416278,
+          "elapsedFromCallStartMs": 507
+        },
+        {
+          "event": "pipeline_runner_started",
+          "timestamp": "2026-09-11T18:17:24.723064+00:00",
+          "monotonicTimestamp": 12316.416311,
+          "elapsedFromCallStartMs": 508
+        },
+        {
+          "event": "call_session_start",
+          "timestamp": "2026-09-11T18:17:24.723280+00:00",
+          "monotonicTimestamp": 12316.416527,
+          "elapsedFromCallStartMs": 508
+        },
+        {
+          "event": "call_session_request_start",
+          "timestamp": "2026-09-11T18:17:24.723317+00:00",
+          "monotonicTimestamp": 12316.416563,
+          "elapsedFromCallStartMs": 508
+        },
+        {
+          "event": "call_session_created",
+          "timestamp": "2026-09-11T18:17:24.741816+00:00",
+          "monotonicTimestamp": 12316.435057,
+          "elapsedFromCallStartMs": 526
+        },
+        {
+          "event": "call_session_resolved",
+          "timestamp": "2026-09-11T18:17:24.742019+00:00",
+          "monotonicTimestamp": 12316.435263,
+          "elapsedFromCallStartMs": 526
+        },
+        {
+          "event": "call_session_response",
+          "timestamp": "2026-09-11T18:17:24.742072+00:00",
+          "monotonicTimestamp": 12316.435318,
+          "elapsedFromCallStartMs": 527
+        },
+        {
+          "event": "tts_ready",
+          "timestamp": "2026-09-11T18:17:25.253828+00:00",
+          "monotonicTimestamp": 12316.947061,
+          "elapsedFromCallStartMs": 1038
+        },
+        {
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T18:17:25.254114+00:00",
+          "monotonicTimestamp": 12316.947358,
+          "elapsedFromCallStartMs": 1039
+        },
+        {
+          "event": "greeting_queued",
+          "timestamp": "2026-09-11T18:17:25.261173+00:00",
+          "monotonicTimestamp": 12316.954407,
+          "elapsedFromCallStartMs": 1046
+        },
+        {
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T18:17:25.267565+00:00",
+          "monotonicTimestamp": 12316.960788,
+          "elapsedFromCallStartMs": 1052
+        },
+        {
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T18:17:25.741876+00:00",
+          "monotonicTimestamp": 12317.434847,
+          "elapsedFromCallStartMs": 1526
+        },
+        {
+          "event": "caller_ready",
+          "timestamp": "2026-09-11T18:17:25.741962+00:00",
+          "monotonicTimestamp": 12317.434847,
+          "elapsedFromCallStartMs": 1526
+        },
+        {
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T18:17:26.590475+00:00",
+          "monotonicTimestamp": 12318.283716,
+          "elapsedFromCallStartMs": 2375
+        }
+      ],
+      "stages": {
+        "sttReady": null,
+        "ttsReady": 12316.9470605,
+        "callStart": 12315.9087813,
+        "callerReady": 12317.4348467,
+        "sttConnected": null,
+        "ttsConnected": 12316.9470605,
+        "pipelineStart": 12316.4161475,
+        "greetingQueued": 12316.9544071,
+        "pipelineCreated": 12316.4156383,
+        "pipelineStarted": 12316.4162781,
+        "ttsConnectStart": null,
+        "websocketAccept": 12315.9098049,
+        "outputAudioFrame": null,
+        "greetingCompleted": 12318.2837159,
+        "llmServiceCreated": 12316.415264,
+        "sttServiceCreated": 12316.1891899,
+        "toolRegistryStart": 12316.1892744,
+        "ttsServiceCreated": 12315.9311304,
+        "websocketAccepted": 12315.9098049,
+        "callSessionCreated": 12316.4350569,
+        "firstGreetingAudio": 12317.4348467,
+        "greetingFirstAudio": 12317.4348467,
+        "greetingQueueStart": 12316.4159887,
+        "greetingTtsStarted": 12316.9607884,
+        "plivoStartReceived": 12315.9132259,
+        "startFrameReceived": 12315.9132259,
+        "ttsConnectionStart": 12316.4161794,
+        "callSessionResponse": 12316.4353181,
+        "deploymentIdResolved": 12315.9143236,
+        "temporalContextReady": 12315.9298582,
+        "temporalContextStart": 12315.9296294,
+        "toolRegistryResolved": 12316.1894106,
+        "llmServiceCreateStart": 12316.1899336,
+        "pipelineRunnerStarted": 12316.4163112,
+        "runtimeConfigResolved": 12315.9293024,
+        "runtimeConfigResponse": 12315.9294919,
+        "sttServiceCreateStart": 12315.9317093,
+        "ttsServiceCreateStart": 12315.9303428,
+        "pipelineConstructStart": 12316.4154842,
+        "callSessionRequestStart": 12316.4165634,
+        "websocketHandlerEntered": 12315.9087813,
+        "runtimeConfigRequestStart": 12315.9146638,
+        "websocketOutputWriteIfAvailable": null
+      },
+      "streamId": "pstn-19b-c4-mtxa3kdt",
+      "breakdown": {
+        "callSessionMs": 19,
+        "runtimeConfigMs": 15,
+        "pickupToWebsocketMs": 1,
+        "pipelineToSTTReadyMs": null,
+        "pipelineToTTSReadyMs": 531,
+        "servicesToPipelineMs": 485,
+        "pipelineConstructionMs": 0,
+        "callSessionToPipelineMs": null,
+        "callSessionToServicesMs": null,
+        "websocketToStartFrameMs": 3,
+        "pipeline_to_tts_ready_ms": 531,
+        "plivoStartToStartFrameMs": 0,
+        "greetingQueuedToTTSStartMs": 6,
+        "ttsReadyToGreetingQueuedMs": 7,
+        "startFrameToRuntimeConfigMs": 16,
+        "greetingQueuedToFirstAudioMs": 480,
+        "pickupToFirstGreetingAudioMs": 1525,
+        "runtimeConfigToCallSessionMs": 506,
+        "runtime_config_to_pipeline_ms": 486,
+        "websocketAcceptToPlivoStartMs": 3,
+        "greetingTTSStartToFirstAudioMs": 474,
+        "tts_ready_to_greeting_queue_ms": 7,
+        "greeting_queue_to_first_audio_ms": 480,
+        "plivo_start_to_runtime_config_ms": 16,
+        "websocket_accept_to_plivo_start_ms": 3,
+        "call_start_to_first_greeting_audio_ms": 1526,
+        "plivo_start_to_first_greeting_audio_ms": 1522,
+        "websocket_accept_to_first_greeting_audio_ms": 1525
+      },
+      "callSessionMs": 19,
+      "runtimeConfigMs": 15,
+      "pipelineToSttReadyMs": null,
+      "pipelineToTtsReadyMs": 531,
+      "servicesToPipelineMs": 485,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "pipeline_to_tts_ready_ms": 531,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 6,
+      "ttsReadyToGreetingQueuedMs": 7,
+      "greetingQueueToFirstAudioMs": 480,
+      "startFrameToRuntimeConfigMs": 16,
+      "pickupToFirstGreetingAudioMs": 1525,
+      "runtimeConfigToCallSessionMs": 506,
+      "runtime_config_to_pipeline_ms": 486,
+      "websocketAcceptToPlivoStartMs": 3,
+      "greetingTTSStartToFirstAudioMs": 474,
+      "totalCallStartupToFirstAudioMs": 1525,
+      "tts_ready_to_greeting_queue_ms": 7,
+      "greeting_queue_to_first_audio_ms": 480,
+      "plivo_start_to_runtime_config_ms": 16,
+      "websocket_accept_to_plivo_start_ms": 3,
+      "call_start_to_first_greeting_audio_ms": 1526,
+      "plivo_start_to_first_greeting_audio_ms": 1522,
+      "websocket_accept_to_first_greeting_audio_ms": 1525
+    },
+    "timeline": [
+      {
+        "type": "STARTUP",
+        "event": "websocket_handler_entered",
+        "timestamp": "2026-09-11T18:17:24.215584+00:00",
+        "monotonicTimestamp": 12315.908781,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_start",
+        "timestamp": "2026-09-11T18:17:24.215861+00:00",
+        "monotonicTimestamp": 12315.908781,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_accepted",
+        "timestamp": "2026-09-11T18:17:24.216761+00:00",
+        "monotonicTimestamp": 12315.909805,
+        "elapsedFromCallStartMs": 1
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_waiting_first_msg",
+        "timestamp": "2026-09-11T18:17:24.216950+00:00",
+        "monotonicTimestamp": 12315.910195,
+        "elapsedFromCallStartMs": 1
+      },
+      {
+        "type": "STARTUP",
+        "event": "plivo_start_received",
+        "timestamp": "2026-09-11T18:17:24.220498+00:00",
+        "monotonicTimestamp": 12315.913226,
+        "elapsedFromCallStartMs": 4
+      },
+      {
+        "type": "STARTUP",
+        "event": "start_frame_received",
+        "timestamp": "2026-09-11T18:17:24.220726+00:00",
+        "monotonicTimestamp": 12315.913226,
+        "elapsedFromCallStartMs": 4
+      },
+      {
+        "type": "STARTUP",
+        "event": "deployment_id_resolved",
+        "timestamp": "2026-09-11T18:17:24.221080+00:00",
+        "monotonicTimestamp": 12315.914324,
+        "elapsedFromCallStartMs": 6
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_start",
+        "timestamp": "2026-09-11T18:17:24.221306+00:00",
+        "monotonicTimestamp": 12315.914547,
+        "elapsedFromCallStartMs": 6
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_request_start",
+        "timestamp": "2026-09-11T18:17:24.221419+00:00",
+        "monotonicTimestamp": 12315.914664,
+        "elapsedFromCallStartMs": 6
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_resolved",
+        "timestamp": "2026-09-11T18:17:24.236065+00:00",
+        "monotonicTimestamp": 12315.929302,
+        "elapsedFromCallStartMs": 21
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_response",
+        "timestamp": "2026-09-11T18:17:24.236249+00:00",
+        "monotonicTimestamp": 12315.929492,
+        "elapsedFromCallStartMs": 21
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_start",
+        "timestamp": "2026-09-11T18:17:24.236385+00:00",
+        "monotonicTimestamp": 12315.929629,
+        "elapsedFromCallStartMs": 21
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_ready",
+        "timestamp": "2026-09-11T18:17:24.236613+00:00",
+        "monotonicTimestamp": 12315.929858,
+        "elapsedFromCallStartMs": 21
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_create_start",
+        "timestamp": "2026-09-11T18:17:24.237107+00:00",
+        "monotonicTimestamp": 12315.930343,
+        "elapsedFromCallStartMs": 22
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_created",
+        "timestamp": "2026-09-11T18:17:24.237889+00:00",
+        "monotonicTimestamp": 12315.93113,
+        "elapsedFromCallStartMs": 22
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_create_start",
+        "timestamp": "2026-09-11T18:17:24.238468+00:00",
+        "monotonicTimestamp": 12315.931709,
+        "elapsedFromCallStartMs": 23
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_created",
+        "timestamp": "2026-09-11T18:17:24.495947+00:00",
+        "monotonicTimestamp": 12316.18919,
+        "elapsedFromCallStartMs": 280
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_start",
+        "timestamp": "2026-09-11T18:17:24.496027+00:00",
+        "monotonicTimestamp": 12316.189274,
+        "elapsedFromCallStartMs": 280
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_resolved",
+        "timestamp": "2026-09-11T18:17:24.496164+00:00",
+        "monotonicTimestamp": 12316.189411,
+        "elapsedFromCallStartMs": 281
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_create_start",
+        "timestamp": "2026-09-11T18:17:24.496690+00:00",
+        "monotonicTimestamp": 12316.189934,
+        "elapsedFromCallStartMs": 281
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_created",
+        "timestamp": "2026-09-11T18:17:24.722023+00:00",
+        "monotonicTimestamp": 12316.415264,
+        "elapsedFromCallStartMs": 506
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_construct_start",
+        "timestamp": "2026-09-11T18:17:24.722239+00:00",
+        "monotonicTimestamp": 12316.415484,
+        "elapsedFromCallStartMs": 507
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_created",
+        "timestamp": "2026-09-11T18:17:24.722391+00:00",
+        "monotonicTimestamp": 12316.415638,
+        "elapsedFromCallStartMs": 507
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queue_start",
+        "timestamp": "2026-09-11T18:17:24.722744+00:00",
+        "monotonicTimestamp": 12316.415989,
+        "elapsedFromCallStartMs": 507
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_start",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:24.722811+00:00",
+        "monotonicTimestamp": 12316.416058,
+        "elapsedFromCallStartMs": 506
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_start",
+        "timestamp": "2026-09-11T18:17:24.722900+00:00",
+        "monotonicTimestamp": 12316.416148,
+        "elapsedFromCallStartMs": 507
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connection_start",
+        "timestamp": "2026-09-11T18:17:24.722932+00:00",
+        "monotonicTimestamp": 12316.416179,
+        "elapsedFromCallStartMs": 507
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_started",
+        "timestamp": "2026-09-11T18:17:24.723031+00:00",
+        "monotonicTimestamp": 12316.416278,
+        "elapsedFromCallStartMs": 507
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_runner_started",
+        "timestamp": "2026-09-11T18:17:24.723064+00:00",
+        "monotonicTimestamp": 12316.416311,
+        "elapsedFromCallStartMs": 508
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_start",
+        "timestamp": "2026-09-11T18:17:24.723280+00:00",
+        "monotonicTimestamp": 12316.416527,
+        "elapsedFromCallStartMs": 508
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_request_start",
+        "timestamp": "2026-09-11T18:17:24.723317+00:00",
+        "monotonicTimestamp": 12316.416563,
+        "elapsedFromCallStartMs": 508
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_created",
+        "timestamp": "2026-09-11T18:17:24.741816+00:00",
+        "monotonicTimestamp": 12316.435057,
+        "elapsedFromCallStartMs": 526
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_resolved",
+        "timestamp": "2026-09-11T18:17:24.742019+00:00",
+        "monotonicTimestamp": 12316.435263,
+        "elapsedFromCallStartMs": 526
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_response",
+        "timestamp": "2026-09-11T18:17:24.742072+00:00",
+        "monotonicTimestamp": 12316.435318,
+        "elapsedFromCallStartMs": 527
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_ready",
+        "timestamp": "2026-09-11T18:17:25.253828+00:00",
+        "monotonicTimestamp": 12316.947061,
+        "elapsedFromCallStartMs": 1038
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connected",
+        "timestamp": "2026-09-11T18:17:25.254114+00:00",
+        "monotonicTimestamp": 12316.947358,
+        "elapsedFromCallStartMs": 1039
+      },
+      {
+        "type": "TURN",
+        "event": "tts_connected",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:25.254228+00:00",
+        "monotonicTimestamp": 12316.947473,
+        "elapsedFromCallStartMs": 1038
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queued",
+        "timestamp": "2026-09-11T18:17:25.261173+00:00",
+        "monotonicTimestamp": 12316.954407,
+        "elapsedFromCallStartMs": 1046
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_tts_started",
+        "timestamp": "2026-09-11T18:17:25.267565+00:00",
+        "monotonicTimestamp": 12316.960788,
+        "elapsedFromCallStartMs": 1052
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_tts_started",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:25.267958+00:00",
+        "monotonicTimestamp": 12316.960788,
+        "elapsedFromCallStartMs": 1051
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_first_audio",
+        "timestamp": "2026-09-11T18:17:25.741876+00:00",
+        "monotonicTimestamp": 12317.434847,
+        "elapsedFromCallStartMs": 1526
+      },
+      {
+        "type": "STARTUP",
+        "event": "caller_ready",
+        "timestamp": "2026-09-11T18:17:25.741962+00:00",
+        "monotonicTimestamp": 12317.434847,
+        "elapsedFromCallStartMs": 1526
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:25.741610+00:00",
+        "monotonicTimestamp": 12317.434847,
+        "elapsedFromCallStartMs": 1525
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:25.747083+00:00",
+        "monotonicTimestamp": 12317.440323,
+        "elapsedFromCallStartMs": 1531
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:25.798605+00:00",
+        "monotonicTimestamp": 12317.491837,
+        "elapsedFromCallStartMs": 1582
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:25.871127+00:00",
+        "monotonicTimestamp": 12317.56436,
+        "elapsedFromCallStartMs": 1655
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:25.934745+00:00",
+        "monotonicTimestamp": 12317.627972,
+        "elapsedFromCallStartMs": 1718
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.002582+00:00",
+        "monotonicTimestamp": 12317.695821,
+        "elapsedFromCallStartMs": 1786
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.077582+00:00",
+        "monotonicTimestamp": 12317.770812,
+        "elapsedFromCallStartMs": 1861
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.141216+00:00",
+        "monotonicTimestamp": 12317.834447,
+        "elapsedFromCallStartMs": 1925
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.221070+00:00",
+        "monotonicTimestamp": 12317.914306,
+        "elapsedFromCallStartMs": 2005
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.284495+00:00",
+        "monotonicTimestamp": 12317.977729,
+        "elapsedFromCallStartMs": 2068
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.359046+00:00",
+        "monotonicTimestamp": 12318.052283,
+        "elapsedFromCallStartMs": 2142
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.431311+00:00",
+        "monotonicTimestamp": 12318.124549,
+        "elapsedFromCallStartMs": 2215
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.491045+00:00",
+        "monotonicTimestamp": 12318.184281,
+        "elapsedFromCallStartMs": 2274
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.547069+00:00",
+        "monotonicTimestamp": 12318.24031,
+        "elapsedFromCallStartMs": 2331
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.548103+00:00",
+        "monotonicTimestamp": 12318.241346,
+        "elapsedFromCallStartMs": 2332
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_completed",
+        "timestamp": "2026-09-11T18:17:26.590475+00:00",
+        "monotonicTimestamp": 12318.283716,
+        "elapsedFromCallStartMs": 2375
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_completed",
+        "turnId": "turn-866f640b",
+        "timestamp": "2026-09-11T18:17:26.590537+00:00",
+        "monotonicTimestamp": 12318.283716,
+        "elapsedFromCallStartMs": 2374
+      },
+      {
+        "type": "TURN",
+        "event": "turn_completed",
+        "turnId": "turn-a21eb48d",
+        "timestamp": "2026-09-11T18:17:28.286684+00:00",
+        "monotonicTimestamp": 12319.979918,
+        "elapsedFromCallStartMs": 4070
+      }
+    ],
+    "ttsConnectedEventsCount": 3,
+    "reconnectOccurred": false,
+    "turnsCount": 1
+  },
+  {
+    "callIndex": 5,
+    "streamId": "pstn-19b-c5-mtxa3ph8",
+    "callId": "call-19b-c5-mtxa3ph8",
+    "sessionId": "1ce810e7-e902-4455-90f0-f270923eee73",
+    "status": "MISSED",
+    "audioChunkCount": 65,
+    "totalAudioBytes": 27820,
+    "startupTimeline": {
+      "callSessionMs": 16,
+      "runtimeConfigMs": 39,
+      "pickupToWebsocketMs": 2,
+      "pipelineToSTTReadyMs": null,
+      "pipelineToTTSReadyMs": 479,
+      "servicesToPipelineMs": 458,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "websocketToStartFrameMs": 3,
+      "pipeline_to_tts_ready_ms": 479,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 10,
+      "ttsReadyToGreetingQueuedMs": 209,
+      "startFrameToRuntimeConfigMs": 41,
+      "greetingQueuedToFirstAudioMs": 448,
+      "pickupToFirstGreetingAudioMs": 1650,
+      "runtimeConfigToCallSessionMs": 487,
+      "runtime_config_to_pipeline_ms": 470,
+      "websocketAcceptToPlivoStartMs": 3,
+      "greetingTTSStartToFirstAudioMs": 439,
+      "tts_ready_to_greeting_queue_ms": 209,
+      "greeting_queue_to_first_audio_ms": 448,
+      "plivo_start_to_runtime_config_ms": 41,
+      "websocket_accept_to_plivo_start_ms": 3,
+      "call_start_to_first_greeting_audio_ms": 1652,
+      "plivo_start_to_first_greeting_audio_ms": 1647,
+      "websocket_accept_to_first_greeting_audio_ms": 1650
+    },
+    "startupMetrics": {
+      "events": [
+        {
+          "event": "websocket_handler_entered",
+          "timestamp": "2026-09-11T18:17:30.817520+00:00",
+          "monotonicTimestamp": 12322.510697,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "call_start",
+          "timestamp": "2026-09-11T18:17:30.817938+00:00",
+          "monotonicTimestamp": 12322.510697,
+          "elapsedFromCallStartMs": 0
+        },
+        {
+          "event": "websocket_accepted",
+          "timestamp": "2026-09-11T18:17:30.819712+00:00",
+          "monotonicTimestamp": 12322.512537,
+          "elapsedFromCallStartMs": 2
+        },
+        {
+          "event": "websocket_waiting_first_msg",
+          "timestamp": "2026-09-11T18:17:30.820118+00:00",
+          "monotonicTimestamp": 12322.513355,
+          "elapsedFromCallStartMs": 3
+        },
+        {
+          "event": "plivo_start_received",
+          "timestamp": "2026-09-11T18:17:30.823022+00:00",
+          "monotonicTimestamp": 12322.515782,
+          "elapsedFromCallStartMs": 5
+        },
+        {
+          "event": "start_frame_received",
+          "timestamp": "2026-09-11T18:17:30.823292+00:00",
+          "monotonicTimestamp": 12322.515782,
+          "elapsedFromCallStartMs": 5
+        },
+        {
+          "event": "deployment_id_resolved",
+          "timestamp": "2026-09-11T18:17:30.823896+00:00",
+          "monotonicTimestamp": 12322.517134,
+          "elapsedFromCallStartMs": 6
+        },
+        {
+          "event": "runtime_config_start",
+          "timestamp": "2026-09-11T18:17:30.824375+00:00",
+          "monotonicTimestamp": 12322.517612,
+          "elapsedFromCallStartMs": 7
+        },
+        {
+          "event": "runtime_config_request_start",
+          "timestamp": "2026-09-11T18:17:30.824584+00:00",
+          "monotonicTimestamp": 12322.517825,
+          "elapsedFromCallStartMs": 7
+        },
+        {
+          "event": "runtime_config_resolved",
+          "timestamp": "2026-09-11T18:17:30.862926+00:00",
+          "monotonicTimestamp": 12322.556159,
+          "elapsedFromCallStartMs": 45
+        },
+        {
+          "event": "runtime_config_response",
+          "timestamp": "2026-09-11T18:17:30.863241+00:00",
+          "monotonicTimestamp": 12322.55648,
+          "elapsedFromCallStartMs": 46
+        },
+        {
+          "event": "temporal_context_start",
+          "timestamp": "2026-09-11T18:17:30.863415+00:00",
+          "monotonicTimestamp": 12322.556658,
+          "elapsedFromCallStartMs": 46
+        },
+        {
+          "event": "temporal_context_ready",
+          "timestamp": "2026-09-11T18:17:30.874899+00:00",
+          "monotonicTimestamp": 12322.568134,
+          "elapsedFromCallStartMs": 57
+        },
+        {
+          "event": "tts_service_create_start",
+          "timestamp": "2026-09-11T18:17:30.875231+00:00",
+          "monotonicTimestamp": 12322.568475,
+          "elapsedFromCallStartMs": 58
+        },
+        {
+          "event": "tts_service_created",
+          "timestamp": "2026-09-11T18:17:30.875561+00:00",
+          "monotonicTimestamp": 12322.568806,
+          "elapsedFromCallStartMs": 58
+        },
+        {
+          "event": "stt_service_create_start",
+          "timestamp": "2026-09-11T18:17:30.875814+00:00",
+          "monotonicTimestamp": 12322.569059,
+          "elapsedFromCallStartMs": 58
+        },
+        {
+          "event": "stt_service_created",
+          "timestamp": "2026-09-11T18:17:31.110740+00:00",
+          "monotonicTimestamp": 12322.803983,
+          "elapsedFromCallStartMs": 293
+        },
+        {
+          "event": "tool_registry_start",
+          "timestamp": "2026-09-11T18:17:31.110802+00:00",
+          "monotonicTimestamp": 12322.804049,
+          "elapsedFromCallStartMs": 293
+        },
+        {
+          "event": "tool_registry_resolved",
+          "timestamp": "2026-09-11T18:17:31.110919+00:00",
+          "monotonicTimestamp": 12322.804166,
+          "elapsedFromCallStartMs": 293
+        },
+        {
+          "event": "llm_service_create_start",
+          "timestamp": "2026-09-11T18:17:31.111436+00:00",
+          "monotonicTimestamp": 12322.80468,
+          "elapsedFromCallStartMs": 294
+        },
+        {
+          "event": "llm_service_created",
+          "timestamp": "2026-09-11T18:17:31.332665+00:00",
+          "monotonicTimestamp": 12323.025905,
+          "elapsedFromCallStartMs": 515
+        },
+        {
+          "event": "pipeline_construct_start",
+          "timestamp": "2026-09-11T18:17:31.332868+00:00",
+          "monotonicTimestamp": 12323.026113,
+          "elapsedFromCallStartMs": 515
+        },
+        {
+          "event": "pipeline_created",
+          "timestamp": "2026-09-11T18:17:31.333143+00:00",
+          "monotonicTimestamp": 12323.026389,
+          "elapsedFromCallStartMs": 516
+        },
+        {
+          "event": "greeting_queue_start",
+          "timestamp": "2026-09-11T18:17:31.333737+00:00",
+          "monotonicTimestamp": 12323.02698,
+          "elapsedFromCallStartMs": 516
+        },
+        {
+          "event": "pipeline_start",
+          "timestamp": "2026-09-11T18:17:31.334011+00:00",
+          "monotonicTimestamp": 12323.027257,
+          "elapsedFromCallStartMs": 517
+        },
+        {
+          "event": "tts_connection_start",
+          "timestamp": "2026-09-11T18:17:31.334073+00:00",
+          "monotonicTimestamp": 12323.02732,
+          "elapsedFromCallStartMs": 517
+        },
+        {
+          "event": "pipeline_started",
+          "timestamp": "2026-09-11T18:17:31.334259+00:00",
+          "monotonicTimestamp": 12323.027504,
+          "elapsedFromCallStartMs": 517
+        },
+        {
+          "event": "pipeline_runner_started",
+          "timestamp": "2026-09-11T18:17:31.334326+00:00",
+          "monotonicTimestamp": 12323.027573,
+          "elapsedFromCallStartMs": 517
+        },
+        {
+          "event": "call_session_start",
+          "timestamp": "2026-09-11T18:17:31.334675+00:00",
+          "monotonicTimestamp": 12323.02792,
+          "elapsedFromCallStartMs": 517
+        },
+        {
+          "event": "call_session_request_start",
+          "timestamp": "2026-09-11T18:17:31.334804+00:00",
+          "monotonicTimestamp": 12323.028048,
+          "elapsedFromCallStartMs": 517
+        },
+        {
+          "event": "call_session_created",
+          "timestamp": "2026-09-11T18:17:31.349758+00:00",
+          "monotonicTimestamp": 12323.042991,
+          "elapsedFromCallStartMs": 532
+        },
+        {
+          "event": "call_session_resolved",
+          "timestamp": "2026-09-11T18:17:31.350247+00:00",
+          "monotonicTimestamp": 12323.043484,
+          "elapsedFromCallStartMs": 533
+        },
+        {
+          "event": "call_session_response",
+          "timestamp": "2026-09-11T18:17:31.350427+00:00",
+          "monotonicTimestamp": 12323.043671,
+          "elapsedFromCallStartMs": 533
+        },
+        {
+          "event": "tts_ready",
+          "timestamp": "2026-09-11T18:17:31.812288+00:00",
+          "monotonicTimestamp": 12323.505523,
+          "elapsedFromCallStartMs": 995
+        },
+        {
+          "event": "tts_connected",
+          "timestamp": "2026-09-11T18:17:31.812563+00:00",
+          "monotonicTimestamp": 12323.505807,
+          "elapsedFromCallStartMs": 995
+        },
+        {
+          "event": "greeting_queued",
+          "timestamp": "2026-09-11T18:17:32.021096+00:00",
+          "monotonicTimestamp": 12323.714324,
+          "elapsedFromCallStartMs": 1204
+        },
+        {
+          "event": "greeting_tts_started",
+          "timestamp": "2026-09-11T18:17:32.030821+00:00",
+          "monotonicTimestamp": 12323.724057,
+          "elapsedFromCallStartMs": 1213
+        },
+        {
+          "event": "greeting_first_audio",
+          "timestamp": "2026-09-11T18:17:32.469542+00:00",
+          "monotonicTimestamp": 12324.162614,
+          "elapsedFromCallStartMs": 1652
+        },
+        {
+          "event": "caller_ready",
+          "timestamp": "2026-09-11T18:17:32.469590+00:00",
+          "monotonicTimestamp": 12324.162614,
+          "elapsedFromCallStartMs": 1652
+        },
+        {
+          "event": "greeting_completed",
+          "timestamp": "2026-09-11T18:17:33.148123+00:00",
+          "monotonicTimestamp": 12324.841355,
+          "elapsedFromCallStartMs": 2331
+        }
+      ],
+      "stages": {
+        "sttReady": null,
+        "ttsReady": 12323.5055231,
+        "callStart": 12322.5106973,
+        "callerReady": 12324.1626143,
+        "sttConnected": null,
+        "ttsConnected": 12323.5055231,
+        "pipelineStart": 12323.0272575,
+        "greetingQueued": 12323.7143237,
+        "pipelineCreated": 12323.0263885,
+        "pipelineStarted": 12323.0275042,
+        "ttsConnectStart": null,
+        "websocketAccept": 12322.5125367,
+        "outputAudioFrame": null,
+        "greetingCompleted": 12324.8413551,
+        "llmServiceCreated": 12323.025905,
+        "sttServiceCreated": 12322.8039834,
+        "toolRegistryStart": 12322.8040491,
+        "ttsServiceCreated": 12322.5688058,
+        "websocketAccepted": 12322.5125367,
+        "callSessionCreated": 12323.0429912,
+        "firstGreetingAudio": 12324.1626143,
+        "greetingFirstAudio": 12324.1626143,
+        "greetingQueueStart": 12323.02698,
+        "greetingTtsStarted": 12323.7240574,
+        "plivoStartReceived": 12322.5157818,
+        "startFrameReceived": 12322.5157818,
+        "ttsConnectionStart": 12323.0273196,
+        "callSessionResponse": 12323.0436713,
+        "deploymentIdResolved": 12322.517134,
+        "temporalContextReady": 12322.568134,
+        "temporalContextStart": 12322.5566581,
+        "toolRegistryResolved": 12322.8041664,
+        "llmServiceCreateStart": 12322.8046797,
+        "pipelineRunnerStarted": 12323.027573,
+        "runtimeConfigResolved": 12322.5561588,
+        "runtimeConfigResponse": 12322.5564804,
+        "sttServiceCreateStart": 12322.5690592,
+        "ttsServiceCreateStart": 12322.5684754,
+        "pipelineConstructStart": 12323.0261134,
+        "callSessionRequestStart": 12323.0280484,
+        "websocketHandlerEntered": 12322.5106973,
+        "runtimeConfigRequestStart": 12322.5178247,
+        "websocketOutputWriteIfAvailable": null
+      },
+      "streamId": "pstn-19b-c5-mtxa3ph8",
+      "breakdown": {
+        "callSessionMs": 16,
+        "runtimeConfigMs": 39,
+        "pickupToWebsocketMs": 2,
+        "pipelineToSTTReadyMs": null,
+        "pipelineToTTSReadyMs": 479,
+        "servicesToPipelineMs": 458,
+        "pipelineConstructionMs": 0,
+        "callSessionToPipelineMs": null,
+        "callSessionToServicesMs": null,
+        "websocketToStartFrameMs": 3,
+        "pipeline_to_tts_ready_ms": 479,
+        "plivoStartToStartFrameMs": 0,
+        "greetingQueuedToTTSStartMs": 10,
+        "ttsReadyToGreetingQueuedMs": 209,
+        "startFrameToRuntimeConfigMs": 41,
+        "greetingQueuedToFirstAudioMs": 448,
+        "pickupToFirstGreetingAudioMs": 1650,
+        "runtimeConfigToCallSessionMs": 487,
+        "runtime_config_to_pipeline_ms": 470,
+        "websocketAcceptToPlivoStartMs": 3,
+        "greetingTTSStartToFirstAudioMs": 439,
+        "tts_ready_to_greeting_queue_ms": 209,
+        "greeting_queue_to_first_audio_ms": 448,
+        "plivo_start_to_runtime_config_ms": 41,
+        "websocket_accept_to_plivo_start_ms": 3,
+        "call_start_to_first_greeting_audio_ms": 1652,
+        "plivo_start_to_first_greeting_audio_ms": 1647,
+        "websocket_accept_to_first_greeting_audio_ms": 1650
+      },
+      "callSessionMs": 16,
+      "runtimeConfigMs": 39,
+      "pipelineToSttReadyMs": null,
+      "pipelineToTtsReadyMs": 479,
+      "servicesToPipelineMs": 458,
+      "pipelineConstructionMs": 0,
+      "callSessionToPipelineMs": null,
+      "callSessionToServicesMs": null,
+      "pipeline_to_tts_ready_ms": 479,
+      "plivoStartToStartFrameMs": 0,
+      "greetingQueuedToTTSStartMs": 10,
+      "ttsReadyToGreetingQueuedMs": 209,
+      "greetingQueueToFirstAudioMs": 448,
+      "startFrameToRuntimeConfigMs": 41,
+      "pickupToFirstGreetingAudioMs": 1650,
+      "runtimeConfigToCallSessionMs": 487,
+      "runtime_config_to_pipeline_ms": 470,
+      "websocketAcceptToPlivoStartMs": 3,
+      "greetingTTSStartToFirstAudioMs": 439,
+      "totalCallStartupToFirstAudioMs": 1650,
+      "tts_ready_to_greeting_queue_ms": 209,
+      "greeting_queue_to_first_audio_ms": 448,
+      "plivo_start_to_runtime_config_ms": 41,
+      "websocket_accept_to_plivo_start_ms": 3,
+      "call_start_to_first_greeting_audio_ms": 1652,
+      "plivo_start_to_first_greeting_audio_ms": 1647,
+      "websocket_accept_to_first_greeting_audio_ms": 1650
+    },
+    "timeline": [
+      {
+        "type": "STARTUP",
+        "event": "websocket_handler_entered",
+        "timestamp": "2026-09-11T18:17:30.817520+00:00",
+        "monotonicTimestamp": 12322.510697,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_start",
+        "timestamp": "2026-09-11T18:17:30.817938+00:00",
+        "monotonicTimestamp": 12322.510697,
+        "elapsedFromCallStartMs": 0
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_accepted",
+        "timestamp": "2026-09-11T18:17:30.819712+00:00",
+        "monotonicTimestamp": 12322.512537,
+        "elapsedFromCallStartMs": 2
+      },
+      {
+        "type": "STARTUP",
+        "event": "websocket_waiting_first_msg",
+        "timestamp": "2026-09-11T18:17:30.820118+00:00",
+        "monotonicTimestamp": 12322.513355,
+        "elapsedFromCallStartMs": 3
+      },
+      {
+        "type": "STARTUP",
+        "event": "plivo_start_received",
+        "timestamp": "2026-09-11T18:17:30.823022+00:00",
+        "monotonicTimestamp": 12322.515782,
+        "elapsedFromCallStartMs": 5
+      },
+      {
+        "type": "STARTUP",
+        "event": "start_frame_received",
+        "timestamp": "2026-09-11T18:17:30.823292+00:00",
+        "monotonicTimestamp": 12322.515782,
+        "elapsedFromCallStartMs": 5
+      },
+      {
+        "type": "STARTUP",
+        "event": "deployment_id_resolved",
+        "timestamp": "2026-09-11T18:17:30.823896+00:00",
+        "monotonicTimestamp": 12322.517134,
+        "elapsedFromCallStartMs": 6
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_start",
+        "timestamp": "2026-09-11T18:17:30.824375+00:00",
+        "monotonicTimestamp": 12322.517612,
+        "elapsedFromCallStartMs": 7
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_request_start",
+        "timestamp": "2026-09-11T18:17:30.824584+00:00",
+        "monotonicTimestamp": 12322.517825,
+        "elapsedFromCallStartMs": 7
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_resolved",
+        "timestamp": "2026-09-11T18:17:30.862926+00:00",
+        "monotonicTimestamp": 12322.556159,
+        "elapsedFromCallStartMs": 45
+      },
+      {
+        "type": "STARTUP",
+        "event": "runtime_config_response",
+        "timestamp": "2026-09-11T18:17:30.863241+00:00",
+        "monotonicTimestamp": 12322.55648,
+        "elapsedFromCallStartMs": 46
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_start",
+        "timestamp": "2026-09-11T18:17:30.863415+00:00",
+        "monotonicTimestamp": 12322.556658,
+        "elapsedFromCallStartMs": 46
+      },
+      {
+        "type": "STARTUP",
+        "event": "temporal_context_ready",
+        "timestamp": "2026-09-11T18:17:30.874899+00:00",
+        "monotonicTimestamp": 12322.568134,
+        "elapsedFromCallStartMs": 57
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_create_start",
+        "timestamp": "2026-09-11T18:17:30.875231+00:00",
+        "monotonicTimestamp": 12322.568475,
+        "elapsedFromCallStartMs": 58
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_service_created",
+        "timestamp": "2026-09-11T18:17:30.875561+00:00",
+        "monotonicTimestamp": 12322.568806,
+        "elapsedFromCallStartMs": 58
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_create_start",
+        "timestamp": "2026-09-11T18:17:30.875814+00:00",
+        "monotonicTimestamp": 12322.569059,
+        "elapsedFromCallStartMs": 58
+      },
+      {
+        "type": "STARTUP",
+        "event": "stt_service_created",
+        "timestamp": "2026-09-11T18:17:31.110740+00:00",
+        "monotonicTimestamp": 12322.803983,
+        "elapsedFromCallStartMs": 293
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_start",
+        "timestamp": "2026-09-11T18:17:31.110802+00:00",
+        "monotonicTimestamp": 12322.804049,
+        "elapsedFromCallStartMs": 293
+      },
+      {
+        "type": "STARTUP",
+        "event": "tool_registry_resolved",
+        "timestamp": "2026-09-11T18:17:31.110919+00:00",
+        "monotonicTimestamp": 12322.804166,
+        "elapsedFromCallStartMs": 293
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_create_start",
+        "timestamp": "2026-09-11T18:17:31.111436+00:00",
+        "monotonicTimestamp": 12322.80468,
+        "elapsedFromCallStartMs": 294
+      },
+      {
+        "type": "STARTUP",
+        "event": "llm_service_created",
+        "timestamp": "2026-09-11T18:17:31.332665+00:00",
+        "monotonicTimestamp": 12323.025905,
+        "elapsedFromCallStartMs": 515
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_construct_start",
+        "timestamp": "2026-09-11T18:17:31.332868+00:00",
+        "monotonicTimestamp": 12323.026113,
+        "elapsedFromCallStartMs": 515
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_created",
+        "timestamp": "2026-09-11T18:17:31.333143+00:00",
+        "monotonicTimestamp": 12323.026389,
+        "elapsedFromCallStartMs": 516
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queue_start",
+        "timestamp": "2026-09-11T18:17:31.333737+00:00",
+        "monotonicTimestamp": 12323.02698,
+        "elapsedFromCallStartMs": 516
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_start",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:31.333849+00:00",
+        "monotonicTimestamp": 12323.027095,
+        "elapsedFromCallStartMs": 515
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_start",
+        "timestamp": "2026-09-11T18:17:31.334011+00:00",
+        "monotonicTimestamp": 12323.027257,
+        "elapsedFromCallStartMs": 517
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connection_start",
+        "timestamp": "2026-09-11T18:17:31.334073+00:00",
+        "monotonicTimestamp": 12323.02732,
+        "elapsedFromCallStartMs": 517
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_started",
+        "timestamp": "2026-09-11T18:17:31.334259+00:00",
+        "monotonicTimestamp": 12323.027504,
+        "elapsedFromCallStartMs": 517
+      },
+      {
+        "type": "STARTUP",
+        "event": "pipeline_runner_started",
+        "timestamp": "2026-09-11T18:17:31.334326+00:00",
+        "monotonicTimestamp": 12323.027573,
+        "elapsedFromCallStartMs": 517
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_start",
+        "timestamp": "2026-09-11T18:17:31.334675+00:00",
+        "monotonicTimestamp": 12323.02792,
+        "elapsedFromCallStartMs": 517
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_request_start",
+        "timestamp": "2026-09-11T18:17:31.334804+00:00",
+        "monotonicTimestamp": 12323.028048,
+        "elapsedFromCallStartMs": 517
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_created",
+        "timestamp": "2026-09-11T18:17:31.349758+00:00",
+        "monotonicTimestamp": 12323.042991,
+        "elapsedFromCallStartMs": 532
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_resolved",
+        "timestamp": "2026-09-11T18:17:31.350247+00:00",
+        "monotonicTimestamp": 12323.043484,
+        "elapsedFromCallStartMs": 533
+      },
+      {
+        "type": "STARTUP",
+        "event": "call_session_response",
+        "timestamp": "2026-09-11T18:17:31.350427+00:00",
+        "monotonicTimestamp": 12323.043671,
+        "elapsedFromCallStartMs": 533
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_ready",
+        "timestamp": "2026-09-11T18:17:31.812288+00:00",
+        "monotonicTimestamp": 12323.505523,
+        "elapsedFromCallStartMs": 995
+      },
+      {
+        "type": "STARTUP",
+        "event": "tts_connected",
+        "timestamp": "2026-09-11T18:17:31.812563+00:00",
+        "monotonicTimestamp": 12323.505807,
+        "elapsedFromCallStartMs": 995
+      },
+      {
+        "type": "TURN",
+        "event": "tts_connected",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:31.812672+00:00",
+        "monotonicTimestamp": 12323.505918,
+        "elapsedFromCallStartMs": 993
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_queued",
+        "timestamp": "2026-09-11T18:17:32.021096+00:00",
+        "monotonicTimestamp": 12323.714324,
+        "elapsedFromCallStartMs": 1204
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_tts_started",
+        "timestamp": "2026-09-11T18:17:32.030821+00:00",
+        "monotonicTimestamp": 12323.724057,
+        "elapsedFromCallStartMs": 1213
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_tts_started",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.030999+00:00",
+        "monotonicTimestamp": 12323.724057,
+        "elapsedFromCallStartMs": 1212
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_first_audio",
+        "timestamp": "2026-09-11T18:17:32.469542+00:00",
+        "monotonicTimestamp": 12324.162614,
+        "elapsedFromCallStartMs": 1652
+      },
+      {
+        "type": "STARTUP",
+        "event": "caller_ready",
+        "timestamp": "2026-09-11T18:17:32.469590+00:00",
+        "monotonicTimestamp": 12324.162614,
+        "elapsedFromCallStartMs": 1652
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.469376+00:00",
+        "monotonicTimestamp": 12324.162614,
+        "elapsedFromCallStartMs": 1650
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.470722+00:00",
+        "monotonicTimestamp": 12324.163962,
+        "elapsedFromCallStartMs": 1651
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.524301+00:00",
+        "monotonicTimestamp": 12324.217537,
+        "elapsedFromCallStartMs": 1705
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.578023+00:00",
+        "monotonicTimestamp": 12324.271255,
+        "elapsedFromCallStartMs": 1759
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.675425+00:00",
+        "monotonicTimestamp": 12324.368663,
+        "elapsedFromCallStartMs": 1856
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.719195+00:00",
+        "monotonicTimestamp": 12324.412435,
+        "elapsedFromCallStartMs": 1900
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.787826+00:00",
+        "monotonicTimestamp": 12324.481062,
+        "elapsedFromCallStartMs": 1969
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.859357+00:00",
+        "monotonicTimestamp": 12324.552597,
+        "elapsedFromCallStartMs": 2040
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.925959+00:00",
+        "monotonicTimestamp": 12324.6192,
+        "elapsedFromCallStartMs": 2107
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:32.986993+00:00",
+        "monotonicTimestamp": 12324.680217,
+        "elapsedFromCallStartMs": 2168
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:33.053473+00:00",
+        "monotonicTimestamp": 12324.746711,
+        "elapsedFromCallStartMs": 2234
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:33.122565+00:00",
+        "monotonicTimestamp": 12324.815796,
+        "elapsedFromCallStartMs": 2303
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:33.137365+00:00",
+        "monotonicTimestamp": 12324.830599,
+        "elapsedFromCallStartMs": 2318
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_first_audio",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:33.147298+00:00",
+        "monotonicTimestamp": 12324.840531,
+        "elapsedFromCallStartMs": 2328
+      },
+      {
+        "type": "STARTUP",
+        "event": "greeting_completed",
+        "timestamp": "2026-09-11T18:17:33.148123+00:00",
+        "monotonicTimestamp": 12324.841355,
+        "elapsedFromCallStartMs": 2331
+      },
+      {
+        "type": "TURN",
+        "event": "greeting_completed",
+        "turnId": "turn-0880141c",
+        "timestamp": "2026-09-11T18:17:33.148275+00:00",
+        "monotonicTimestamp": 12324.841355,
+        "elapsedFromCallStartMs": 2329
+      },
+      {
+        "type": "TURN",
+        "event": "turn_completed",
+        "turnId": "turn-7bb68955",
+        "timestamp": "2026-09-11T18:17:34.996906+00:00",
+        "monotonicTimestamp": 12326.690147,
+        "elapsedFromCallStartMs": 4178
+      }
+    ],
+    "ttsConnectedEventsCount": 3,
+    "reconnectOccurred": false,
+    "turnsCount": 1
+  }
+]
