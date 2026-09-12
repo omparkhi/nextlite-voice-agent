@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,20 +69,27 @@ async def create_client(
     sub = Subscription(
         id=uuid.uuid4(),
         tenantId=tenant.id,
+        planName="starter",
         status=SubscriptionStatus.PENDING,
+        startedAt=now,
+        currentPeriodEnd=now + timedelta(days=30),
         createdAt=now,
         updatedAt=now
     )
     session.add(sub)
+
+
 
     ver_token = VerificationToken(
         id=uuid.uuid4(),
         userId=user.id,
         token=generate_refresh_token(),
         type="email_verification",
-        expiresAt=now + datetime.resolution * 86400,
+        expiresAt=now + timedelta(days=1),
         createdAt=now
     )
+
+
     session.add(ver_token)
 
     await session.commit()

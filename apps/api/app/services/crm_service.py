@@ -394,10 +394,10 @@ class CRMService:
             "id": str(f.id),
             "tenantId": str(f.tenantId),
             "callSessionId": str(f.callSessionId) if f.callSessionId else None,
-            "recipientPhone": f.recipientPhone,
-            "recipientName": f.recipientName,
+            "recipientPhone": f.customerPhone,
+            "recipientName": f.customerName,
             "channel": f.channel,
-            "messageContent": f.messageContent,
+            "messageContent": f.messageText,
             "status": f.status.value if hasattr(f.status, "value") else str(f.status),
             "sentAt": f.sentAt.isoformat() if f.sentAt else None,
             "deliveredAt": f.deliveredAt.isoformat() if f.deliveredAt else None,
@@ -415,11 +415,15 @@ class CRMService:
             id=uuid.uuid4(),
             tenantId=tenant_id,
             callSessionId=uuid.UUID(data["callSessionId"]) if data.get("callSessionId") else None,
-            recipientPhone=customer_phone,
-            recipientName=data.get("customerName"),
+            customerPhone=customer_phone,
+            customerName=data.get("customerName"),
             channel="WHATSAPP",
-            messageContent=message,
+            provider="DEMO",
+            messageType=data.get("messageType", "CUSTOM"),
+            messageText=message,
             status=FollowUpStatus.DELIVERED,
+            providerMessageId=demo_msg_id,
+            isDemo=True,
             sentAt=now,
             deliveredAt=now,
             createdAt=now,
@@ -437,6 +441,7 @@ class CRMService:
             "isDemo": True,
             "message": "Message simulated and delivered via Demo WhatsApp Provider"
         }
+
 
     # Analytics Overview
     async def get_analytics_overview(self, tenant_id: uuid.UUID) -> Dict[str, Any]:
