@@ -236,20 +236,43 @@ class DeterministicTestEchoProcessor(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+DEFAULT_EARLY_TOOL_ACK_PHRASES: Dict[str, str] = {
+    "en-IN": "Sure, let me check that for you.",
+    "en": "Sure, let me check that for you.",
+    "hi-IN": "जी, मैं अभी चेक कर लेता हूँ।",
+    "hi": "जी, मैं अभी चेक कर लेता हूँ।",
+    "mr-IN": "हो, मी लगेच तपासतो.",
+    "mr": "हो, मी लगेच तपासतो.",
+    "gu-IN": "હા, હું હમણાં જ તપાસ કરું છું.",
+    "gu": "હા, હું હમણાં જ તપાસ કરું છું.",
+    "bn-IN": "হ্যাঁ, আমি এখনই দেখছি।",
+    "bn": "হ্যাঁ, আমি এখনই দেখছি।",
+    "ta-IN": "சரிங்க, நான் இப்போதே பார்க்கிறேன்.",
+    "ta": "சரிங்க, நான் இப்போதே பார்க்கிறேன்.",
+    "te-IN": "సరేనండి, నేను ఇప్పుడే చూస్తాను.",
+    "te": "సరేనండి, నేను ఇప్పుడే చూస్తాను.",
+    "kn-IN": "ಖಂಡಿತ, ನಾನು ಈಗಲೇ ಪರಿಶೀಲಿಸುತ್ತೇನೆ.",
+    "kn": "ಖಂಡಿತ, ನಾನು ಈಗಲೇ ಪರಿಶೀಲಿಸುತ್ತೇನೆ.",
+}
+
+
 class InstrumentedAsyncStream:
-    """Non-blocking async stream wrapper for observing chunk deltas and tool call boundaries."""
+    """Non-blocking async stream wrapper for observing chunk deltas, tool call boundaries, and early acknowledgements."""
 
     def __init__(
         self,
         raw_stream: Any,
         timing_tracker: Optional[TurnTimingTracker] = None,
         is_call_terminating_fn: Optional[Any] = None,
+        early_ack_callback: Optional[Any] = None,
     ):
         self._raw_stream = raw_stream
         self._timing_tracker = timing_tracker
         self._is_call_terminating_fn = is_call_terminating_fn
+        self._early_ack_callback = early_ack_callback
         self._first_chunk_seen = False
         self._in_tool_call = False
+        self._early_ack_triggered = False
         self._iter = None
 
     def __aiter__(self):
@@ -288,6 +311,17 @@ class InstrumentedAsyncStream:
                         self._in_tool_call = True
                         if self._timing_tracker:
                             self._timing_tracker.record_tool_call_delta(now)
+                        if self._early_ack_callback and not self._early_ack_triggered:
+                            self._early_ack_triggered = True
+                            try:
+                                res = self._early_ack_callback()
+                                if inspect.isawaitable(res):
+                                    asyncio.create_task(res)
+                            except Exception as e:
+                                logger.debug(f"[EarlyToolAck] Error scheduling callback: {e}")
+                    else:
+                        if self._timing_tracker:
+                            self._timing_tracker.record_tool_call_delta(now)
                 elif getattr(delta, "content", None):
                     if self._in_tool_call:
                         if self._timing_tracker:
@@ -323,19 +357,64 @@ class InstrumentedAsyncStream:
 
 
 class InstrumentedSarvamLLMService(SarvamLLMService):
-    """Pipecat-native Sarvam service with granular HTTP dispatch, shared connection pool, and stream timing."""
+    """Pipecat-native Sarvam service with granular HTTP dispatch, shared connection pool, stream timing, and safe early tool acknowledgement."""
+
     def __init__(
         self,
         *args,
         timing_tracker: Optional[TurnTimingTracker] = None,
         http_client: Optional[httpx.AsyncClient] = None,
         is_call_terminating_fn: Optional[Any] = None,
+        runtime_config: Optional[RuntimeAgentConfig] = None,
+        language_manager: Optional[ConversationLanguageManager] = None,
         **kwargs,
     ):
         self._shared_http_client = http_client
         super().__init__(*args, **kwargs)
         self._nextlite_timing_tracker = timing_tracker
         self._is_call_terminating_fn = is_call_terminating_fn
+        self._runtime_config = runtime_config
+        self._language_manager = language_manager
+        self._early_ack_sent_turn_id: Optional[str] = None
+
+    async def _dispatch_early_tool_ack(self):
+        """Dispatches an immediate non-committal filler phrase to TTS in the active language."""
+        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+            return
+        if self._runtime_config and not getattr(self._runtime_config.runtime, "enable_early_tool_ack", True):
+            return
+
+        current_turn_id = self._nextlite_timing_tracker.active_turn_id if self._nextlite_timing_tracker else None
+        if current_turn_id and self._early_ack_sent_turn_id == current_turn_id:
+            return
+        self._early_ack_sent_turn_id = current_turn_id
+
+        # Resolve active language
+        active_lang = "en-IN"
+        if self._language_manager and getattr(self._language_manager, "current_language", None):
+            active_lang = self._language_manager.current_language
+        elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
+            active_lang = self._runtime_config.language.primary
+
+        base_code = active_lang.split("-")[0]
+        filler_phrase = (
+            DEFAULT_EARLY_TOOL_ACK_PHRASES.get(active_lang)
+            or DEFAULT_EARLY_TOOL_ACK_PHRASES.get(base_code)
+            or DEFAULT_EARLY_TOOL_ACK_PHRASES["en-IN"]
+        )
+
+        now = time.perf_counter()
+        if self._nextlite_timing_tracker:
+            self._nextlite_timing_tracker.record_early_ack_sent(now)
+
+        logger.info(
+            f"[EarlyToolAck] Dispatched early safe filler phrase to TTS: '{filler_phrase}' "
+            f"(lang={active_lang}, turn_id={current_turn_id})"
+        )
+        try:
+            await self.push_frame(TTSSpeakFrame(text=filler_phrase), FrameDirection.DOWNSTREAM)
+        except Exception as e:
+            logger.warning(f"[EarlyToolAck] Failed to push early filler TTSSpeakFrame: {e}")
 
     def create_client(
         self,
@@ -370,6 +449,29 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             default_headers=merged_headers,
         )
 
+    def build_chat_completion_params(self, params_from_context: Any) -> dict:
+        """Dynamically applies tool-calling token optimization, short post-tool responses, and model routing."""
+        params = super().build_chat_completion_params(params_from_context)
+
+        messages = params.get("messages", [])
+        is_post_tool = bool(messages and messages[-1].get("role") == "tool")
+        has_tools = bool(params.get("tools"))
+
+        if self._runtime_config:
+            runtime_cfg = self._runtime_config.runtime
+            if is_post_tool:
+                if runtime_cfg.post_tool_max_tokens:
+                    params["max_tokens"] = runtime_cfg.post_tool_max_tokens
+            elif has_tools:
+                if runtime_cfg.tool_max_tokens:
+                    params["max_tokens"] = runtime_cfg.tool_max_tokens
+                if runtime_cfg.tool_llm_model:
+                    params["model"] = runtime_cfg.tool_llm_model
+                if runtime_cfg.tool_reasoning_mode:
+                    params["reasoning_effort"] = runtime_cfg.tool_reasoning_mode
+
+        return params
+
     async def get_chat_completions(self, context):
         if self._is_call_terminating_fn and self._is_call_terminating_fn():
             from openai.types.chat import ChatCompletionChunk
@@ -392,7 +494,9 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             raw_stream,
             timing_tracker=self._nextlite_timing_tracker,
             is_call_terminating_fn=self._is_call_terminating_fn,
+            early_ack_callback=self._dispatch_early_tool_ack,
         )
+
 
 
 class RealtimeStreamingTimingMonitor(FrameProcessor):
@@ -570,7 +674,10 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                 if is_greeting_context and self._turn_tracker.turn_type == "greeting":
                     self._turn_tracker.record_greeting_first_audio(first_audio_time)
                 else:
+                    if self._turn_tracker.early_ack_sent is not None and self._turn_tracker.early_ack_first_audio is None:
+                        self._turn_tracker.record_early_ack_first_audio(first_audio_time)
                     self._turn_tracker.record_first_tts_audio(first_audio_time)
+
 
             # Record first greeting audio and emit startup metrics ONLY in greeting context
             if is_greeting_context and self._startup_tracker and self._startup_tracker.first_greeting_audio is None:
@@ -1575,7 +1682,10 @@ async def websocket_plivo_endpoint(
             timing_tracker=turn_tracker,
             http_client=sarvam_llm_pool,
             is_call_terminating_fn=is_terminating,
+            runtime_config=runtime_config,
+            language_manager=language_manager,
         )
+
         startup_tracker.record_stage("llm_service_created")
 
         # Compute static greeting cache key (Phase 22A Greeting Fast Path)

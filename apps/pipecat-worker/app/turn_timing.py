@@ -176,7 +176,11 @@ class TurnTimingTracker:
         self.llm_first_releasable_text: Optional[float] = None  # First complete clause/sentence
         self.text_released_to_tts: Optional[float] = None  # Text released/dispatched to TTS
         self.tool_call_delta: Optional[float] = None  # First tool call delta
+        self.last_tool_delta: Optional[float] = None  # Last tool call delta
+        self.tool_delta_count: int = 0
         self.tool_call_complete: Optional[float] = None  # Tool arguments JSON complete
+        self.early_ack_sent: Optional[float] = None  # Immediate early non-committal filler dispatched to TTS
+        self.early_ack_first_audio: Optional[float] = None  # Caller first heard early filler audio
         self.llm_response_complete: Optional[float] = None
         self.tool_executions: List[ToolExecutionTiming] = []
         self.post_tool_llm_start: Optional[float] = None
@@ -200,6 +204,7 @@ class TurnTimingTracker:
         self.interruption_reason: Optional[str] = None
         self.active_turn_events: List[Dict[str, Any]] = []
         self.active_phone_trace: Optional[Dict[str, Any]] = None
+
 
     @property
     def is_assistant_speaking(self) -> bool:
@@ -248,9 +253,12 @@ class TurnTimingTracker:
         self.llm_first_provider_response = None
         self.first_llm_output = None
         self.llm_first_releasable_text = None
-        self.text_released_to_tts = None
         self.tool_call_delta = None
+        self.last_tool_delta = None
+        self.tool_delta_count = 0
         self.tool_call_complete = None
+        self.early_ack_sent = None
+        self.early_ack_first_audio = None
         self.llm_response_complete = None
         self.tool_executions = []
         self.post_tool_llm_start = None
@@ -271,6 +279,7 @@ class TurnTimingTracker:
         self.active_turn_events = []
         self.active_phone_trace = None
         return self.active_turn_id
+
 
     def record_audio_sent_to_plivo(self, ts: Optional[float] = None):
         """Records timestamp when first audio chunk is serialized and dispatched to Plivo."""
@@ -387,15 +396,30 @@ class TurnTimingTracker:
 
     def record_tool_call_delta(self, ts: Optional[float] = None):
         now = ts if ts is not None else time.perf_counter()
+        self.tool_delta_count += 1
+        self.last_tool_delta = now
         if self.tool_call_delta is None:
             self.tool_call_delta = now
             self.record_event("first_tool_call_delta", now)
+
+    def record_early_ack_sent(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        if self.early_ack_sent is None:
+            self.early_ack_sent = now
+            self.record_event("early_tool_ack_sent_to_tts", now)
+
+    def record_early_ack_first_audio(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        if self.early_ack_first_audio is None:
+            self.early_ack_first_audio = now
+            self.record_event("early_tool_ack_first_audio", now)
 
     def record_tool_call_complete(self, ts: Optional[float] = None):
         now = ts if ts is not None else time.perf_counter()
         if self.tool_call_complete is None:
             self.tool_call_complete = now
             self.record_event("tool_call_complete", now)
+
 
     def record_first_llm_output(self, ts: Optional[float] = None):
         now = ts if ts is not None else time.perf_counter()
@@ -583,12 +607,18 @@ class TurnTimingTracker:
 
         # 8. Tool Call Generation Latency (LLM generating JSON tokens)
         llm_to_first_tool_delta_ms = diff_ms(self.tool_call_delta, self.llm_request_start or self.llm_start, "llmToFirstToolDeltaMs")
+        user_stop_to_first_tool_delta_ms = diff_ms(self.tool_call_delta, self.speech_stop, "userStopToFirstToolDeltaMs")
         first_tool_delta_to_tool_complete_ms = diff_ms(self.tool_call_complete, self.tool_call_delta, "firstToolDeltaToToolCompleteMs")
+
+        # 8b. Early Safe Tool Acknowledgement Latency
+        early_ack_sent_to_first_audio_ms = diff_ms(self.early_ack_first_audio, self.early_ack_sent, "earlyAckSentToFirstAudioMs")
+        user_stop_to_early_ack_first_audio_ms = diff_ms(self.early_ack_first_audio, self.speech_stop, "userStopToEarlyAckFirstAudioMs")
 
         # 9. Tool execution duration & post-tool latencies
         tool_duration_ms: Optional[int] = None
         tools_list: List[Dict[str, Any]] = []
         last_tool_end: Optional[float] = None
+        tool_call_complete_to_execution_start_ms: Optional[int] = None
         tool_result_to_post_tool_llm_start_ms: Optional[int] = None
         post_tool_llm_to_first_output_ms: Optional[int] = None
         tool_result_to_first_audio_ms: Optional[int] = None
@@ -605,6 +635,11 @@ class TurnTimingTracker:
             ]
             first_tool_start = self.tool_executions[0].start_time
             last_tool_end = self.tool_executions[-1].end_time
+
+            if self.tool_call_complete is not None and first_tool_start >= self.tool_call_complete:
+                tool_call_complete_to_execution_start_ms = diff_ms(
+                    first_tool_start, self.tool_call_complete, "toolCallCompleteToExecutionStartMs"
+                )
 
             if self.first_llm_output is not None and first_tool_start >= self.first_llm_output:
                 first_output_to_tool_start_ms = diff_ms(first_tool_start, self.first_llm_output, "firstOutputToToolStartMs")
@@ -640,13 +675,17 @@ class TurnTimingTracker:
         else:
             tts_connection_ms = None
 
-        # 12. Explicit user response latency = first_tts_audio - speech_stop
-        response_latency_ms = diff_ms(self.first_tts_audio, self.speech_stop, "responseLatencyMs")
+        # 12. Explicit user response latency = first audio heard (early filler or final speech) - speech_stop
+        effective_first_audio = self.early_ack_first_audio or self.first_tts_audio
+        if self.early_ack_first_audio is not None and self.first_tts_audio is not None:
+            effective_first_audio = min(self.early_ack_first_audio, self.first_tts_audio)
+
+        response_latency_ms = diff_ms(effective_first_audio, self.speech_stop, "responseLatencyMs")
         user_stop_to_first_audio_ms = response_latency_ms
         speech_stop_to_first_audio_ms = response_latency_ms
 
         # 13. aggregation_to_first_audio_ms = first_tts_audio - user_aggregation_finalized
-        aggregation_to_first_audio_ms = diff_ms(self.first_tts_audio, self.user_aggregation_finalized, "aggregationToFirstAudioMs")
+        aggregation_to_first_audio_ms = diff_ms(effective_first_audio, self.user_aggregation_finalized, "aggregationToFirstAudioMs")
 
         # 14. llm_first_output_to_tts_start_ms / llmToTTSStartMs = tts_start - first_llm_output
         first_output_ref = self.first_llm_output or self.first_post_tool_llm_output
@@ -687,7 +726,12 @@ class TurnTimingTracker:
             "llmStartToFirstOutputMs": llm_start_to_first_output_ms,
             "llmRequestToFirstOutputMs": llm_request_to_first_output_ms,
             "llmToFirstToolDeltaMs": llm_to_first_tool_delta_ms,
+            "userStopToFirstToolDeltaMs": user_stop_to_first_tool_delta_ms,
             "firstToolDeltaToToolCompleteMs": first_tool_delta_to_tool_complete_ms,
+            "toolDeltaCount": self.tool_delta_count,
+            "earlyAckSentToFirstAudioMs": early_ack_sent_to_first_audio_ms,
+            "userStopToEarlyAckFirstAudioMs": user_stop_to_early_ack_first_audio_ms,
+            "toolCallCompleteToExecutionStartMs": tool_call_complete_to_execution_start_ms,
             "llmFirstTextToReleaseMs": llm_first_text_to_release_ms,
             "llmFirstTextToTtsStartMs": llm_first_text_to_tts_start_ms,
             "llmFirstOutputToTtsStartMs": llm_first_output_to_tts_start_ms,
@@ -719,6 +763,7 @@ class TurnTimingTracker:
         }
 
     def emit_turn_metrics_log(self) -> Dict[str, Any]:
+
         """Emits a single compact structured log line for the completed turn and records it."""
         if self.speech_start is None and self.tts_start is None and self.first_llm_output is None:
             return {}

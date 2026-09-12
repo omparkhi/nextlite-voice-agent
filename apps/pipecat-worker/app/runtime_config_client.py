@@ -69,6 +69,11 @@ class RuntimeLanguageConfig(BaseContractModel):
 class RuntimeBehaviorConfig(BaseContractModel):
     model_provider: Optional[str] = Field(default=None, alias="modelProvider")
     llm_model: Optional[str] = Field(default=None, alias="llmModel")
+    tool_llm_model: Optional[str] = Field(default=None, alias="toolLlmModel")
+    tool_max_tokens: Optional[int] = Field(default=128, alias="toolMaxTokens")
+    post_tool_max_tokens: Optional[int] = Field(default=80, alias="postToolMaxTokens")
+    tool_reasoning_mode: Optional[str] = Field(default=None, alias="toolReasoningMode")
+    enable_early_tool_ack: bool = Field(default=True, alias="enableEarlyToolAck")
     temperature: Optional[float] = None
     interruption_mode: Optional[str] = Field(default=None, alias="interruptionMode")
     preemptive_generation_enabled: Optional[bool] = Field(default=None, alias="preemptiveGenerationEnabled")
@@ -76,6 +81,7 @@ class RuntimeBehaviorConfig(BaseContractModel):
     noise_cancellation_model: Optional[str] = Field(default=None, alias="noiseCancellationModel")
     expressive_mode_enabled: Optional[bool] = Field(default=None, alias="expressiveModeEnabled")
     max_call_duration_seconds: Optional[int] = Field(default=None, alias="maxCallDurationSeconds")
+
 
 
 class RuntimeKnowledgeRetrievalConfig(BaseContractModel):
