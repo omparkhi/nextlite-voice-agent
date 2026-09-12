@@ -194,6 +194,20 @@ class AgentTemplate(Base):
     isSystem: Mapped[bool] = mapped_column("is_system", Boolean, default=True, nullable=False)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
 
+    @property
+    def defaultConfig(self) -> dict:
+        return self.defaultConfiguration or {}
+
+    @property
+    def systemPromptTemplate(self) -> Optional[str]:
+        if isinstance(self.defaultConfiguration, dict):
+            return self.defaultConfiguration.get("basePrompt") or self.defaultConfiguration.get("systemPrompt") or self.defaultConfiguration.get("systemInstructions")
+        return None
+
+    @property
+    def basePrompt(self) -> Optional[str]:
+        return self.systemPromptTemplate
+
 
 class Agent(Base):
     __tablename__ = "agents"
@@ -207,6 +221,7 @@ class Agent(Base):
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     tenant = relationship("Tenant", back_populates="agents")
+    template = relationship("AgentTemplate", foreign_keys=[templateId])
     versions = relationship("AgentVersion", back_populates="agent", cascade="all, delete-orphan")
 
 

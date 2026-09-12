@@ -44,6 +44,7 @@ class PromptCompilerService:
         configuration: Any = None,
         knowledge_results: Optional[List[Dict[str, Any]]] = None,
         base_prompt: Optional[str] = None,
+        template_base_prompt: Optional[str] = None,
         timezone: Optional[str] = None,
         primary_lang: Optional[str] = None,
         supported_langs: Optional[List[str]] = None,
@@ -72,7 +73,13 @@ class PromptCompilerService:
         )
         parts.append(self.compile_temporal_context(tz_str))
 
-        # 3. IDENTITY & PERSONA
+        # 3. TEMPLATE ROLE BASELINE & CONVERSATIONAL PRINCIPLES
+        t_prompt = template_base_prompt or cfg.get("templateBasePrompt") or cfg.get("template_base_prompt")
+        if t_prompt and str(t_prompt).strip():
+            parts.append("=== ROLE BASELINE & CONVERSATIONAL PRINCIPLES ===")
+            parts.append(str(t_prompt).strip())
+
+        # 4. IDENTITY & PERSONA
         identity = cfg.get("identity") or {}
         agent_name = identity.get("agentName") or identity.get("displayName") or identity.get("name") or "Assistant"
         biz_info = cfg.get("businessInformation") or {}

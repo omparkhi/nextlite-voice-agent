@@ -16,6 +16,7 @@ from ..logging import logger
 from ..auth.password import hash_password
 from ..auth.tokens import generate_refresh_token
 from ..services.agent_service import AgentService
+from ..services.template_service import TemplateService
 from ..services.telephony_service import TelephonyService
 from ..services.prompt_compiler_service import prompt_compiler
 
@@ -201,24 +202,12 @@ async def update_client(
 # Agent Templates
 @router.get("/templates")
 async def list_templates(
+    industry: Optional[str] = None,
     payload: Dict[str, Any] = Depends(require_admin),
     session: AsyncSession = Depends(get_db)
 ):
-    res = await session.execute(select(AgentTemplate).order_by(AgentTemplate.createdAt.desc()))
-    templates = res.scalars().all()
-    return [
-        {
-            "id": str(tmpl.id),
-            "name": tmpl.name,
-            "industry": tmpl.industry,
-            "description": tmpl.description,
-            "systemPromptTemplate": tmpl.systemPromptTemplate,
-            "defaultConfiguration": tmpl.defaultConfig,
-            "defaultConfig": tmpl.defaultConfig,
-            "createdAt": tmpl.createdAt.isoformat() if tmpl.createdAt else None,
-        }
-        for tmpl in templates
-    ]
+    service = TemplateService(session)
+    return await service.list_templates(industry=industry)
 
 @router.get("/templates/{template_id}")
 async def get_template(
@@ -226,20 +215,11 @@ async def get_template(
     payload: Dict[str, Any] = Depends(require_admin),
     session: AsyncSession = Depends(get_db)
 ):
-    res = await session.execute(select(AgentTemplate).where(AgentTemplate.id == uuid.UUID(template_id)))
-    tmpl = res.scalar_one_or_none()
+    service = TemplateService(session)
+    tmpl = await service.get_template(template_id)
     if not tmpl:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
-    return {
-        "id": str(tmpl.id),
-        "name": tmpl.name,
-        "industry": tmpl.industry,
-        "description": tmpl.description,
-        "systemPromptTemplate": tmpl.systemPromptTemplate,
-        "defaultConfiguration": tmpl.defaultConfig,
-        "defaultConfig": tmpl.defaultConfig,
-        "createdAt": tmpl.createdAt.isoformat() if tmpl.createdAt else None,
-    }
+    return tmpl
 
 # Client-Scoped Agent Routes
 @router.get("/clients/{client_id}/agents")

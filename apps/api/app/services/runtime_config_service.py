@@ -2,7 +2,7 @@ import uuid
 from typing import Optional, Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from ..models import Deployment, Agent, AgentVersion, PhoneNumber, DeploymentStatus
+from ..models import Deployment, Agent, AgentVersion, AgentTemplate, PhoneNumber, DeploymentStatus
 from ..schemas import (
     RuntimeAgentConfig, RuntimeTenantConfig, RuntimeAgentMetadata,
     RuntimeDeploymentMetadata, RuntimePromptConfig, RuntimeVoiceConfig,
@@ -124,8 +124,18 @@ class RuntimeAgentConfigService:
         primary_lang = lang_cfg.get("primary", "hi-IN")
         supported_langs = lang_cfg.get("supported") or lang_cfg.get("supportedLanguages") or ["en-IN", "hi-IN"]
 
+        # Resolve template base prompt if agent references a template
+        template_base_prompt = None
+        if agent.templateId:
+            t_stmt = select(AgentTemplate).where(AgentTemplate.id == agent.templateId)
+            t_res = await self.session.execute(t_stmt)
+            tmpl = t_res.scalar_one_or_none()
+            if tmpl:
+                template_base_prompt = tmpl.basePrompt or tmpl.systemPromptTemplate
+
         compiled_prompt = prompt_compiler.compile_system_prompt(
             configuration=cfg,
+            template_base_prompt=template_base_prompt,
             timezone=timezone,
             primary_lang=primary_lang,
             supported_langs=supported_langs

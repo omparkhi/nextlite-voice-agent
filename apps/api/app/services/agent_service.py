@@ -26,6 +26,7 @@ class AgentService:
 
             results.append({
                 "id": str(a.id),
+                "templateId": str(a.templateId) if a.templateId else None,
                 "name": a.name,
                 "status": a.status.value,
                 "createdAt": a.createdAt.isoformat() if a.createdAt else None,
@@ -57,6 +58,7 @@ class AgentService:
         return {
             "id": str(agent.id),
             "tenantId": str(agent.tenantId),
+            "templateId": str(agent.templateId) if agent.templateId else None,
             "name": agent.name,
             "status": agent.status.value,
             "createdAt": agent.createdAt.isoformat() if agent.createdAt else None,
@@ -113,23 +115,49 @@ class AgentService:
         created_by: Optional[uuid.UUID] = None,
         description: Optional[str] = None
     ) -> Dict[str, Any]:
+        from .template_service import TemplateService, SYSTEM_TEMPLATES
+        t_service = TemplateService(self.session)
+
+        # If no template_id provided, default to generic Receptionist template to satisfy DB schema
+        target_template_id = template_id or SYSTEM_TEMPLATES[0]["id"]
+
+        # Ensure system template exists in DB if needed
+        tmpl_data = await t_service.get_template(target_template_id)
+        if tmpl_data:
+            # Check if template row is in DB
+            stmt = select(AgentTemplate).where(AgentTemplate.id == target_template_id)
+            res = await self.session.execute(stmt)
+            if not res.scalar_one_or_none():
+                new_db_tmpl = AgentTemplate(
+                    id=target_template_id,
+                    name=tmpl_data["name"],
+                    description=tmpl_data["description"],
+                    industry=tmpl_data["industry"],
+                    defaultConfiguration=tmpl_data["defaultConfiguration"],
+                    isSystem=True
+                )
+                self.session.add(new_db_tmpl)
+                await self.session.flush()
+
         agent = Agent(
             tenantId=tenant_id,
-            templateId=template_id,
+            templateId=target_template_id,
             name=name,
             status=AgentStatus.READY
         )
         self.session.add(agent)
         await self.session.flush()
 
-        # If template provided, load template config
+        # Load template config snapshot
         tmpl_config = {}
-        if template_id:
-            t_stmt = select(AgentTemplate).where(AgentTemplate.id == template_id)
-            t_res = await self.session.execute(t_stmt)
-            tmpl = t_res.scalar_one_or_none()
-            if tmpl and tmpl.defaultConfig:
-                tmpl_config = tmpl.defaultConfig
+        if tmpl_data and tmpl_data.get("defaultConfiguration"):
+            import copy
+            tmpl_config = copy.deepcopy(tmpl_data["defaultConfiguration"])
+            if "identity" in tmpl_config and isinstance(tmpl_config["identity"], dict):
+                tmpl_config["identity"]["agentName"] = name
+                tmpl_config["identity"]["name"] = name
+            if tmpl_data.get("basePrompt") and "basePrompt" not in tmpl_config:
+                tmpl_config["basePrompt"] = tmpl_data["basePrompt"]
 
         default_config = tmpl_config or {
             "identity": {"agentName": name, "greeting": "Hello! How can I assist you today?"},

@@ -5,8 +5,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_db
 from ..auth import get_current_user_payload
 from ..services.crm_service import CRMService
+from ..services.template_service import TemplateService
 
 router = APIRouter(prefix="/api/client", tags=["client"])
+
+# Templates
+@router.get("/templates")
+async def list_templates(
+    industry: Optional[str] = None,
+    payload: Dict[str, Any] = Depends(get_current_user_payload),
+    session: AsyncSession = Depends(get_db)
+):
+    service = TemplateService(session)
+    return await service.list_templates(industry=industry)
+
+@router.get("/templates/{template_id}")
+async def get_template(
+    template_id: str,
+    payload: Dict[str, Any] = Depends(get_current_user_payload),
+    session: AsyncSession = Depends(get_db)
+):
+    service = TemplateService(session)
+    tmpl = await service.get_template(template_id)
+    if not tmpl:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+    return tmpl
 
 def resolve_tenant_id(payload: Dict[str, Any], query_tenant_id: Optional[str] = None) -> uuid.UUID:
     if payload.get("role") == "ADMIN" and query_tenant_id:
