@@ -235,6 +235,7 @@ export interface AgentConfiguration {
   leadRules?: { requiredFields: string[]; qualificationCriteria: string };
   escalationRules?: { triggerConditions: string[]; transferNumber: string; timeout: number };
   systemInstructions: string;
+  instructions?: string;
 }
 
 export interface ChecklistItem {

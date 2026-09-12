@@ -14,22 +14,6 @@ import { PromptPreviewModal } from '../../components/agent-builder/PromptPreview
 import { ChecklistPanel } from '../../components/agent-builder/ChecklistPanel';
 import { ToolsManager } from '../../components/agent-builder/ToolsManager';
 
-const TIMEZONE_OPTIONS = [
-  { value: 'Asia/Kolkata', label: 'Asia/Kolkata (IST, +05:30)' },
-  { value: 'America/New_York', label: 'America/New_York (Eastern Time, UTC-5 / UTC-4)' },
-  { value: 'America/Chicago', label: 'America/Chicago (Central Time, UTC-6 / UTC-5)' },
-  { value: 'America/Denver', label: 'America/Denver (Mountain Time, UTC-7 / UTC-6)' },
-  { value: 'America/Los_Angeles', label: 'America/Los_Angeles (Pacific Time, UTC-8 / UTC-7)' },
-  { value: 'Europe/London', label: 'Europe/London (GMT / BST, UTC+0 / UTC+1)' },
-  { value: 'Europe/Paris', label: 'Europe/Paris (CET / CEST, UTC+1 / UTC+2)' },
-  { value: 'Europe/Berlin', label: 'Europe/Berlin (CET / CEST, UTC+1 / UTC+2)' },
-  { value: 'Asia/Dubai', label: 'Asia/Dubai (GST, UTC+4)' },
-  { value: 'Asia/Singapore', label: 'Asia/Singapore (SGT, UTC+8)' },
-  { value: 'Asia/Tokyo', label: 'Asia/Tokyo (JST, UTC+9)' },
-  { value: 'Australia/Sydney', label: 'Australia/Sydney (AEST / AEDT, UTC+10 / UTC+11)' },
-  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-];
-
 const defaultConfiguration: AgentConfiguration = {
   identity: { agentName: 'Assistant', greeting: 'Hello! How can I help you today?', businessName: '' },
   persona: { role: 'AI Assistant', personality: 'Helpful and efficient', tone: 'warm', style: 'concise', formality: 'mixed' },
@@ -398,171 +382,145 @@ export function AgentDetail() {
           <div className="max-w-3xl space-y-8">
             {activeTab === 'instructions' && (
               <div className="space-y-6 text-xs">
-                {/* Greeting Section */}
-                <div className="space-y-2">
+                {/* Dedicated Greeting Card */}
+                <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-2xs space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="block font-semibold text-gray-700 text-sm">Greeting</label>
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200 flex items-center gap-1 cursor-pointer">
-                      <span>🌐</span> Translations
-                    </span>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 text-sm">Greeting</h3>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        The exact opening sentence spoken by the agent when the call connects.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                        Initial Call Turn
+                      </span>
+                    </div>
                   </div>
+
                   <textarea
                     rows={3}
                     value={configuration.identity?.greeting || ''}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const val = e.target.value;
                       handleConfigChange({
-                        identity: { ...configuration.identity, greeting: e.target.value },
-                      })
-                    }
-                    placeholder="Namaste, SuccessPath Competitive Academy se bol raha hoon. Aap kis exam ki preparation ke baare mein jaanna chahenge?"
-                    className="w-full bg-white border border-gray-200 rounded-xl p-3.5 text-gray-900 font-medium leading-relaxed focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 shadow-2xs"
+                        identity: { ...configuration.identity, greeting: val },
+                      });
+                    }}
+                    placeholder="Hi, thanks for calling {serviceProviderName}! This is Aarti. How can I help you today?"
+                    className="w-full bg-gray-50/50 border border-gray-200 rounded-xl p-3.5 text-gray-900 font-medium leading-relaxed focus:bg-white focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-xs transition-colors"
                   />
-                  <p className="text-[11px] text-gray-400">Supports variables like &#123;&#123;userName&#125;&#125;, &#123;&#123;businessName&#125;&#125;</p>
-                </div>
-
-                {/* Persona Section */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-semibold text-gray-900 text-base">Persona</h4>
-                  <div className="bg-gray-50/50 rounded-2xl border border-gray-200 p-4 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-gray-600 font-medium mb-1">Agent Display Name</label>
-                        <input
-                          type="text"
-                          value={configuration.identity?.agentName || ''}
-                          onChange={(e) =>
-                            handleConfigChange({
-                              identity: { ...configuration.identity, agentName: e.target.value },
-                            })
-                          }
-                          placeholder="Rahul"
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-600 font-medium mb-1">Role</label>
-                        <input
-                          type="text"
-                          value={configuration.persona?.role || ''}
-                          onChange={(e) =>
-                            handleConfigChange({
-                              persona: { ...configuration.persona, role: e.target.value },
-                            })
-                          }
-                          placeholder="Receptionist and admission counseling assistant"
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-600 font-medium mb-1">Tone & Speaking Style</label>
-                      <input
-                        type="text"
-                        value={configuration.persona?.personality || ''}
-                        onChange={(e) =>
-                          handleConfigChange({
-                            persona: { ...configuration.persona, personality: e.target.value },
-                          })
-                        }
-                        placeholder="Warm, professional, natural, conversational, confident, and concise"
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
-                      />
-                    </div>
+                  <div className="flex items-center justify-between text-[11px] text-gray-400">
+                    <span>Supports variable placeholders like <code className="text-gray-600 bg-gray-100 px-1 py-0.5 rounded font-mono">&#123;serviceProviderName&#125;</code>, <code className="text-gray-600 bg-gray-100 px-1 py-0.5 rounded font-mono">&#123;userName&#125;</code></span>
+                    <span>{(configuration.identity?.greeting || '').length} characters</span>
                   </div>
                 </div>
 
-                {/* Environment & Situation */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-semibold text-gray-900 text-base">Environment & Situation</h4>
-                  <div className="bg-gray-50/50 rounded-2xl border border-gray-200 p-4 space-y-3">
+                {/* Powerful Long-form Instructions Editor */}
+                <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <label className="block text-gray-600 font-medium mb-1">Situation</label>
-                      <input
-                        type="text"
-                        value={configuration.environment?.situation || ''}
-                        onChange={(e) =>
-                          handleConfigChange({
-                            environment: { ...configuration.environment, situation: e.target.value },
-                          })
-                        }
-                        placeholder="Inbound phone calls from prospective students and parents enquiring about competitive exam coaching."
-                        className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
-                      />
+                      <h3 className="font-semibold text-gray-900 text-sm">Instructions</h3>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Detailed conversation instructions, phase guidelines, guardrails, and business rules. Supports structured markdown.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-gray-100 text-gray-600 border border-gray-200">
+                        Markdown &amp; Headings Supported
+                      </span>
                     </div>
                   </div>
-                </div>
 
-                {/* Primary Objective */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-semibold text-gray-900 text-base">Primary Objective</h4>
-                  <div className="bg-gray-50/50 rounded-2xl border border-gray-200 p-4">
-                    <input
-                      type="text"
-                      value={configuration.objective?.primaryObjective || ''}
-                      onChange={(e) =>
+                  {/* Formatting quick helpers */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-gray-500">
+                    <span className="text-gray-400 font-medium">Quick Insert:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = configuration.systemInstructions || '';
+                        const heading = (current ? '\n\n' : '') + '## Phase 1: Identity\n- Greet the caller professionally\n- Confirm caller name and purpose\n';
                         handleConfigChange({
-                          objective: { ...configuration.objective, primaryObjective: e.target.value },
-                        })
-                      }
-                      placeholder="Understand student goals, recommend suitable coaching batch, and book demo class"
-                      className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
-                    />
+                          systemInstructions: current + heading,
+                          instructions: current + heading,
+                        });
+                      }}
+                      className="px-2 py-0.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-medium transition-colors"
+                    >
+                      + Phase
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = configuration.systemInstructions || '';
+                        const guardrail = (current ? '\n\n' : '') + '## Guardrails\n- Never fabricate unverified business information\n- Politely decline out-of-scope requests\n';
+                        handleConfigChange({
+                          systemInstructions: current + guardrail,
+                          instructions: current + guardrail,
+                        });
+                      }}
+                      className="px-2 py-0.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-medium transition-colors"
+                    >
+                      + Guardrails
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const current = configuration.systemInstructions || '';
+                        const dateRes = (current ? '\n\n' : '') + '## Date Resolution\n- Always resolve relative dates like "tomorrow" against runtime context\n- Confirm exact appointment day and time before booking\n';
+                        handleConfigChange({
+                          systemInstructions: current + dateRes,
+                          instructions: current + dateRes,
+                        });
+                      }}
+                      className="px-2 py-0.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-[10px] font-medium transition-colors"
+                    >
+                      + Date Resolution
+                    </button>
                   </div>
-                </div>
 
-                {/* Business Information */}
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-semibold text-gray-900 text-base">Business Information</h4>
-                  <div className="bg-gray-50/50 rounded-2xl border border-gray-200 p-4 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-gray-600 font-medium mb-1">Business Name</label>
-                        <input
-                          type="text"
-                          value={configuration.businessInformation?.businessName || ''}
-                          onChange={(e) =>
-                            handleConfigChange({
-                              businessInformation: { ...configuration.businessInformation, businessName: e.target.value },
-                            })
-                          }
-                          placeholder="SuccessPath Competitive Academy"
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-600 font-medium mb-1">Working Hours</label>
-                        <input
-                          type="text"
-                          value={configuration.businessInformation?.hours || ''}
-                          onChange={(e) =>
-                            handleConfigChange({
-                              businessInformation: { ...configuration.businessInformation, hours: e.target.value },
-                            })
-                          }
-                          placeholder="Mon-Sat 8:00 AM - 8:00 PM"
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-gray-600 font-medium mb-1">Business Timezone</label>
-                        <select
-                          value={configuration.businessInformation?.timezone || 'Asia/Kolkata'}
-                          onChange={(e) =>
-                            handleConfigChange({
-                              businessInformation: { ...configuration.businessInformation, timezone: e.target.value },
-                            })
-                          }
-                          className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400"
-                        >
-                          {TIMEZONE_OPTIONS.map((tz) => (
-                            <option key={tz.value} value={tz.value}>
-                              {tz.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                  <textarea
+                    rows={18}
+                    value={configuration.systemInstructions || (configuration as any).instructions || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      handleConfigChange({
+                        systemInstructions: val,
+                        instructions: val,
+                      });
+                    }}
+                    placeholder={`## Conversation Guidelines
+
+## Phase 1: Identity
+- Greet the caller and introduce yourself as the voice assistant for {serviceProviderName}.
+- Confirm who you are speaking with.
+
+## Phase 2: Intent
+- Ask open questions to understand if the caller needs a new booking, reschedule, or enquiry.
+
+## Phase 3: New Booking
+- Collect required details (date, time, service type).
+- Check availability using available tools before confirming.
+
+## Guardrails
+- If the caller speaks Hindi, continue naturally in Hindi.
+- Escalate emergency or sensitive situations immediately.
+
+## Date Resolution
+- Use the runtime current date context to resolve relative days like "today", "tomorrow", or "next Monday".`}
+                    className="w-full min-h-[420px] bg-gray-50/50 border border-gray-200 rounded-xl p-4 text-gray-900 font-mono text-xs leading-relaxed focus:bg-white focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-colors"
+                    spellCheck={false}
+                  />
+
+                  <div className="flex items-center justify-between text-[11px] text-gray-400">
+                    <span>Universal platform safety boundaries remain authoritative over custom instructions.</span>
+                    <span className="font-mono">
+                      {((configuration.systemInstructions || (configuration as any).instructions || '') as string).length} chars ·{' '}
+                      {((configuration.systemInstructions || (configuration as any).instructions || '') as string)
+                        .split(/\s+/)
+                        .filter(Boolean).length}{' '}
+                      words
+                    </span>
                   </div>
                 </div>
               </div>
