@@ -13,6 +13,7 @@ import { SettingsEditor } from '../../components/agent-builder/SettingsEditor';
 import { PromptPreviewModal } from '../../components/agent-builder/PromptPreviewModal';
 import { ChecklistPanel } from '../../components/agent-builder/ChecklistPanel';
 import { ToolsManager } from '../../components/agent-builder/ToolsManager';
+import { VariableAutocompleteTextarea } from '../../components/agent-builder/VariableAutocompleteTextarea';
 
 const defaultConfiguration: AgentConfiguration = {
   identity: { agentName: 'Assistant', greeting: 'Hello! How can I help you today?', businessName: '' },
@@ -398,11 +399,11 @@ export function AgentDetail() {
                     </div>
                   </div>
 
-                  <textarea
+                  <VariableAutocompleteTextarea
                     rows={3}
                     value={configuration.identity?.greeting || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
+                    availableVariables={configuration.variables?.input || []}
+                    onChange={(val) => {
                       handleConfigChange({
                         identity: { ...configuration.identity, greeting: val },
                       });
@@ -411,7 +412,7 @@ export function AgentDetail() {
                     className="w-full bg-gray-50/50 border border-gray-200 rounded-xl p-3.5 text-gray-900 font-medium leading-relaxed focus:bg-white focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-xs transition-colors"
                   />
                   <div className="flex items-center justify-between text-[11px] text-gray-400">
-                    <span>Supports variable placeholders like <code className="text-gray-600 bg-gray-100 px-1 py-0.5 rounded font-mono">&#123;serviceProviderName&#125;</code>, <code className="text-gray-600 bg-gray-100 px-1 py-0.5 rounded font-mono">&#123;userName&#125;</code></span>
+                    <span>Type <code className="text-gray-600 bg-gray-100 px-1 py-0.5 rounded font-mono">&#123;</code> to autocomplete available variables</span>
                     <span>{(configuration.identity?.greeting || '').length} characters</span>
                   </div>
                 </div>
@@ -422,12 +423,12 @@ export function AgentDetail() {
                     <div>
                       <h3 className="font-semibold text-gray-900 text-sm">Instructions</h3>
                       <p className="text-[11px] text-gray-500 mt-0.5">
-                        Detailed conversation instructions, phase guidelines, guardrails, and business rules. Supports structured markdown.
+                        Detailed conversation instructions, phase guidelines, guardrails, and business rules. Supports structured markdown and variable autocomplete.
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-gray-100 text-gray-600 border border-gray-200">
-                        Markdown &amp; Headings Supported
+                        Markdown &amp; Variables Supported
                       </span>
                     </div>
                   </div>
@@ -479,11 +480,11 @@ export function AgentDetail() {
                     </button>
                   </div>
 
-                  <textarea
+                  <VariableAutocompleteTextarea
                     rows={18}
                     value={configuration.systemInstructions || (configuration as any).instructions || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
+                    availableVariables={configuration.variables?.input || []}
+                    onChange={(val) => {
                       handleConfigChange({
                         systemInstructions: val,
                         instructions: val,
@@ -509,11 +510,10 @@ export function AgentDetail() {
 ## Date Resolution
 - Use the runtime current date context to resolve relative days like "today", "tomorrow", or "next Monday".`}
                     className="w-full min-h-[420px] bg-gray-50/50 border border-gray-200 rounded-xl p-4 text-gray-900 font-mono text-xs leading-relaxed focus:bg-white focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 transition-colors"
-                    spellCheck={false}
                   />
 
                   <div className="flex items-center justify-between text-[11px] text-gray-400">
-                    <span>Universal platform safety boundaries remain authoritative over custom instructions.</span>
+                    <span>Type <code className="text-gray-600 bg-gray-100 px-1 py-0.5 rounded font-mono">&#123;</code> to suggest and autocomplete variables.</span>
                     <span className="font-mono">
                       {((configuration.systemInstructions || (configuration as any).instructions || '') as string).length} chars ·{' '}
                       {((configuration.systemInstructions || (configuration as any).instructions || '') as string)
@@ -547,15 +547,10 @@ export function AgentDetail() {
             {activeTab === 'variables' && (
               <VariablesManager
                 inputVariables={configuration.variables?.input || []}
-                outputVariables={configuration.variables?.output || []}
+                instructionText={configuration.systemInstructions || (configuration as any).instructions || ''}
                 onChangeInput={(inputs) =>
                   handleConfigChange({
                     variables: { input: inputs, output: configuration.variables?.output || [] },
-                  })
-                }
-                onChangeOutput={(outputs) =>
-                  handleConfigChange({
-                    variables: { input: configuration.variables?.input || [], output: outputs },
                   })
                 }
               />

@@ -50,14 +50,17 @@ export interface ApiError {
 
 export interface InputVariable {
   key: string;
+  name?: string;
   label: string;
   description?: string;
-  type: 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'phone' | 'email' | 'enum';
+  type: 'text' | 'string' | 'number' | 'boolean' | 'currency' | 'phone' | 'email' | 'address' | 'time' | 'date' | 'datetime' | 'list' | 'json' | 'enum' | string;
   required: boolean;
   defaultValue?: any;
+  value?: any;
   source?: 'STATIC' | 'RUNTIME' | 'CALLER' | 'SYSTEM' | 'INTEGRATION';
   scope?: 'CALL' | 'TENANT' | 'GLOBAL';
   sensitive?: boolean;
+  isCore?: boolean;
 }
 
 export interface OutputVariable {

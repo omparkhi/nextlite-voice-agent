@@ -2,6 +2,7 @@ import zoneinfo
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from ..domain.variable_references import normalize_variable_references, extract_variable_references
+from ..domain.variable_resolver import resolve_prompt_variables
 
 class PromptCompilerService:
     """
@@ -206,6 +207,18 @@ class PromptCompilerService:
         parts.append("- NATURAL CODE-SWITCHING: Speak natural conversational language (e.g. Hinglish for Hindi, Minglish for Marathi). Do NOT force textbook or archaic translations. Keep standard business and everyday English words in English (e.g. appointment, booking, timing, phone number, team, fees, pricing, confirmation, online, WhatsApp, payment).")
         parts.append("- DO NOT RANDOMLY SWITCH TO ENGLISH: Never switch the entire conversation to English merely because the caller uses an English word, English phrase, name, phone number, or technical term while speaking Hindi or Marathi.")
 
+        # Extract variables and runtime context
+        vars_cfg = cfg.get("variables")
+        if isinstance(vars_cfg, dict):
+            input_vars = vars_cfg.get("input") or vars_cfg.get("inputVariables") or []
+            runtime_ctx = vars_cfg.get("runtimeContext") or cfg.get("runtimeContext") or {}
+        elif isinstance(vars_cfg, list):
+            input_vars = vars_cfg
+            runtime_ctx = cfg.get("runtimeContext") or {}
+        else:
+            input_vars = []
+            runtime_ctx = cfg.get("runtimeContext") or {}
+
         # 11. AGENT & CUSTOM INSTRUCTIONS
         raw_instructions = (
             cfg.get("instructions")
@@ -214,9 +227,14 @@ class PromptCompilerService:
             or base_prompt
         )
         if raw_instructions and str(raw_instructions).strip():
-            normalized_instructions = normalize_variable_references(str(raw_instructions).strip())
+            resolved_instructions = resolve_prompt_variables(
+                str(raw_instructions).strip(),
+                variables=input_vars,
+                runtime_context=runtime_ctx,
+                config=cfg
+            )
             parts.append("=== CUSTOM INSTRUCTIONS ===")
-            parts.append(normalized_instructions)
+            parts.append(resolved_instructions)
 
         # 12. RAG KNOWLEDGE CONTEXT
         if knowledge_results and len(knowledge_results) > 0:
@@ -228,9 +246,14 @@ class PromptCompilerService:
         # 13. INITIAL GREETING GUIDANCE
         raw_greeting = identity.get("greeting") or cfg.get("greeting")
         if raw_greeting and str(raw_greeting).strip():
-            normalized_greeting = normalize_variable_references(str(raw_greeting).strip())
+            resolved_greeting = resolve_prompt_variables(
+                str(raw_greeting).strip(),
+                variables=input_vars,
+                runtime_context=runtime_ctx,
+                config=cfg
+            )
             parts.append("=== INITIAL GREETING GUIDANCE ===")
-            parts.append(f'On call connect, greet caller with: "{normalized_greeting}"')
+            parts.append(f'On call connect, greet caller with: "{resolved_greeting}"')
 
         # 14. VOICE PERSONA & GENDER GRAMMAR
         voice_cfg = cfg.get("voice") or {}
