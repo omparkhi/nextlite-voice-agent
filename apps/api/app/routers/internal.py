@@ -120,3 +120,36 @@ async def execute_tool(
         return result
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+@router.post("/knowledge/retrieve")
+async def retrieve_knowledge(
+    payload: Dict[str, Any],
+    authenticated: bool = Depends(require_worker),
+    session: AsyncSession = Depends(get_db)
+):
+    from ..services.knowledge_service import KnowledgeService
+
+    tenant_id_str = payload.get("tenantId")
+    agent_id_str = payload.get("agentId")
+    query = payload.get("query")
+
+    if not tenant_id_str or not agent_id_str or not query:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="tenantId, agentId, and query are required"
+        )
+
+    tenant_id = uuid.UUID(tenant_id_str)
+    agent_id = uuid.UUID(agent_id_str)
+    top_k = int(payload.get("topK", 3))
+    threshold = float(payload.get("scoreThreshold", 0.65))
+
+    service = KnowledgeService(session)
+    chunks = await service.retrieve_relevant_chunks(
+        tenant_id=tenant_id,
+        agent_id=agent_id,
+        query=query,
+        top_k=top_k,
+        threshold=threshold
+    )
+    return {"results": chunks, "count": len(chunks)}

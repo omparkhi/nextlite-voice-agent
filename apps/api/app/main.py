@@ -10,6 +10,7 @@ from .db import engine, redis_client
 from .routers.auth import router as auth_router
 from .routers.agents import router as agents_router
 from .routers.internal import router as internal_router
+from .routers.knowledge import router as knowledge_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -32,6 +33,7 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(agents_router)
 app.include_router(internal_router)
+app.include_router(knowledge_router)
 
 # Bypass ngrok browser interposer page for API and WebSocket calls
 @app.middleware("http")
