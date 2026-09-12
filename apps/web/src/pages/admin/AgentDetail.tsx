@@ -177,7 +177,7 @@ export function AgentDetail() {
   const isLive = agent?.status === 'LIVE';
 
   return (
-    <div className="h-screen flex flex-col bg-white text-gray-900 overflow-hidden font-sans">
+    <div className="h-full flex flex-col bg-white text-gray-900 overflow-hidden font-sans">
       {/* TOP HEADER BAR (Sarvam Light Theme) */}
       <header className="h-14 border-b border-gray-200 bg-white px-6 flex items-center justify-between shrink-0 shadow-2xs">
         <div className="flex items-center gap-3">
@@ -272,9 +272,8 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setActiveTab('instructions')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
-              activeTab === 'instructions' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${activeTab === 'instructions' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center gap-2">
               <span className="font-semibold text-gray-700">T</span>
@@ -285,9 +284,8 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setActiveTab('phases')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
-              activeTab === 'phases' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${activeTab === 'phases' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center gap-2">
               <span>🔄</span>
@@ -299,9 +297,8 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setActiveTab('guardrails')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
-              activeTab === 'guardrails' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${activeTab === 'guardrails' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center gap-2">
               <span>🛡</span>
@@ -312,9 +309,8 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setActiveTab('variables')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
-              activeTab === 'variables' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${activeTab === 'variables' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center gap-2">
               <span className="font-mono text-gray-700">{`{ }`}</span>
@@ -325,9 +321,8 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setActiveTab('tools')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
-              activeTab === 'tools' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${activeTab === 'tools' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center gap-2">
               <span>🛠</span>
@@ -341,9 +336,8 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setActiveTab('knowledge')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
-              activeTab === 'knowledge' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${activeTab === 'knowledge' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center gap-2">
               <span>📚</span>
@@ -354,9 +348,8 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
-              activeTab === 'settings' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${activeTab === 'settings' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center gap-2">
               <span>⚙</span>
@@ -367,9 +360,8 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setActiveTab('tests')}
-            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${
-              activeTab === 'tests' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-            }`}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-full text-left font-medium transition-all ${activeTab === 'tests' ? 'bg-gray-200/80 text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
           >
             <div className="flex items-center gap-2">
               <span>🧪</span>

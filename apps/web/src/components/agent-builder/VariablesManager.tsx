@@ -287,7 +287,11 @@ export function VariablesManager({
               filteredVariables.map((v) => {
                 const referenced = isReferencedInInstructions(v.key);
                 return (
-                  <tr key={v.key} className="hover:bg-gray-50/80 transition-colors group">
+                  <tr
+                    key={v.key}
+                    onClick={() => openEditModal(v)}
+                    className="hover:bg-gray-50/80 transition-colors group cursor-pointer"
+                  >
                     <td className="py-3 px-5">
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-semibold text-gray-900 text-xs">{v.key}</span>
@@ -314,20 +318,28 @@ export function VariablesManager({
                     </td>
 
                     <td className="py-3 px-5 font-mono text-gray-700 text-xs">
-                      {v.defaultValue !== undefined && v.defaultValue !== '' ? (
-                        <span className="bg-gray-100 px-2 py-1 rounded-md text-gray-800">
-                          {String(v.defaultValue)}
+                      <div className="flex items-center justify-between group/val">
+                        {v.defaultValue !== undefined && v.defaultValue !== '' ? (
+                          <span className="bg-gray-100 group-hover:bg-white group-hover:border group-hover:border-gray-300 px-2.5 py-1 rounded-md text-gray-800 transition-all">
+                            {String(v.defaultValue)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">No default value (click to set)</span>
+                        )}
+                        <span className="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity font-sans ml-2">
+                          ✏️ Edit
                         </span>
-                      ) : (
-                        <span className="text-gray-400 italic">No default value</span>
-                      )}
+                      </div>
                     </td>
 
-                    <td className="py-3 px-4 text-right relative">
+                    <td className="py-3 px-4 text-right relative" onClick={(e) => e.stopPropagation()}>
                       <div className="relative inline-block text-left">
                         <button
                           type="button"
-                          onClick={() => setOpenActionMenuKey(openActionMenuKey === v.key ? null : v.key)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionMenuKey(openActionMenuKey === v.key ? null : v.key);
+                          }}
                           className="w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold transition-colors"
                           title="Actions"
                         >
@@ -338,14 +350,20 @@ export function VariablesManager({
                           <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-30 text-xs">
                             <button
                               type="button"
-                              onClick={() => openEditModal(v)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(v);
+                              }}
                               className="w-full px-3 py-1.5 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 font-medium"
                             >
                               <span>✏️</span> Edit
                             </button>
                             <button
                               type="button"
-                              onClick={() => confirmDelete(v)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                confirmDelete(v);
+                              }}
                               className="w-full px-3 py-1.5 text-left text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-medium"
                             >
                               <span>🗑</span> Delete
