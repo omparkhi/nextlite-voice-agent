@@ -682,6 +682,7 @@ class TurnTimingTracker:
             "llmContextToRequestMs": llm_context_to_request_ms,
             "llmHttpRequestMs": llm_http_request_ms,
             "llmProviderToFirstOutputMs": llm_provider_to_first_output_ms,
+            "providerToFirstOutputMs": llm_provider_to_first_output_ms,
             "llmToFirstOutputMs": llm_to_first_output_ms,
             "llmStartToFirstOutputMs": llm_start_to_first_output_ms,
             "llmRequestToFirstOutputMs": llm_request_to_first_output_ms,

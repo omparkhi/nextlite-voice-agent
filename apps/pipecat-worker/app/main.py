@@ -1558,7 +1558,10 @@ async def websocket_plivo_endpoint(
 
         # 10. Instantiate Sarvam LLM Service (Phase 21B: Worker-Lifetime Shared Connection Pool)
         startup_tracker.record_stage("llm_service_create_start")
-        llm_settings_kwargs = {"model": llm_model}
+        llm_settings_kwargs = {
+            "model": llm_model,
+            "reasoning_effort": None,
+        }
         if runtime_config.runtime.temperature is not None:
             llm_settings_kwargs["temperature"] = runtime_config.runtime.temperature
 
