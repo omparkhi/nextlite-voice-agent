@@ -11,7 +11,6 @@ import { GuardrailsEditor } from '../../components/agent-builder/GuardrailsEdito
 import { VariablesManager } from '../../components/agent-builder/VariablesManager';
 import { SettingsEditor } from '../../components/agent-builder/SettingsEditor';
 import { PromptPreviewModal } from '../../components/agent-builder/PromptPreviewModal';
-import { ChecklistPanel } from '../../components/agent-builder/ChecklistPanel';
 import { ToolsManager } from '../../components/agent-builder/ToolsManager';
 import { VariableAutocompleteTextarea } from '../../components/agent-builder/VariableAutocompleteTextarea';
 
@@ -53,7 +52,6 @@ export function AgentDetail() {
   const [showTestModal, setShowTestModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [proposing, setProposing] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
@@ -140,29 +138,6 @@ export function AgentDetail() {
       setPublishMessage(err.message || 'Failed to publish agent');
     } finally {
       setPublishing(false);
-    }
-  };
-
-  const handleProposeConfig = async (userMessage: string) => {
-    if (!clientId || !agentId) return;
-    setProposing(true);
-    try {
-      const proposal = await api.proposeConfig(clientId, agentId, userMessage);
-      if (proposal?.proposedConfig) {
-        await api.approveConfigProposal(clientId, agentId, proposal.id);
-        const updatedAgent = await api.getAgent(clientId, agentId);
-        setAgent(updatedAgent);
-        if (updatedAgent?.versions?.length) {
-          setVersions(updatedAgent.versions);
-          setConfiguration(updatedAgent.versions[0].configuration);
-        }
-        const cl = await api.getChecklist(clientId, agentId).catch(() => null);
-        if (cl) setChecklist(cl);
-        setSaveStatus('saved');
-      }
-    } catch {
-    } finally {
-      setProposing(false);
     }
   };
 
@@ -595,7 +570,7 @@ export function AgentDetail() {
         </main>
 
         {/* RIGHT AI ASSISTANT & CHECKLIST PANEL */}
-        <ChecklistPanel checklist={checklist} onProposeConfig={handleProposeConfig} proposing={proposing} />
+        {/* <ChecklistPanel checklist={checklist} onProposeConfig={handleProposeConfig} proposing={proposing} /> */}
       </div>
 
       {/* PROMPT PREVIEW MODAL */}

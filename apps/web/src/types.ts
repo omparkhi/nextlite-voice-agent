@@ -366,6 +366,7 @@ export interface ToolCatalogParameter {
 }
 
 export interface ToolCatalogItem {
+  id?: string;
   toolId: string;
   name: string;
   displayName: string;
@@ -373,6 +374,7 @@ export interface ToolCatalogItem {
   category: string;
   parameters: ToolCatalogParameter[];
   confirmationSupported: boolean;
+  isPlatformDefault?: boolean;
 }
 
 // --- Module 1B: Client CRM & Follow-up Types ---

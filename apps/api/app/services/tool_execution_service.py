@@ -1,9 +1,16 @@
 import uuid
 from typing import Optional, Dict, Any, List
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ..repositories import AppointmentRepository, CallSessionRepository, KnowledgeRepository
-from ..models import Appointment, Lead, AppointmentStatus, LeadStatus, LeadPriority
-from ..domain.tools_safety import normalize_tool_id, get_user_safe_display_id
+from ..models import Appointment, Lead, Agent, AgentTemplate, AppointmentStatus, LeadStatus, LeadPriority
+from ..domain.tool_registry import (
+    normalize_tool_id,
+    validate_tool_arguments,
+    sanitize_tool_arguments,
+    get_canonical_tool,
+)
+from ..domain.tools_safety import get_user_safe_display_id
 from ..logging import logger
 
 class ToolExecutionService:
@@ -23,11 +30,20 @@ class ToolExecutionService:
         if not canonical_name:
             raise ValueError(f"Unknown tool: {tool_name}")
 
+        # 1. Sanitize untrusted arguments (strips any tenantId/agentId injected by LLM)
+        safe_args = sanitize_tool_arguments(arguments)
+
+        # 2. Validate input schema
+        is_valid, err_msg = validate_tool_arguments(canonical_name, safe_args)
+        if not is_valid:
+            logger.warning(f"Invalid tool arguments for {canonical_name}: {err_msg}")
+            raise ValueError(f"Invalid tool arguments: {err_msg}")
+
         logger.info(f"Executing tool {canonical_name} for tenant {trusted_tenant_id}")
 
         if canonical_name == "book_appointment":
             return await self._execute_book_appointment(
-                arguments=arguments,
+                arguments=safe_args,
                 tenant_id=trusted_tenant_id,
                 agent_id=trusted_agent_id,
                 caller_phone=trusted_caller_phone,
@@ -35,7 +51,7 @@ class ToolExecutionService:
             )
         elif canonical_name == "create_callback_lead":
             return await self._execute_create_lead(
-                arguments=arguments,
+                arguments=safe_args,
                 tenant_id=trusted_tenant_id,
                 agent_id=trusted_agent_id,
                 caller_phone=trusted_caller_phone,
@@ -43,7 +59,7 @@ class ToolExecutionService:
             )
         elif canonical_name == "query_knowledge_base":
             return await self._execute_knowledge_query(
-                arguments=arguments,
+                arguments=safe_args,
                 tenant_id=trusted_tenant_id,
                 agent_id=trusted_agent_id
             )
@@ -63,9 +79,42 @@ class ToolExecutionService:
             raise ValueError("customerName is required for booking an appointment")
 
         service_type = arguments.get("title") or arguments.get("serviceType") or arguments.get("service") or "General Appointment"
-        apt_date = arguments.get("appointmentDate") or arguments.get("date") or "Tomorrow"
-        apt_time = arguments.get("appointmentTime") or arguments.get("time") or "10:00 AM"
+        apt_date = arguments.get("appointmentDate") or arguments.get("bookingDate") or arguments.get("date") or "Tomorrow"
+        apt_time = arguments.get("appointmentTime") or arguments.get("bookingTime") or arguments.get("time") or "10:00 AM"
         phone = arguments.get("customerPhone") or caller_phone or "+910000000000"
+
+        # Auto-resolve agent_id if omitted
+        effective_agent_id = agent_id
+        if not effective_agent_id:
+            a_res = await self.session.execute(select(Agent.id).where(Agent.tenantId == tenant_id).limit(1))
+            effective_agent_id = a_res.scalar_one_or_none()
+            if not effective_agent_id:
+                from .template_service import SYSTEM_TEMPLATES
+                default_template_id = SYSTEM_TEMPLATES[0]["id"]
+                # Ensure template exists in DB
+                tmpl_res = await self.session.execute(select(AgentTemplate.id).where(AgentTemplate.id == default_template_id))
+                if not tmpl_res.scalar_one_or_none():
+                    tmpl_data = SYSTEM_TEMPLATES[0]
+                    self.session.add(AgentTemplate(
+                        id=default_template_id,
+                        name=tmpl_data["name"],
+                        description=tmpl_data["description"],
+                        industry=tmpl_data["industry"],
+                        defaultConfiguration=tmpl_data["default_configuration"],
+                        isSystem=True
+                    ))
+                    await self.session.flush()
+
+                # Create a default Agent for this tenant if none exists
+                default_agent = Agent(
+                    id=uuid.uuid4(),
+                    tenantId=tenant_id,
+                    templateId=default_template_id,
+                    name="Default Voice Agent"
+                )
+                self.session.add(default_agent)
+                await self.session.flush()
+                effective_agent_id = default_agent.id
 
         # 1. Acquire atomic sequence number
         apt_repo = AppointmentRepository(self.session)
@@ -74,7 +123,7 @@ class ToolExecutionService:
         # 2. Insert Appointment record
         apt = Appointment(
             tenantId=tenant_id,
-            agentId=agent_id,
+            agentId=effective_agent_id,
             callSessionId=call_session_id,
             appointmentNumber=apt_number,
             customerName=customer_name,
@@ -113,20 +162,50 @@ class ToolExecutionService:
         priority_str = arguments.get("priority", "MEDIUM").upper()
         priority_enum = getattr(LeadPriority, priority_str, LeadPriority.MEDIUM)
 
+        # Auto-resolve agent_id if omitted
+        effective_agent_id = agent_id
+        if not effective_agent_id:
+            a_res = await self.session.execute(select(Agent.id).where(Agent.tenantId == tenant_id).limit(1))
+            effective_agent_id = a_res.scalar_one_or_none()
+            if not effective_agent_id:
+                from .template_service import SYSTEM_TEMPLATES
+                default_template_id = SYSTEM_TEMPLATES[0]["id"]
+                tmpl_res = await self.session.execute(select(AgentTemplate.id).where(AgentTemplate.id == default_template_id))
+                if not tmpl_res.scalar_one_or_none():
+                    tmpl_data = SYSTEM_TEMPLATES[0]
+                    self.session.add(AgentTemplate(
+                        id=default_template_id,
+                        name=tmpl_data["name"],
+                        description=tmpl_data["description"],
+                        industry=tmpl_data["industry"],
+                        defaultConfiguration=tmpl_data["default_configuration"],
+                        isSystem=True
+                    ))
+                    await self.session.flush()
+
+                default_agent = Agent(
+                    id=uuid.uuid4(),
+                    tenantId=tenant_id,
+                    templateId=default_template_id,
+                    name="Default Voice Agent"
+                )
+                self.session.add(default_agent)
+                await self.session.flush()
+                effective_agent_id = default_agent.id
+
         lead_number = f"LEAD-{str(uuid.uuid4())[:6].upper()}"
 
         lead = Lead(
             tenantId=tenant_id,
-            agentId=agent_id,
+            agentId=effective_agent_id,
             callSessionId=call_session_id,
-            leadNumber=lead_number,
             customerName=customer_name,
             customerPhone=phone,
             customerEmail=arguments.get("customerEmail"),
-            requirement=requirement,
+            interestCategory=requirement,
             status=LeadStatus.NEW,
-            priority=priority_enum,
-            notes=arguments.get("notes")
+            notes=arguments.get("notes"),
+            metadataJson={"leadNumber": lead_number, "priority": priority_str}
         )
         self.session.add(lead)
         await self.session.commit()

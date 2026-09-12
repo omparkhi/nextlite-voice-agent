@@ -22,35 +22,12 @@ from ..services.prompt_compiler_service import prompt_compiler
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
+from ..domain.tool_registry import list_canonical_tools
+
 # Platform Tools Catalog
 @router.get("/tools")
 async def get_tool_catalog(payload: Dict[str, Any] = Depends(require_admin)):
-    return [
-        {
-            "id": "query_knowledge_base",
-            "name": "query_knowledge_base",
-            "displayName": "Knowledge Retrieval",
-            "description": "Searches the business knowledge base for relevant facts and information.",
-            "category": "Knowledge",
-            "isPlatformDefault": True
-        },
-        {
-            "id": "book_appointment",
-            "name": "book_appointment",
-            "displayName": "Appointment Booking",
-            "description": "Records customer appointment requests with date, time, and service details.",
-            "category": "Scheduling",
-            "isPlatformDefault": True
-        },
-        {
-            "id": "create_callback_lead",
-            "name": "create_callback_lead",
-            "displayName": "Lead Capture & Callback",
-            "description": "Captures customer contact details, inquiries, and follow-up requests.",
-            "category": "CRM",
-            "isPlatformDefault": True
-        }
-    ]
+    return list_canonical_tools()
 
 # Clients (Tenants)
 @router.post("/clients", status_code=status.HTTP_201_CREATED)

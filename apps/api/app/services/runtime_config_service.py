@@ -10,58 +10,16 @@ from ..schemas import (
     RuntimeToolConfig, RuntimeToolDefinition, RuntimeVariableConfig
 )
 from .prompt_compiler_service import prompt_compiler
+from ..domain.tool_registry import (
+    CANONICAL_TOOL_REGISTRY,
+    filter_agent_runtime_tools,
+    get_canonical_tool,
+)
 from ..logging import logger
 
 CANONICAL_TOOL_DEFS = {
-    "book_appointment": RuntimeToolDefinition(
-        tool_id="book_appointment",
-        name="book_appointment",
-        description="Submit an appointment request. Records an unconfirmed request for team verification.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "customerName": {"type": "string", "description": "Customer name"},
-                "title": {"type": "string", "description": "Reason for visit or appointment purpose"},
-                "bookingDate": {"type": "string", "description": "Date of appointment (YYYY-MM-DD or relative like tomorrow)"},
-                "bookingTime": {"type": "string", "description": "Time of appointment (e.g. 10:00 AM, 12:00 PM)"},
-                "resourceName": {"type": "string", "description": "Requested staff member, host, specialist, or service provider"},
-                "customerPhone": {"type": "string", "description": "Contact phone number"},
-                "notes": {"type": "string", "description": "Additional notes"}
-            },
-            "required": ["customerName", "title", "bookingDate", "bookingTime"]
-        },
-        enabled=True
-    ),
-    "create_callback_lead": RuntimeToolDefinition(
-        tool_id="create_callback_lead",
-        name="create_callback_lead",
-        description="Create a callback request or lead for a customer wanting more information.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "customerName": {"type": "string", "description": "Customer name"},
-                "customerPhone": {"type": "string", "description": "Contact phone number"},
-                "customerEmail": {"type": "string", "description": "Customer email address"},
-                "requirement": {"type": "string", "description": "Customer inquiry, question, or requirement"},
-                "priority": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "URGENT"], "description": "Priority level"}
-            },
-            "required": ["customerName", "customerPhone"]
-        },
-        enabled=True
-    ),
-    "query_knowledge_base": RuntimeToolDefinition(
-        tool_id="query_knowledge_base",
-        name="query_knowledge_base",
-        description="Query the business knowledge base to retrieve authoritative facts, pricing, policies, and business details.",
-        parameters={
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Semantic query to search business knowledge base"}
-            },
-            "required": ["query"]
-        },
-        enabled=True
-    ),
+    t_id: t_def.to_runtime_tool_definition(enabled=True)
+    for t_id, t_def in CANONICAL_TOOL_REGISTRY.items()
 }
 
 class RuntimeAgentConfigService:
@@ -111,7 +69,7 @@ class RuntimeAgentConfigService:
         voice_cfg = cfg.get("voice", {})
         lang_cfg = cfg.get("language", {})
         runtime_cfg = cfg.get("runtime", {}) or cfg.get("runtimeSettings", {})
-        tools_cfg = cfg.get("tools", {})
+        tools_cfg = cfg.get("tools")
         vars_cfg = cfg.get("variables", {})
         knowledge_cfg = cfg.get("knowledge", {})
         identity_cfg = cfg.get("identity", {})
@@ -147,34 +105,9 @@ class RuntimeAgentConfigService:
             or "Hello! How can I assist you today?"
         )
 
-        # Build tools list
-        resolved_tool_defs: List[RuntimeToolDefinition] = []
-        raw_tools = tools_cfg.get("tools") or tools_cfg.get("bindings") or []
-        tools_enabled = tools_cfg.get("enabled", True)
-
-        if tools_enabled:
-            if isinstance(raw_tools, list) and len(raw_tools) > 0:
-                for t in raw_tools:
-                    if isinstance(t, dict):
-                        t_id = t.get("toolId") or t.get("tool_id") or t.get("name")
-                        if t_id and t.get("enabled", True):
-                            canon = CANONICAL_TOOL_DEFS.get(t_id)
-                            if canon:
-                                resolved_tool_defs.append(canon)
-                            else:
-                                resolved_tool_defs.append(RuntimeToolDefinition(
-                                    tool_id=t_id,
-                                    name=t.get("name", t_id),
-                                    description=t.get("description", "Custom business tool"),
-                                    parameters=t.get("parameters"),
-                                    enabled=True,
-                                    confirmation_required=t.get("confirmationRequired", False)
-                                ))
-            else:
-                # Default canonical tools enabled for voice agent
-                resolved_tool_defs.append(CANONICAL_TOOL_DEFS["query_knowledge_base"])
-                resolved_tool_defs.append(CANONICAL_TOOL_DEFS["book_appointment"])
-                resolved_tool_defs.append(CANONICAL_TOOL_DEFS["create_callback_lead"])
+        # Build tools list dynamically from canonical tool registry and agent bindings
+        tools_enabled = tools_cfg.get("enabled", True) if isinstance(tools_cfg, dict) else (tools_cfg is not None)
+        resolved_tool_defs: List[RuntimeToolDefinition] = filter_agent_runtime_tools(tools_cfg)
 
         return RuntimeAgentConfig(
             tenant=RuntimeTenantConfig(tenant_id=str(deployment.tenantId)),

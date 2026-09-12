@@ -349,16 +349,52 @@ class Lead(Base):
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     agentId: Mapped[Optional[uuid.UUID]] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
     callSessionId: Mapped[Optional[uuid.UUID]] = mapped_column("call_session_id", UUID(as_uuid=True), ForeignKey("call_sessions.id", ondelete="SET NULL"), nullable=True)
-    leadNumber: Mapped[str] = mapped_column("lead_number", String(50), nullable=False)
     customerName: Mapped[str] = mapped_column("customer_name", String(255), nullable=False)
     customerPhone: Mapped[str] = mapped_column("customer_phone", String(50), nullable=False)
     customerEmail: Mapped[Optional[str]] = mapped_column("customer_email", String(255), nullable=True)
-    requirement: Mapped[Text] = mapped_column(Text, nullable=False)
+    interestCategory: Mapped[Optional[str]] = mapped_column("interest_category", String(255), nullable=True)
     status: Mapped[LeadStatus] = mapped_column(SQLEnum(LeadStatus, name="lead_status", native_enum=False), nullable=False, default=LeadStatus.NEW)
-    priority: Mapped[LeadPriority] = mapped_column(SQLEnum(LeadPriority, name="lead_priority", native_enum=False), nullable=False, default=LeadPriority.MEDIUM)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadataJson: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True, default=dict)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    @property
+    def leadNumber(self) -> str:
+        if self.metadataJson and isinstance(self.metadataJson, dict) and self.metadataJson.get("leadNumber"):
+            return self.metadataJson["leadNumber"]
+        return f"LEAD-{str(self.id)[:6].upper()}"
+
+    @leadNumber.setter
+    def leadNumber(self, val: str):
+        if self.metadataJson is None:
+            self.metadataJson = {}
+        self.metadataJson["leadNumber"] = val
+
+    @property
+    def requirement(self) -> str:
+        return self.interestCategory or self.notes or "General Inquiry"
+
+    @requirement.setter
+    def requirement(self, val: str):
+        self.interestCategory = val
+
+    @property
+    def priority(self) -> LeadPriority:
+        if self.metadataJson and isinstance(self.metadataJson, dict) and self.metadataJson.get("priority"):
+            p = self.metadataJson["priority"]
+            if isinstance(p, LeadPriority):
+                return p
+            if hasattr(LeadPriority, str(p)):
+                return getattr(LeadPriority, str(p))
+        return LeadPriority.MEDIUM
+
+    @priority.setter
+    def priority(self, val: Any):
+        if self.metadataJson is None:
+            self.metadataJson = {}
+        p_val = val.value if hasattr(val, "value") else str(val)
+        self.metadataJson["priority"] = p_val
 
 
 class Appointment(Base):
