@@ -198,7 +198,8 @@ async def get_me(
         "user": {
             "id": str(user.id),
             "email": user.email,
-            "role": user.role.value,
+            "role": user.role.value if hasattr(user.role, "value") else str(user.role),
             "tenantId": str(user.tenantId) if user.tenantId else None
         }
     }
+
