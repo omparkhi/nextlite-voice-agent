@@ -1,5 +1,9 @@
 import re
+import base64
+import httpx
 from typing import Optional, Dict, Any
+from ..config import settings
+from ..logging import logger
 
 class TelephonyService:
     @staticmethod
@@ -25,3 +29,47 @@ class TelephonyService:
         {websocket_url}
     </Stream>
 </Response>"""
+
+    @staticmethod
+    async def create_outbound_phone_call(to_phone_number: str, answer_url: str) -> Dict[str, Any]:
+        """
+        Calls Plivo REST API to place an outbound phone call and connect it to the answer XML endpoint.
+        """
+        if not settings.PLIVO_AUTH_ID or not settings.PLIVO_AUTH_TOKEN:
+            logger.warning("Plivo credentials not configured, returning mock call response")
+            return {
+                "message": "call fired (mock)",
+                "request_uuid": f"mock-plivo-{re.sub(r'[^a-zA-Z0-9]', '', to_phone_number)[-6:]}",
+                "api_id": "mock-api-id"
+            }
+
+        caller_id = settings.PLIVO_CALLER_ID or "+918031707681"
+        url = f"https://api.plivo.com/v1/Account/{settings.PLIVO_AUTH_ID}/Call/"
+        auth_bytes = f"{settings.PLIVO_AUTH_ID}:{settings.PLIVO_AUTH_TOKEN}".encode("utf-8")
+        auth_header = f"Basic {base64.b64encode(auth_bytes).decode('utf-8')}"
+
+        payload = {
+            "from": caller_id,
+            "to": to_phone_number,
+            "answer_url": answer_url,
+            "answer_method": "GET"
+        }
+
+        logger.info(f"[TelephonyService] Calling Plivo to dial {to_phone_number} with answer URL: {answer_url}")
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                url,
+                json=payload,
+                headers={
+                    "Authorization": auth_header,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                }
+            )
+            if resp.status_code not in (200, 201, 202):
+                logger.error(f"[TelephonyService] Plivo call creation failed: {resp.status_code} - {resp.text}")
+                raise RuntimeError(f"Plivo error ({resp.status_code}): {resp.text}")
+            
+            data = resp.json()
+            logger.info(f"[TelephonyService] Plivo call initiated successfully: {data}")
+            return data

@@ -63,14 +63,15 @@ async def create_version(
     session: AsyncSession = Depends(get_db)
 ):
     tenant_id = uuid.UUID(payload["tenantId"])
+    user_id = uuid.UUID(payload["userId"])
     service = AgentService(session)
     try:
         ver = await service.create_version(
             agent_id=uuid.UUID(agent_id),
             tenant_id=tenant_id,
-            system_prompt=req.system_prompt,
-            config=req.config,
-            change_summary=req.change_summary
+            configuration=req.config,
+            created_by=user_id,
+            notes=req.change_summary or req.system_prompt
         )
         return ver
     except ValueError as e:

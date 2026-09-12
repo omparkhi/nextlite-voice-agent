@@ -230,8 +230,7 @@ class TurnTimingTracker:
         self.turn_count += 1
         self.active_turn_id = f"turn-{uuid.uuid4().hex[:8]}"
         self.turn_type = turn_type
-        now = speech_start if speech_start is not None else time.perf_counter()
-        self.speech_start = now
+        self.speech_start = speech_start
         self.speech_stop = None
         self.sarvam_vad_stop = None
         self.stt_utterance_end = None
@@ -255,6 +254,7 @@ class TurnTimingTracker:
         self.tts_start = None
         self.tts_connected = None
         self.first_tts_audio = None
+        self.first_audio_sent_to_plivo = None
         self.tts_stop = None
         self.output_audio = None
         self.turn_complete = None
@@ -264,6 +264,14 @@ class TurnTimingTracker:
         self.active_turn_events = []
         self.active_phone_trace = None
         return self.active_turn_id
+
+    def record_audio_sent_to_plivo(self, ts: Optional[float] = None):
+        """Records timestamp when first audio chunk is serialized and dispatched to Plivo."""
+        if self.first_audio_sent_to_plivo is not None:
+            return
+        now = ts if ts is not None else time.perf_counter()
+        self.first_audio_sent_to_plivo = now
+        self.record_event("first_audio_sent_to_plivo", now)
 
     def record_speech_start(self, ts: Optional[float] = None):
         now = ts if ts is not None else time.perf_counter()
@@ -596,8 +604,11 @@ class TurnTimingTracker:
         # 10. tts_start_to_first_audio_ms = first_tts_audio - tts_start
         tts_start_to_first_audio_ms = diff_ms(self.first_tts_audio, self.tts_start, "ttsStartToFirstAudioMs")
 
-        # 11. tts_connection_ms = tts_connected - speech_start (guaranteed non-negative)
-        tts_connection_ms = diff_ms(self.tts_connected, self.speech_start, "ttsConnectionMs")
+        # 11. tts_connection_ms = tts_connected - speech_start (guaranteed non-negative if connected in this turn)
+        if self.tts_connected is not None and self.speech_start is not None and self.tts_connected >= self.speech_start:
+            tts_connection_ms = diff_ms(self.tts_connected, self.speech_start, "ttsConnectionMs")
+        else:
+            tts_connection_ms = None
 
         # 12. Explicit user response latency = first_tts_audio - speech_stop
         response_latency_ms = diff_ms(self.first_tts_audio, self.speech_stop, "responseLatencyMs")
@@ -839,9 +850,11 @@ class StartupTimingTracker:
         self.greeting_queued: Optional[float] = None
         self.greeting_tts_started: Optional[float] = None
         self.greeting_first_audio: Optional[float] = None
-        self.greeting_completed: Optional[float] = None
         self.first_greeting_audio: Optional[float] = None
+        self.greeting_completed: Optional[float] = None
         self.output_audio_frame: Optional[float] = None
+        self.first_audio_sent_to_plivo: Optional[float] = None
+        self.greeting_first_audio_sent_to_plivo: Optional[float] = None
         self.websocket_output_write_if_available: Optional[float] = None
         self.caller_ready: Optional[float] = None
 
@@ -858,6 +871,10 @@ class StartupTimingTracker:
             if self.greeting_first_audio is None:
                 self.greeting_first_audio = now
                 self.first_greeting_audio = now
+        elif stage_name in ("first_audio_sent_to_plivo", "greeting_first_audio_sent_to_plivo"):
+            if self.first_audio_sent_to_plivo is None:
+                self.first_audio_sent_to_plivo = now
+                self.greeting_first_audio_sent_to_plivo = now
         elif hasattr(self, stage_name):
             setattr(self, stage_name, now)
 

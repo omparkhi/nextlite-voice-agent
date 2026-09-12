@@ -115,6 +115,41 @@ class KnowledgeService:
             "status": source.status.value
         }
 
+    async def get_source(self, tenant_id: uuid.UUID, agent_id: uuid.UUID, source_id: uuid.UUID) -> Optional[Dict[str, Any]]:
+        stmt = select(KnowledgeSource).where(
+            KnowledgeSource.id == source_id,
+            KnowledgeSource.tenantId == tenant_id,
+            KnowledgeSource.agentId == agent_id
+        )
+        res = await self.session.execute(stmt)
+        s = res.scalar_one_or_none()
+        if not s:
+            return None
+        return {
+            "id": str(s.id),
+            "fileName": s.fileName,
+            "fileType": s.fileType,
+            "chunkCount": s.chunkCount,
+            "status": s.status.value,
+            "createdAt": s.createdAt.isoformat() if s.createdAt else None
+        }
+
+    async def delete_source(self, tenant_id: uuid.UUID, agent_id: uuid.UUID, source_id: uuid.UUID) -> bool:
+        stmt = select(KnowledgeSource).where(
+            KnowledgeSource.id == source_id,
+            KnowledgeSource.tenantId == tenant_id,
+            KnowledgeSource.agentId == agent_id
+        )
+        res = await self.session.execute(stmt)
+        s = res.scalar_one_or_none()
+        if not s:
+            return False
+        
+        await self.session.execute(delete(KnowledgeChunk).where(KnowledgeChunk.sourceId == source_id))
+        await self.session.delete(s)
+        await self.session.commit()
+        return True
+
     async def retrieve_relevant_chunks(
         self,
         tenant_id: uuid.UUID,

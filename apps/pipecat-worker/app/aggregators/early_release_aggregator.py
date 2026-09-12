@@ -71,17 +71,17 @@ class EarlyReleaseTextAggregator(BaseTextAggregator):
         *,
         min_first_chunk_words: int = 3,
         min_first_chunk_chars: int = 30,
-        min_clause_words: int = 4,
-        min_clause_chars: int = 30,
+        min_clause_words: int = 3,
+        min_clause_chars: int = 15,
         aggregation_type: AggregationType = AggregationType.SENTENCE,
     ):
         """Initialize the early release text aggregator.
 
         Args:
             min_first_chunk_words: Minimum words required for the first early-released phrase (default: 3).
-            min_first_chunk_chars: Minimum characters required for the first early-released phrase (default: 20).
-            min_clause_words: Minimum words required for subsequent clause splits within a sentence (default: 4).
-            min_clause_chars: Minimum characters required for subsequent clause splits (default: 25).
+            min_first_chunk_chars: Minimum characters required for the first early-released phrase (default: 30).
+            min_clause_words: Minimum words required for subsequent clause splits within a sentence (default: 3).
+            min_clause_chars: Minimum characters required for subsequent clause splits (default: 15).
             aggregation_type: Base aggregation type (default: SENTENCE).
         """
         super().__init__(aggregation_type=aggregation_type)

@@ -105,17 +105,24 @@ class CallSessionRepository(BaseRepository[CallSession]):
         call_id: uuid.UUID,
         status: CallStatus,
         duration_seconds: int,
-        transcript: list,
+        transcript: Any,
         metrics_json: dict,
-        tools_used: list = None
+        tools_used: list = None,
+        transcript_text: Optional[str] = None
     ) -> Optional[CallSession]:
+        turns_data = transcript if isinstance(transcript, list) else []
+        text_data = transcript_text
+        if not text_data and isinstance(transcript, str):
+            text_data = transcript
+
         stmt = (
             update(CallSession)
             .where(CallSession.id == call_id)
             .values(
                 status=status,
                 durationSeconds=duration_seconds,
-                transcript=transcript,
+                turnsJson=turns_data,
+                transcriptText=text_data,
                 metricsJson=metrics_json,
                 toolsUsed=tools_used or [],
                 endedAt=datetime.utcnow()

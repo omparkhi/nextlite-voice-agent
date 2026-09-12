@@ -14,7 +14,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting NextLite Python Control Plane...")
     await init_db()
     logger.info("PostgreSQL Database connection pool initialized.")
-    redis_client = get_redis()
+    redis_client = await get_redis()
     try:
         await redis_client.ping()
         logger.info("Redis connection established.")

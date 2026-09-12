@@ -10,6 +10,7 @@
 
 import asyncio
 import base64
+import enum
 import inspect
 import json
 import math
@@ -236,9 +237,15 @@ class DeterministicTestEchoProcessor(FrameProcessor):
 class InstrumentedAsyncStream:
     """Non-blocking async stream wrapper for observing chunk deltas and tool call boundaries."""
 
-    def __init__(self, raw_stream: Any, timing_tracker: Optional[TurnTimingTracker] = None):
+    def __init__(
+        self,
+        raw_stream: Any,
+        timing_tracker: Optional[TurnTimingTracker] = None,
+        is_call_terminating_fn: Optional[Any] = None,
+    ):
         self._raw_stream = raw_stream
         self._timing_tracker = timing_tracker
+        self._is_call_terminating_fn = is_call_terminating_fn
         self._first_chunk_seen = False
         self._in_tool_call = False
         self._iter = None
@@ -248,6 +255,9 @@ class InstrumentedAsyncStream:
         return self
 
     async def __anext__(self):
+        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+            raise StopAsyncIteration
+
         if self._iter is None:
             self._iter = self._raw_stream.__aiter__()
         try:
@@ -260,6 +270,9 @@ class InstrumentedAsyncStream:
             if self._timing_tracker:
                 self._timing_tracker.record_llm_response_complete(now)
             raise
+
+        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+            raise StopAsyncIteration
 
         now = time.perf_counter()
         if not self._first_chunk_seen:
@@ -314,11 +327,13 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         *args,
         timing_tracker: Optional[TurnTimingTracker] = None,
         http_client: Optional[httpx.AsyncClient] = None,
+        is_call_terminating_fn: Optional[Any] = None,
         **kwargs,
     ):
         self._shared_http_client = http_client
         super().__init__(*args, **kwargs)
         self._nextlite_timing_tracker = timing_tracker
+        self._is_call_terminating_fn = is_call_terminating_fn
 
     def create_client(
         self,
@@ -354,6 +369,13 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         )
 
     async def get_chat_completions(self, context):
+        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+            from openai.types.chat import ChatCompletionChunk
+            async def _empty_gen():
+                if False:
+                    yield
+            return InstrumentedAsyncStream(_empty_gen(), timing_tracker=self._nextlite_timing_tracker, is_call_terminating_fn=self._is_call_terminating_fn)
+
         t0 = time.perf_counter()
         if self._nextlite_timing_tracker:
             self._nextlite_timing_tracker.record_llm_request_created(t0)
@@ -364,7 +386,11 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         if self._nextlite_timing_tracker:
             self._nextlite_timing_tracker.record_llm_first_provider_response(t1)
 
-        return InstrumentedAsyncStream(raw_stream, timing_tracker=self._nextlite_timing_tracker)
+        return InstrumentedAsyncStream(
+            raw_stream,
+            timing_tracker=self._nextlite_timing_tracker,
+            is_call_terminating_fn=self._is_call_terminating_fn,
+        )
 
 
 class RealtimeStreamingTimingMonitor(FrameProcessor):
@@ -385,6 +411,8 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
         transcript_collector: Optional[CallTranscriptCollector] = None,
         primary_language: str = "en-IN",
         greeting_cache_key: Optional[str] = None,
+        startup_gate: Optional[Any] = None,
+        is_call_terminating_fn: Optional[Any] = None,
     ):
         super().__init__()
         self._timing_tracker = timing_tracker if timing_tracker is not None else {}
@@ -393,12 +421,18 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
         self._transcript_collector = transcript_collector
         self._primary_language = primary_language
         self._greeting_cache_key = greeting_cache_key
+        self._startup_gate = startup_gate
+        self._is_call_terminating_fn = is_call_terminating_fn
         self._greeting_audio_collector: List[bytes] = []
         self._greeting_sample_rate: Optional[int] = None
         self._greeting_num_channels: Optional[int] = None
         self._assistant_chunks: List[str] = []
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+            if isinstance(frame, (TTSAudioRawFrame, OutputAudioRawFrame, LLMTextFrame, TextFrame, TranscriptionFrame)):
+                return
+
         await super().process_frame(frame, direction)
 
         if isinstance(frame, InputAudioRawFrame):
@@ -511,6 +545,9 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                 (self._turn_tracker and self._turn_tracker.turn_type == "greeting")
                 or (self._startup_tracker and self._startup_tracker.greeting_queued is not None and self._startup_tracker.greeting_completed is None)
             )
+            if is_greeting_context and self._startup_gate:
+                self._startup_gate.set_greeting_first_audio()
+
             if is_greeting_context and self._greeting_cache_key and getattr(frame, "audio", None):
                 self._greeting_audio_collector.append(bytes(frame.audio))
                 if self._greeting_sample_rate is None:
@@ -591,6 +628,8 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                         # Mark caller_ready so call proceeds, but do NOT fake greeting audio
                         self._startup_tracker.record_stage("caller_ready", now_stop)
                         self._startup_tracker.emit_startup_metrics_log()
+                if self._startup_gate:
+                    self._startup_gate.set_ready_for_user()
                 if self._turn_tracker:
                     self._turn_tracker.record_greeting_completed(now_stop)
                     self._turn_tracker.turn_type = "user_turn"
@@ -640,6 +679,8 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
 
         elif isinstance(frame, InterruptionFrame):
             logger.info("[Interruption] User speech interruption detected — clearing Plivo audio buffer")
+            if self._startup_gate:
+                self._startup_gate.set_ready_for_user()
             if self._turn_tracker:
                 self._turn_tracker.record_interruption("user_barge_in")
                 if self._turn_tracker.turn_type == "greeting":
@@ -727,16 +768,56 @@ def analyze_pcm_audio(audio_bytes: bytes) -> Dict[str, Any]:
         return {"bytes": len(audio_bytes), "samples": num_samples, "rms": 0.0, "peak": 0, "nonzero_ratio": 0.0}
 
 
-class PreSTTDiagnosticProcessor(FrameProcessor):
-    """Immediate Pre-STT Diagnostic Processor (Boundary B)."""
+class StartupState(str, enum.Enum):
+    STARTING = "STARTING"
+    GREETING = "GREETING"
+    READY_FOR_USER = "READY_FOR_USER"
 
-    def __init__(self):
+
+class StartupGateProcessor(FrameProcessor):
+    """Immediate Pre-STT Diagnostic & Startup State Gate Processor (Boundary B).
+    
+    Prevents PSTN line noise / ambient sound from:
+    1. Reaching SarvamSTT before or during initial greeting delivery.
+    2. Triggering false VAD speech-start and sending spurious InterruptionFrame / clearAudio to Plivo.
+    3. Creating premature user aggregation and hallucinated LLM responses.
+    
+    Once the greeting is finished (or if no greeting was configured), transitions to
+    READY_FOR_USER to allow full bidirectional speech recognition, VAD, LLM inference,
+    and native Pipecat barge-in interruption.
+    """
+
+    def __init__(self, has_greeting: bool = False, allow_interruptions: bool = True):
         super().__init__()
-        self._inbound_frame_count = 0
-        self._total_pcm_bytes = 0
+        self._state: StartupState = StartupState.STARTING if has_greeting else StartupState.READY_FOR_USER
+        self._has_greeting: bool = has_greeting
+        self._allow_interruptions: bool = allow_interruptions
+        self._greeting_first_audio_seen: bool = False
+        self._inbound_frame_count: int = 0
+        self._suppressed_frame_count: int = 0
+        self._total_pcm_bytes: int = 0
+
+    @property
+    def state(self) -> StartupState:
+        return self._state
+
+    def set_greeting_active(self):
+        """Called when initial greeting synthesis/playback begins."""
+        if self._has_greeting and self._state == StartupState.STARTING:
+            self._state = StartupState.GREETING
+            logger.info("[StartupGate] State transitioned to GREETING (suppressing pre-greeting line noise)")
+
+    def set_greeting_first_audio(self):
+        """Called when first greeting audio frame is produced."""
+        self._greeting_first_audio_seen = True
+        logger.info("[StartupGate] First greeting audio active")
+
+    def set_ready_for_user(self):
+        """Called when initial greeting completes or is legitimately interrupted."""
+        self._state = StartupState.READY_FOR_USER
+        logger.info("[StartupGate] State transitioned to READY_FOR_USER (gate open for bidirectional conversation)")
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
-        await super().process_frame(frame, direction)
         if isinstance(frame, InputAudioRawFrame):
             self._inbound_frame_count += 1
             audio_bytes = getattr(frame, "audio", b"")
@@ -747,20 +828,55 @@ class PreSTTDiagnosticProcessor(FrameProcessor):
             ):
                 stats = analyze_pcm_audio(audio_bytes)
                 logger.info(
-                    f"[PreSTT Boundary B] Audio frame #{self._inbound_frame_count} entering SarvamSTT | "
+                    f"[PreSTT Boundary B] Audio frame #{self._inbound_frame_count} | "
+                    f"state={self._state.value} | "
                     f"sample_rate={getattr(frame, 'sample_rate', 8000)} | "
                     f"channels={getattr(frame, 'num_channels', 1)} | "
                     f"bytes={stats['bytes']} | rms={stats['rms']} | peak={stats['peak']} | "
                     f"nonzero_ratio={stats['nonzero_ratio']}"
                 )
+
+            # Gate check: Suppress startup line noise before/during greeting
+            if self._state == StartupState.STARTING:
+                self._suppressed_frame_count += 1
+                return
+            elif self._state == StartupState.GREETING:
+                if not self._greeting_first_audio_seen:
+                    self._suppressed_frame_count += 1
+                    return
+                elif not self._allow_interruptions:
+                    self._suppressed_frame_count += 1
+                    return
+
+        elif isinstance(frame, (ProposedUserStartedSpeakingFrame, UserStartedSpeakingFrame, InterruptionFrame)):
+            if self._state == StartupState.STARTING or (self._state == StartupState.GREETING and not self._greeting_first_audio_seen):
+                logger.debug(f"[StartupGate] Suppressing premature {frame.__class__.__name__} during {self._state.value}")
+                return
+
+        await super().process_frame(frame, direction)
         await self.push_frame(frame, direction)
 
 
+# Alias for backward compatibility
+PreSTTDiagnosticProcessor = StartupGateProcessor
+
+
 class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
-    def __init__(self, *args, encoding: str = "audio/x-mulaw", **kwargs):
+    def __init__(
+        self,
+        *args,
+        encoding: str = "audio/x-mulaw",
+        turn_tracker: Optional[TurnTimingTracker] = None,
+        startup_tracker: Optional[StartupTimingTracker] = None,
+        is_call_terminating_fn: Optional[Any] = None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._media_count = 0
         self._stream_encoding = encoding
+        self._turn_tracker = turn_tracker
+        self._startup_tracker = startup_tracker
+        self._is_call_terminating_fn = is_call_terminating_fn
 
     async def deserialize(self, data: str | bytes):
         try:
@@ -814,13 +930,23 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
         return await super().deserialize(data)
 
     async def serialize(self, frame: Frame) -> str | bytes | None:
+        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+            return None
+
         payload = await super().serialize(frame)
         try:
             if payload and isinstance(frame, AudioRawFrame):
+                now = time.perf_counter()
+                if self._turn_tracker:
+                    self._turn_tracker.record_audio_sent_to_plivo(now)
+                if self._startup_tracker:
+                    if self._startup_tracker.greeting_queued is not None and self._startup_tracker.greeting_completed is None:
+                        self._startup_tracker.record_stage("greeting_first_audio_sent_to_plivo", now)
+                    self._startup_tracker.record_stage("first_audio_sent_to_plivo", now)
                 if not getattr(self, "_first_outbound_audio_logged", False):
                     self._first_outbound_audio_logged = True
                     logger.info(
-                        f"[AudioOutput Boundary O (Plivo Serializer)] First outbound audio frame serialized "
+                        f"[AudioOutput Boundary O (Plivo Serializer)] First outbound audio frame serialized & sent to Plivo "
                         f"| bytes={len(payload)}"
                     )
         except Exception as ser_err:
@@ -879,13 +1005,18 @@ async def websocket_plivo_endpoint(
     finalization_lock = asyncio.Lock()
     is_finalized = False
     is_finalizing = False
+    is_call_terminating = False
+
+    def is_terminating() -> bool:
+        return is_call_terminating
 
     shared_http_client: Optional[httpx.AsyncClient] = getattr(websocket.app.state, "http_client", None)
     call_session_client = CallSessionClient(http_client=shared_http_client)
 
     async def finalize_call_session(final_status: str = "COMPLETED") -> None:
         """Atomically finalize call session in NextLite Control Plane exactly once."""
-        nonlocal is_finalized, is_finalizing, call_session_id
+        nonlocal is_finalized, is_finalizing, is_call_terminating, call_session_id
+        is_call_terminating = True
         async with finalization_lock:
             if is_finalized or is_finalizing:
                 return
@@ -1114,10 +1245,14 @@ async def websocket_plivo_endpoint(
             tts_model = raw_tts_model
 
         # LLM Model Compatibility Normalization
-        raw_llm_model = (runtime_config.runtime.llm_model or settings.LLM_MODEL).strip()
+        raw_llm_model = (runtime_config.runtime.llm_model or settings.LLM_MODEL or "sarvam-105b-conversations").strip()
+        allowed_sarvam_models = ("gemma4", "glm5.2", "sarvam-105b", "sarvam-105b-conversations")
         if raw_llm_model in ("sarvam-105b", "sarvam-105b-v1"):
             llm_model = "sarvam-105b-conversations"
             logger.info(f"[LLM Compatibility] Normalized LLM model '{raw_llm_model}' to 'sarvam-105b-conversations'")
+        elif raw_llm_model not in allowed_sarvam_models:
+            llm_model = "sarvam-105b-conversations"
+            logger.info(f"[LLM Compatibility] Normalized unsupported/legacy LLM model '{raw_llm_model}' to 'sarvam-105b-conversations'")
         else:
             llm_model = raw_llm_model
 
@@ -1217,19 +1352,26 @@ async def websocket_plivo_endpoint(
             api_key=settings.SARVAM_API_KEY,
             settings=SarvamTTSService.Settings(**tts_settings_kwargs),
         )
-        # Phase 21A & 22D: Early Release Phrase & Clause Aggregator (aligned to Sarvam min_buffer_size: 30)
+        # Phase 21A & 22D: Early Release Phrase & Clause Aggregator (fast first chunk dispatch)
         tts_service._text_aggregator = EarlyReleaseTextAggregator(
-            min_first_chunk_words=3,
-            min_first_chunk_chars=30,
+            min_first_chunk_words=2,
+            min_first_chunk_chars=10,
+            min_clause_words=3,
+            min_clause_chars=15,
         )
         startup_tracker.record_stage("tts_service_created")
 
         @tts_service.event_handler("on_connected")
         async def on_tts_connected(service):
-            startup_tracker.record_stage("tts_ready")
-            startup_tracker.record_stage("tts_connected")
-            turn_tracker.record_tts_connected()
-            logger.info("Sarvam TTS WebSocket connected")
+            now_tts = time.perf_counter()
+            if startup_tracker.tts_ready is None:
+                startup_tracker.record_stage("tts_ready", now_tts)
+                startup_tracker.record_stage("tts_connected", now_tts)
+                turn_tracker.record_tts_connected(now_tts)
+                logger.info(f"Sarvam TTS WebSocket connected (startup ready at {now_tts - conn_start_time:.3f}s)")
+            else:
+                turn_tracker.record_tts_connected(now_tts)
+                logger.info(f"[TTS Reconnect] Sarvam TTS WebSocket reconnected during active call (elapsed: {now_tts - conn_start_time:.3f}s)")
 
 
         # Check Sarvam API key
@@ -1251,6 +1393,9 @@ async def websocket_plivo_endpoint(
             auth_token=settings.PLIVO_AUTH_TOKEN or None,
             encoding=stream_encoding,
             params=serializer_params,
+            turn_tracker=turn_tracker,
+            startup_tracker=startup_tracker,
+            is_call_terminating_fn=is_terminating,
         )
 
         # 7. Instantiate FastAPI WebSocket Transport
@@ -1266,6 +1411,8 @@ async def websocket_plivo_endpoint(
 
         @transport.event_handler("on_client_disconnected")
         async def on_client_disconnected(transport_instance, ws):
+            nonlocal is_call_terminating
+            is_call_terminating = True
             logger.info(f"[Plivo Transport] WebSocket client disconnected event triggered for stream_id={stream_id}")
             await finalize_call_session("COMPLETED")
 
@@ -1380,8 +1527,15 @@ async def websocket_plivo_endpoint(
             turn_tracker.record_user_aggregation_finalized()
             logger.info(f"[Trace H - User Aggregation Finalized] User turn inference triggered via strategy={strategy.__class__.__name__}")
 
-        # Instantiate Immediate Pre-STT Diagnostic Processor (Boundary B)
-        pre_stt_processor = PreSTTDiagnosticProcessor()
+        # Instantiate Immediate Pre-STT Diagnostic & Startup Gate Processor (Boundary B)
+        allow_interruptions = bool(
+            runtime_config.runtime.interruption_mode is None
+            or runtime_config.runtime.interruption_mode != "never"
+        )
+        pre_stt_processor = StartupGateProcessor(
+            has_greeting=bool(greeting),
+            allow_interruptions=allow_interruptions,
+        )
 
         # Instantiate Language Context Processor (Boundary D) preserving authoritative temporal prompt
         language_processor = LanguageContextProcessor(
@@ -1405,6 +1559,7 @@ async def websocket_plivo_endpoint(
             settings=SarvamLLMSettings(**llm_settings_kwargs),
             timing_tracker=turn_tracker,
             http_client=sarvam_llm_pool,
+            is_call_terminating_fn=is_terminating,
         )
         startup_tracker.record_stage("llm_service_created")
 
@@ -1436,6 +1591,8 @@ async def websocket_plivo_endpoint(
             transcript_collector=transcript_collector,
             primary_language=runtime_config.language.primary or "en-IN",
             greeting_cache_key=greeting_cache_key,
+            startup_gate=pre_stt_processor,
+            is_call_terminating_fn=is_terminating,
         )
 
         # 13. Compose Pipecat Native Voice Pipeline
@@ -1463,7 +1620,7 @@ async def websocket_plivo_endpoint(
             ),
         )
 
-        # Queue initial greeting immediately on pipeline start
+        # Queue initial greeting immediately on pipeline start directly to TTS
         if greeting:
             turn_tracker.turn_type = "greeting"
             startup_tracker.record_stage("greeting_queue_start")
@@ -1476,6 +1633,8 @@ async def websocket_plivo_endpoint(
             @worker.event_handler("on_pipeline_started")
             async def on_pipeline_started(worker_instance, frame):
                 startup_tracker.record_stage("greeting_queued")
+                if pre_stt_processor:
+                    pre_stt_processor.set_greeting_active()
                 if cached_greeting_chunks:
                     chunks = (
                         cached_greeting_chunks.audio_chunks
@@ -1489,9 +1648,9 @@ async def websocket_plivo_endpoint(
                         f"({len(chunks)} chunks, sample_rate={cached_sr}, channels={cached_ch}, "
                         f"key={greeting_cache_key[:10]}...)"
                     )
-                    await worker_instance.queue_frame(TTSStartedFrame(context_id="greeting_fast_path"))
+                    await timing_monitor.queue_frame(TTSStartedFrame(context_id="greeting_fast_path"))
                     for chunk in chunks:
-                        await worker_instance.queue_frame(
+                        await timing_monitor.queue_frame(
                             TTSAudioRawFrame(
                                 audio=chunk,
                                 sample_rate=cached_sr,
@@ -1499,7 +1658,7 @@ async def websocket_plivo_endpoint(
                                 context_id="greeting_fast_path",
                             )
                         )
-                    await worker_instance.queue_frame(TTSStoppedFrame(context_id="greeting_fast_path"))
+                    await timing_monitor.queue_frame(TTSStoppedFrame(context_id="greeting_fast_path"))
                 else:
                     logger.info(f"Emitting initial assistant greeting for stream_id={stream_id}: '{greeting}'")
                     await worker_instance.queue_frame(TTSSpeakFrame(text=greeting))
@@ -1541,16 +1700,20 @@ async def websocket_plivo_endpoint(
         await runner.run()
 
     except WebSocketDisconnect:
+        is_call_terminating = True
         logger.info(f"Plivo WebSocket disconnected normally for stream_id={stream_id}")
         await finalize_call_session("COMPLETED")
     except asyncio.CancelledError:
+        is_call_terminating = True
         logger.info(f"Plivo WebSocket task cancelled for stream_id={stream_id}")
         await finalize_call_session("COMPLETED")
     except Exception as e:
+        is_call_terminating = True
         logger.error(f"Error in Plivo WebSocket handler for stream_id={stream_id}: {e}", exc_info=True)
         transcript_collector.record_error(str(e))
         await finalize_call_session("FAILED")
     finally:
+        is_call_terminating = True
         if 'duration_task' in locals() and duration_task and not duration_task.done():
             duration_task.cancel()
         

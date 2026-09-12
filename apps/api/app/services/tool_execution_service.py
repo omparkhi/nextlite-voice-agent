@@ -79,11 +79,11 @@ class ToolExecutionService:
             appointmentNumber=apt_number,
             customerName=customer_name,
             customerPhone=phone,
-            customerEmail=arguments.get("customerEmail"),
-            serviceType=service_type,
-            appointmentDate=apt_date,
-            appointmentTime=apt_time,
-            status=AppointmentStatus.SCHEDULED,
+            title=service_type,
+            resourceName=arguments.get("resourceName"),
+            bookingDate=apt_date,
+            bookingTime=apt_time,
+            status=AppointmentStatus.REQUESTED,
             notes=arguments.get("notes")
         )
         await apt_repo.create(apt)

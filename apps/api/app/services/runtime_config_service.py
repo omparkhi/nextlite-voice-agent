@@ -1,5 +1,5 @@
 import uuid
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from ..models import Deployment, Agent, AgentVersion, PhoneNumber, DeploymentStatus
@@ -11,6 +11,58 @@ from ..schemas import (
 )
 from .prompt_compiler_service import prompt_compiler
 from ..logging import logger
+
+CANONICAL_TOOL_DEFS = {
+    "book_appointment": RuntimeToolDefinition(
+        tool_id="book_appointment",
+        name="book_appointment",
+        description="Submit an appointment request. Records an unconfirmed request for team verification.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "customerName": {"type": "string", "description": "Customer name"},
+                "title": {"type": "string", "description": "Reason for visit or appointment purpose"},
+                "bookingDate": {"type": "string", "description": "Date of appointment (YYYY-MM-DD or relative like tomorrow)"},
+                "bookingTime": {"type": "string", "description": "Time of appointment (e.g. 10:00 AM, 12:00 PM)"},
+                "resourceName": {"type": "string", "description": "Requested staff, doctor, or specialist"},
+                "customerPhone": {"type": "string", "description": "Contact phone number"},
+                "notes": {"type": "string", "description": "Additional notes"}
+            },
+            "required": ["customerName", "title", "bookingDate", "bookingTime"]
+        },
+        enabled=True
+    ),
+    "create_callback_lead": RuntimeToolDefinition(
+        tool_id="create_callback_lead",
+        name="create_callback_lead",
+        description="Create a callback request or lead for a customer wanting more information.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "customerName": {"type": "string", "description": "Customer name"},
+                "customerPhone": {"type": "string", "description": "Contact phone number"},
+                "customerEmail": {"type": "string", "description": "Customer email address"},
+                "requirement": {"type": "string", "description": "Customer inquiry, question, or requirement"},
+                "priority": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "URGENT"], "description": "Priority level"}
+            },
+            "required": ["customerName", "customerPhone"]
+        },
+        enabled=True
+    ),
+    "query_knowledge_base": RuntimeToolDefinition(
+        tool_id="query_knowledge_base",
+        name="query_knowledge_base",
+        description="Query the business knowledge base to retrieve authoritative facts, pricing, policies, and clinic details.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Semantic query to search business knowledge base"}
+            },
+            "required": ["query"]
+        },
+        enabled=True
+    ),
+}
 
 class RuntimeAgentConfigService:
     def __init__(self, session: AsyncSession):
@@ -58,22 +110,61 @@ class RuntimeAgentConfigService:
         cfg = version.configuration or {}
         voice_cfg = cfg.get("voice", {})
         lang_cfg = cfg.get("language", {})
-        runtime_cfg = cfg.get("runtime", {})
+        runtime_cfg = cfg.get("runtime", {}) or cfg.get("runtimeSettings", {})
         tools_cfg = cfg.get("tools", {})
         vars_cfg = cfg.get("variables", {})
         knowledge_cfg = cfg.get("knowledge", {})
+        identity_cfg = cfg.get("identity", {})
 
-        base_prompt = cfg.get("systemPrompt") or "You are a professional voice assistant."
-        timezone = cfg.get("timezone") or "Asia/Kolkata"
-        primary_lang = lang_cfg.get("primary", "en-IN")
-        supported_langs = lang_cfg.get("supportedLanguages", ["en-IN", "hi-IN"])
+        timezone = (
+            cfg.get("timezone")
+            or cfg.get("businessInformation", {}).get("timezone")
+            or "Asia/Kolkata"
+        )
+        primary_lang = lang_cfg.get("primary", "hi-IN")
+        supported_langs = lang_cfg.get("supported") or lang_cfg.get("supportedLanguages") or ["en-IN", "hi-IN"]
 
         compiled_prompt = prompt_compiler.compile_system_prompt(
-            base_prompt=base_prompt,
+            configuration=cfg,
             timezone=timezone,
             primary_lang=primary_lang,
             supported_langs=supported_langs
         )
+
+        greeting = (
+            identity_cfg.get("greeting")
+            or cfg.get("greeting")
+            or "Hello! How can I assist you today?"
+        )
+
+        # Build tools list
+        resolved_tool_defs: List[RuntimeToolDefinition] = []
+        raw_tools = tools_cfg.get("tools") or tools_cfg.get("bindings") or []
+        tools_enabled = tools_cfg.get("enabled", True)
+
+        if tools_enabled:
+            if isinstance(raw_tools, list) and len(raw_tools) > 0:
+                for t in raw_tools:
+                    if isinstance(t, dict):
+                        t_id = t.get("toolId") or t.get("tool_id") or t.get("name")
+                        if t_id and t.get("enabled", True):
+                            canon = CANONICAL_TOOL_DEFS.get(t_id)
+                            if canon:
+                                resolved_tool_defs.append(canon)
+                            else:
+                                resolved_tool_defs.append(RuntimeToolDefinition(
+                                    tool_id=t_id,
+                                    name=t.get("name", t_id),
+                                    description=t.get("description", "Custom business tool"),
+                                    parameters=t.get("parameters"),
+                                    enabled=True,
+                                    confirmation_required=t.get("confirmationRequired", False)
+                                ))
+            else:
+                # Default canonical tools enabled for voice agent
+                resolved_tool_defs.append(CANONICAL_TOOL_DEFS["query_knowledge_base"])
+                resolved_tool_defs.append(CANONICAL_TOOL_DEFS["book_appointment"])
+                resolved_tool_defs.append(CANONICAL_TOOL_DEFS["create_callback_lead"])
 
         return RuntimeAgentConfig(
             tenant=RuntimeTenantConfig(tenant_id=str(deployment.tenantId)),
@@ -89,48 +180,46 @@ class RuntimeAgentConfigService:
             ),
             prompt=RuntimePromptConfig(
                 compiled_system_prompt=compiled_prompt,
-                greeting=cfg.get("greeting", "Hello! How can I assist you today?"),
+                greeting=greeting,
                 timezone=timezone
             ),
             voice=RuntimeVoiceConfig(
                 provider=voice_cfg.get("provider", "sarvam"),
                 stt_model=voice_cfg.get("sttModel", "saaras:v3"),
                 tts_model=voice_cfg.get("ttsModel", "bulbul:v3"),
-                voice_id=voice_cfg.get("voiceId", "priya"),
-                gender=voice_cfg.get("gender", "female"),
-                speaking_speed=voice_cfg.get("speakingSpeed", 1.0),
-                pitch=voice_cfg.get("pitch", 0.0)
+                voice_id=voice_cfg.get("voiceId", "shubh"),
+                gender=voice_cfg.get("gender", "male"),
+                speaking_speed=float(voice_cfg.get("speakingSpeed", 1.0)),
+                pitch=float(voice_cfg.get("pitch", 0.0))
             ),
             language=RuntimeLanguageConfig(
                 primary=primary_lang,
                 supported_languages=supported_langs,
-                auto_detect_enabled=lang_cfg.get("autoDetectEnabled", False),
-                language_switching_enabled=lang_cfg.get("languageSwitchingEnabled", True)
+                auto_detect_enabled=lang_cfg.get("autoDetect", lang_cfg.get("autoDetectEnabled", False)),
+                language_switching_enabled=lang_cfg.get("languageSwitchEnabled", lang_cfg.get("languageSwitchingEnabled", True))
             ),
             runtime=RuntimeBehaviorConfig(
                 model_provider=runtime_cfg.get("modelProvider", "sarvam"),
-                llm_model=runtime_cfg.get("llmModel", "sarvam-2b-v0.5"),
-                temperature=runtime_cfg.get("temperature", 0.3),
+                llm_model=runtime_cfg.get("llmModel", "sarvam-105b-conversations"),
+                temperature=float(runtime_cfg.get("modelTemperature", runtime_cfg.get("temperature", 0.3))),
                 interruption_mode=runtime_cfg.get("interruptionMode", "adaptive"),
                 preemptive_generation_enabled=runtime_cfg.get("preemptiveGenerationEnabled", False),
-                response_eagerness=runtime_cfg.get("responseEagerness", "medium"),
+                response_eagerness=runtime_cfg.get("eagernessToRespond", runtime_cfg.get("responseEagerness", "medium")),
                 noise_cancellation_model=runtime_cfg.get("noiseCancellationModel", "quailVfS"),
                 expressive_mode_enabled=runtime_cfg.get("expressiveModeEnabled", False),
-                max_call_duration_seconds=runtime_cfg.get("maxCallDurationSeconds", 600)
+                max_call_duration_seconds=int(runtime_cfg.get("maxCallLengthSeconds", runtime_cfg.get("maxCallDurationSeconds", 600)))
             ),
             knowledge=RuntimeKnowledgeConfig(
-                enabled=knowledge_cfg.get("enabled", False),
+                enabled=knowledge_cfg.get("enabled", True),
                 retrieval_config=knowledge_cfg.get("retrievalConfig", {"topK": 3, "scoreThreshold": 0.65})
             ),
             tools=RuntimeToolConfig(
-                enabled=tools_cfg.get("enabled", True),
-                tools=[
-                    RuntimeToolDefinition.model_validate(t) for t in tools_cfg.get("tools", [])
-                ]
+                enabled=tools_enabled,
+                tools=resolved_tool_defs
             ),
             variables=RuntimeVariableConfig(
-                input_variables=vars_cfg.get("inputVariables", []),
-                output_variables=vars_cfg.get("outputVariables", []),
+                input_variables=vars_cfg.get("input", vars_cfg.get("inputVariables", [])),
+                output_variables=vars_cfg.get("output", vars_cfg.get("outputVariables", [])),
                 runtime_context=vars_cfg.get("runtimeContext", {})
             )
         )

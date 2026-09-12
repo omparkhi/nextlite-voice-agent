@@ -69,6 +69,7 @@ class LeadStatus(str, enum.Enum):
     NEW = "NEW"
     CONTACTED = "CONTACTED"
     QUALIFIED = "QUALIFIED"
+    CLOSED = "CLOSED"
     LOST = "LOST"
 
 class LeadPriority(str, enum.Enum):
@@ -77,9 +78,10 @@ class LeadPriority(str, enum.Enum):
     HIGH = "HIGH"
 
 class AppointmentStatus(str, enum.Enum):
-    SCHEDULED = "SCHEDULED"
+    REQUESTED = "REQUESTED"
     CONFIRMED = "CONFIRMED"
     CANCELLED = "CANCELLED"
+    SCHEDULED = "SCHEDULED"
     COMPLETED = "COMPLETED"
     NO_SHOW = "NO_SHOW"
 
@@ -310,19 +312,19 @@ class CallSession(Base):
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     agentId: Mapped[Optional[uuid.UUID]] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
     deploymentId: Mapped[Optional[uuid.UUID]] = mapped_column("deployment_id", UUID(as_uuid=True), ForeignKey("deployments.id", ondelete="SET NULL"), nullable=True)
-    status: Mapped[CallStatus] = mapped_column(SQLEnum(CallStatus, name="call_status", native_enum=False), nullable=False, default=CallStatus.ACTIVE)
+    roomName: Mapped[Optional[str]] = mapped_column("room_name", String(255), nullable=True, default="default-room")
+    callerNumber: Mapped[Optional[str]] = mapped_column("caller_number", String(50), nullable=True)
     direction: Mapped[CallDirection] = mapped_column(SQLEnum(CallDirection, name="call_direction", native_enum=False), nullable=False, default=CallDirection.INBOUND)
-    callerPhoneNumber: Mapped[Optional[str]] = mapped_column("caller_phone_number", String(50), nullable=True)
-    recipientPhoneNumber: Mapped[Optional[str]] = mapped_column("recipient_phone_number", String(50), nullable=True)
+    status: Mapped[CallStatus] = mapped_column(SQLEnum(CallStatus, name="call_status", native_enum=False), nullable=False, default=CallStatus.COMPLETED)
     durationSeconds: Mapped[Optional[int]] = mapped_column("duration_seconds", Integer, default=0, nullable=True)
-    transcript: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True, default=list)
-    toolsUsed: Mapped[Optional[list]] = mapped_column("tools_used", JSONB, nullable=True, default=list)
-    metricsJson: Mapped[Optional[dict]] = mapped_column("metrics_json", JSONB, nullable=True, default=dict)
-    recordingUrl: Mapped[Optional[str]] = mapped_column("recording_url", Text, nullable=True)
-    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    sentiment: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    primaryLanguage: Mapped[Optional[str]] = mapped_column("primary_language", String(50), nullable=True, default="en-IN")
     startedAt: Mapped[datetime] = mapped_column("started_at", DateTime, default=datetime.utcnow, nullable=False)
     endedAt: Mapped[Optional[datetime]] = mapped_column("ended_at", DateTime, nullable=True)
+    transcriptText: Mapped[Optional[str]] = mapped_column("transcript_text", Text, nullable=True)
+    turnsJson: Mapped[Optional[list]] = mapped_column("turns_json", JSONB, nullable=True, default=list)
+    toolsUsed: Mapped[Optional[list]] = mapped_column("tools_used", JSONB, nullable=True, default=list)
+    metricsJson: Mapped[Optional[dict]] = mapped_column("metrics_json", JSONB, nullable=True, default=dict)
+    createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
 
 
 class Lead(Base):
@@ -351,15 +353,16 @@ class Appointment(Base):
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     agentId: Mapped[Optional[uuid.UUID]] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
     callSessionId: Mapped[Optional[uuid.UUID]] = mapped_column("call_session_id", UUID(as_uuid=True), ForeignKey("call_sessions.id", ondelete="SET NULL"), nullable=True)
-    appointmentNumber: Mapped[str] = mapped_column("appointment_number", String(50), nullable=False)
+    appointmentNumber: Mapped[Optional[str]] = mapped_column("appointment_number", String(50), nullable=True)
     customerName: Mapped[str] = mapped_column("customer_name", String(255), nullable=False)
     customerPhone: Mapped[str] = mapped_column("customer_phone", String(50), nullable=False)
-    customerEmail: Mapped[Optional[str]] = mapped_column("customer_email", String(255), nullable=True)
-    serviceType: Mapped[str] = mapped_column("service_type", String(255), nullable=False)
-    appointmentDate: Mapped[str] = mapped_column("appointment_date", String(50), nullable=False)
-    appointmentTime: Mapped[str] = mapped_column("appointment_time", String(50), nullable=False)
-    status: Mapped[AppointmentStatus] = mapped_column(SQLEnum(AppointmentStatus, name="appointment_status", native_enum=False), nullable=False, default=AppointmentStatus.SCHEDULED)
+    title: Mapped[str] = mapped_column("title", String(255), nullable=False, default="Consultation")
+    resourceName: Mapped[Optional[str]] = mapped_column("resource_name", String(255), nullable=True)
+    bookingDate: Mapped[str] = mapped_column("booking_date", String(50), nullable=False)
+    bookingTime: Mapped[str] = mapped_column("booking_time", String(50), nullable=False)
+    status: Mapped[AppointmentStatus] = mapped_column(SQLEnum(AppointmentStatus, name="appointment_status", native_enum=False), nullable=False, default=AppointmentStatus.REQUESTED)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadataJson: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True, default=dict)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
