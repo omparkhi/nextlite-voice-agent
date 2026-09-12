@@ -184,6 +184,7 @@ class TurnTimingTracker:
         self.tts_start: Optional[float] = None
         self.tts_connected: Optional[float] = None
         self.first_tts_audio: Optional[float] = None
+        self.first_audio_sent_to_plivo: Optional[float] = None
         self.tts_stop: Optional[float] = None
         self.output_audio: Optional[float] = None
         self.turn_complete: Optional[float] = None
@@ -322,12 +323,14 @@ class TurnTimingTracker:
 
     def record_llm_context_frame(self, ts: Optional[float] = None):
         now = ts if ts is not None else time.perf_counter()
-        self.llm_context_frame = now
         if self.tool_executions:
             self.post_tool_llm_start = now
             self.record_event("post_tool_llm_context", now)
         else:
-            self.llm_start = now
+            if self.llm_context_frame is None:
+                self.llm_context_frame = now
+            if self.llm_start is None:
+                self.llm_start = now
             self.record_event("llm_context", now)
 
     def record_llm_start(self, ts: Optional[float] = None):
@@ -542,7 +545,11 @@ class TurnTimingTracker:
         # 6. user_aggregation_to_llm_start_ms / aggregationToLLMRequestMs = llm_request_start - user_aggregation_finalized
         aggregation_to_llm_request_ms = diff_ms(self.llm_request_start or self.llm_start, self.user_aggregation_finalized, "aggregationToLLMRequestMs")
         aggregation_to_llm_start_canonical = aggregation_to_llm_request_ms
-        llm_context_to_request_ms = diff_ms(self.llm_request_start, self.llm_context_frame or self.llm_start, "llmContextToRequestMs")
+        llm_context_ref = self.llm_context_frame or self.llm_start
+        if self.llm_request_start is not None and llm_context_ref is not None and self.llm_request_start >= llm_context_ref:
+            llm_context_to_request_ms = diff_ms(self.llm_request_start, llm_context_ref, "llmContextToRequestMs")
+        else:
+            llm_context_to_request_ms = None
 
         # 7. LLM Provider Request & Streaming
         llm_http_request_ms = diff_ms(self.llm_first_provider_response, self.llm_request_start, "llmHttpRequestMs")
@@ -861,20 +868,30 @@ class StartupTimingTracker:
     def record_stage(self, stage_name: str, ts: Optional[float] = None, **fields: Any):
         now = ts if ts is not None else time.perf_counter()
 
-        # Idempotent latching for startup milestones: first event latches, subsequent events do not overwrite
+        # Idempotent latching for startup milestones: first event latches, subsequent events do not overwrite or duplicate events
         if stage_name in ("tts_ready", "tts_connected"):
-            if self.tts_ready is None:
-                self.tts_ready = now
-            if self.tts_connected is None:
-                self.tts_connected = now
+            if self.tts_ready is not None:
+                return
+            self.tts_ready = now
+            self.tts_connected = now
         elif stage_name in ("greeting_first_audio", "first_greeting_audio"):
-            if self.greeting_first_audio is None:
-                self.greeting_first_audio = now
-                self.first_greeting_audio = now
+            if self.greeting_first_audio is not None:
+                return
+            self.greeting_first_audio = now
+            self.first_greeting_audio = now
         elif stage_name in ("first_audio_sent_to_plivo", "greeting_first_audio_sent_to_plivo"):
-            if self.first_audio_sent_to_plivo is None:
-                self.first_audio_sent_to_plivo = now
-                self.greeting_first_audio_sent_to_plivo = now
+            if self.first_audio_sent_to_plivo is not None:
+                return
+            self.first_audio_sent_to_plivo = now
+            self.greeting_first_audio_sent_to_plivo = now
+        elif stage_name == "output_audio_frame":
+            if self.output_audio_frame is not None:
+                return
+            self.output_audio_frame = now
+        elif stage_name == "caller_ready":
+            if self.caller_ready is not None:
+                return
+            self.caller_ready = now
         elif hasattr(self, stage_name):
             setattr(self, stage_name, now)
 

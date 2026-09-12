@@ -942,8 +942,10 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
                     self._turn_tracker.record_audio_sent_to_plivo(now)
                 if self._startup_tracker:
                     if self._startup_tracker.greeting_queued is not None and self._startup_tracker.greeting_completed is None:
-                        self._startup_tracker.record_stage("greeting_first_audio_sent_to_plivo", now)
-                    self._startup_tracker.record_stage("first_audio_sent_to_plivo", now)
+                        if self._startup_tracker.greeting_first_audio_sent_to_plivo is None:
+                            self._startup_tracker.record_stage("greeting_first_audio_sent_to_plivo", now)
+                    if self._startup_tracker.first_audio_sent_to_plivo is None:
+                        self._startup_tracker.record_stage("first_audio_sent_to_plivo", now)
                 if not getattr(self, "_first_outbound_audio_logged", False):
                     self._first_outbound_audio_logged = True
                     logger.info(
@@ -1615,12 +1617,12 @@ async def websocket_plivo_endpoint(
         user_bot_latency_observer = UserBotLatencyObserver()
 
         @user_bot_latency_observer.event_handler("on_latency_measured")
-        async def on_pipecat_latency_measured(latency: float):
+        async def on_pipecat_latency_measured(observer, latency: float):
             latency_ms = round(latency * 1000)
             logger.info(f"[PIPECAT_NATIVE_LATENCY] User-to-bot latency: {latency_ms}ms ({latency:.3f}s)")
 
         @user_bot_latency_observer.event_handler("on_latency_breakdown")
-        async def on_pipecat_latency_breakdown(breakdown):
+        async def on_pipecat_latency_breakdown(observer, breakdown):
             ttfb_info = [f"{b.processor}:{b.duration_secs*1000:.0f}ms" for b in breakdown.ttfb]
             text_agg_str = f"{breakdown.text_aggregation.duration_secs*1000:.0f}ms" if breakdown.text_aggregation else "none"
             logger.info(
@@ -1629,7 +1631,7 @@ async def websocket_plivo_endpoint(
             )
 
         @user_bot_latency_observer.event_handler("on_first_bot_speech_latency")
-        async def on_pipecat_first_bot_speech_latency(latency: float):
+        async def on_pipecat_first_bot_speech_latency(observer, latency: float):
             latency_ms = round(latency * 1000)
             logger.info(f"[PIPECAT_NATIVE_FIRST_SPEECH] First bot speech latency: {latency_ms}ms ({latency:.3f}s)")
 
