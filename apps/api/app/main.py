@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from .config import settings
 from .logging import logger
 from .db import engine, redis_client
+from .routers.auth import router as auth_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,6 +25,9 @@ app = FastAPI(
     version="0.3.0",
     lifespan=lifespan
 )
+
+# Mount Routers
+app.include_router(auth_router)
 
 # Bypass ngrok browser interposer page for API and WebSocket calls
 @app.middleware("http")
