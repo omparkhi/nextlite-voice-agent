@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional, List, Any
 from sqlalchemy import (
     Column, String, Text, Boolean, DateTime, Integer, Float, ForeignKey,
-    Enum as SQLEnum, Index, UniqueConstraint, func, text
+    Enum as SQLEnum, Index, UniqueConstraint, func
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship, Mapped, mapped_column
@@ -12,7 +12,7 @@ from pgvector.sqlalchemy import Vector
 from .db import Base
 
 # ==========================================
-# 1. DATABASE ENUMS (13 ENUMS)
+# 1. DATABASE ENUMS
 # ==========================================
 
 class VersionStatus(str, enum.Enum):
@@ -51,7 +51,7 @@ class SubscriptionStatus(str, enum.Enum):
 
 class ProposalStatus(str, enum.Enum):
     PENDING = "PENDING"
-    APPLIED = "APPLIED"
+    APPROVED = "APPROVED"
     REJECTED = "REJECTED"
 
 class CallStatus(str, enum.Enum):
@@ -63,6 +63,7 @@ class CallStatus(str, enum.Enum):
 class CallDirection(str, enum.Enum):
     INBOUND = "INBOUND"
     OUTBOUND = "OUTBOUND"
+    WEB_TEST = "WEB_TEST"
 
 class LeadStatus(str, enum.Enum):
     NEW = "NEW"
@@ -88,6 +89,11 @@ class FollowUpStatus(str, enum.Enum):
     DELIVERED = "DELIVERED"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+
+class KnowledgeSourceStatus(str, enum.Enum):
+    PROCESSING = "PROCESSING"
+    READY = "READY"
+    FAILED = "FAILED"
 
 
 # ==========================================
@@ -155,7 +161,7 @@ class VerificationToken(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     userId: Mapped[uuid.UUID] = mapped_column("user_id", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
-    type: Mapped[str] = mapped_column(String(50), nullable=False)  # email_verification | password_reset
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
     expiresAt: Mapped[datetime] = mapped_column("expires_at", DateTime, nullable=False)
     usedAt: Mapped[Optional[datetime]] = mapped_column("used_at", DateTime, nullable=True)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
@@ -179,10 +185,10 @@ class AgentTemplate(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
     industry: Mapped[str] = mapped_column(String(100), nullable=False)
-    systemPrompt: Mapped[str] = mapped_column("system_prompt", Text, nullable=False)
-    defaultConfig: Mapped[dict] = mapped_column("default_config", JSONB, nullable=False, default=dict)
+    defaultConfiguration: Mapped[dict] = mapped_column("default_configuration", JSONB, nullable=False, default=dict)
+    isSystem: Mapped[bool] = mapped_column("is_system", Boolean, default=True, nullable=False)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
 
 
@@ -193,7 +199,6 @@ class Agent(Base):
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     templateId: Mapped[Optional[uuid.UUID]] = mapped_column("template_id", UUID(as_uuid=True), ForeignKey("agent_templates.id", ondelete="SET NULL"), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[AgentStatus] = mapped_column(SQLEnum(AgentStatus, name="agent_status", native_enum=False), nullable=False, default=AgentStatus.DRAFT)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -208,10 +213,10 @@ class AgentVersion(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agentId: Mapped[uuid.UUID] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
     versionNumber: Mapped[int] = mapped_column("version_number", Integer, nullable=False)
+    configuration: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     status: Mapped[VersionStatus] = mapped_column(SQLEnum(VersionStatus, name="version_status", native_enum=False), nullable=False, default=VersionStatus.DRAFT)
-    systemPrompt: Mapped[str] = mapped_column("system_prompt", Text, nullable=False)
-    config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-    changeSummary: Mapped[Optional[str]] = mapped_column("change_summary", Text, nullable=True)
+    createdBy: Mapped[uuid.UUID] = mapped_column("created_by", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
 
     agent = relationship("Agent", back_populates="versions")
@@ -222,13 +227,13 @@ class Deployment(Base):
     __tablename__ = "deployments"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     agentId: Mapped[uuid.UUID] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
     versionId: Mapped[uuid.UUID] = mapped_column("version_id", UUID(as_uuid=True), ForeignKey("agent_versions.id", ondelete="CASCADE"), nullable=False)
-    tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-    environment: Mapped[DeploymentEnvironment] = mapped_column(SQLEnum(DeploymentEnvironment, name="deployment_environment", native_enum=False), nullable=False)
+    environment: Mapped[DeploymentEnvironment] = mapped_column(SQLEnum(DeploymentEnvironment, name="deployment_environment", native_enum=False), nullable=False, default=DeploymentEnvironment.TEST)
     status: Mapped[DeploymentStatus] = mapped_column(SQLEnum(DeploymentStatus, name="deployment_status", native_enum=False), nullable=False, default=DeploymentStatus.ACTIVE)
-    deployedBy: Mapped[Optional[uuid.UUID]] = mapped_column("deployed_by", UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
+    createdBy: Mapped[uuid.UUID] = mapped_column("created_by", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    deployedAt: Mapped[datetime] = mapped_column("deployed_at", DateTime, default=datetime.utcnow, nullable=False)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -240,9 +245,8 @@ class AgentTool(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agentId: Mapped[uuid.UUID] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
-    toolName: Mapped[str] = mapped_column("tool_name", String(100), nullable=False)
-    toolType: Mapped[str] = mapped_column("tool_type", String(50), nullable=False)
-    config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    toolName: Mapped[str] = mapped_column("tool_name", String(255), nullable=False)
+    toolConfig: Mapped[dict] = mapped_column("tool_config", JSONB, nullable=False, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
 
@@ -251,14 +255,14 @@ class KnowledgeSource(Base):
     __tablename__ = "knowledge_sources"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agentId: Mapped[uuid.UUID] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-    agentId: Mapped[Optional[uuid.UUID]] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=True)
-    title: Mapped[str] = mapped_column(String(255), nullable=False)
-    sourceType: Mapped[str] = mapped_column("source_type", String(50), nullable=False)  # pdf, txt, docx, url
-    storagePath: Mapped[Optional[str]] = mapped_column("storage_path", Text, nullable=True)
-    fileSize: Mapped[Optional[int]] = mapped_column("file_size", Integer, nullable=True)
-    status: Mapped[str] = mapped_column(String(50), default="processing", nullable=False)
-    metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
+    fileName: Mapped[str] = mapped_column("file_name", String(255), nullable=False)
+    filePath: Mapped[str] = mapped_column("file_path", Text, nullable=False)
+    fileType: Mapped[str] = mapped_column("file_type", String(50), nullable=False)
+    chunkCount: Mapped[int] = mapped_column("chunk_count", Integer, default=0, nullable=False)
+    contentHash: Mapped[Optional[str]] = mapped_column("content_hash", String(64), nullable=True)
+    status: Mapped[KnowledgeSourceStatus] = mapped_column(SQLEnum(KnowledgeSourceStatus, name="knowledge_source_status", native_enum=False), default=KnowledgeSourceStatus.PROCESSING, nullable=False)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
 
     chunks = relationship("KnowledgeChunk", back_populates="source", cascade="all, delete-orphan")
@@ -269,11 +273,11 @@ class KnowledgeChunk(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     sourceId: Mapped[uuid.UUID] = mapped_column("source_id", UUID(as_uuid=True), ForeignKey("knowledge_sources.id", ondelete="CASCADE"), nullable=False)
+    agentId: Mapped[uuid.UUID] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
-    agentId: Mapped[Optional[uuid.UUID]] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=True)
-    chunkIndex: Mapped[int] = mapped_column("chunk_index", Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    embedding = mapped_column(Vector(1024), nullable=True)
+    embedding = mapped_column(JSONB, nullable=True)
+    chunkIndex: Mapped[int] = mapped_column("chunk_index", Integer, nullable=False)
     tokenCount: Mapped[Optional[int]] = mapped_column("token_count", Integer, nullable=True)
     metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
@@ -286,10 +290,13 @@ class ConfigChangeProposal(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     agentId: Mapped[uuid.UUID] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     proposedBy: Mapped[uuid.UUID] = mapped_column("proposed_by", UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    status: Mapped[ProposalStatus] = mapped_column(SQLEnum(ProposalStatus, name="proposal_status", native_enum=False), nullable=False, default=ProposalStatus.PENDING)
-    changes: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    rationale: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    userMessage: Mapped[str] = mapped_column("user_message", Text, nullable=False)
+    currentConfig: Mapped[dict] = mapped_column("current_config", JSONB, nullable=False)
+    proposedConfig: Mapped[dict] = mapped_column("proposed_config", JSONB, nullable=False)
+    diff: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    status: Mapped[ProposalStatus] = mapped_column(SQLEnum(ProposalStatus, name="config_proposal_status", native_enum=False), default=ProposalStatus.PENDING, nullable=False)
     reviewedBy: Mapped[Optional[uuid.UUID]] = mapped_column("reviewed_by", UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewedAt: Mapped[Optional[datetime]] = mapped_column("reviewed_at", DateTime, nullable=True)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
