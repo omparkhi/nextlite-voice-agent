@@ -43,7 +43,7 @@ async def test_02_template_prompt_included_in_runtime_compilation():
     )
 
     assert "=== ROLE BASELINE & CONVERSATIONAL PRINCIPLES ===" in compiled
-    assert "You are a professional AI receptionist" in compiled
+    assert "You are a professional front-desk and phone representative" in compiled
     assert "Zenith Salon & Spa" in compiled
     assert "Maya" in compiled
 
