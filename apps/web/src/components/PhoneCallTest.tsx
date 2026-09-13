@@ -32,6 +32,7 @@ export const isValidE164Phone = (phone: string): boolean => {
 export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showDialForm, setShowDialForm] = useState(false);
   const [callResult, setCallResult] = useState<PhoneTestResult | null>(null);
   const [callSession, setCallSession] = useState<CallSession | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -43,6 +44,26 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
 
   const pollIntervalRef = useRef<number | null>(null);
   const pollCountRef = useRef(0);
+
+  // Load latest call session automatically on mount or when agentId/clientId changes
+  useEffect(() => {
+    let isMounted = true;
+    const loadLatestCall = async () => {
+      try {
+        const response = await api.getClientCalls({ agentId, tenantId: clientId, limit: 1 });
+        const calls = response.calls || (response as any).sessions || [];
+        if (isMounted && calls.length > 0) {
+          setCallSession(calls[0]);
+        }
+      } catch (err) {
+        console.warn('Initial call session fetch failed:', err);
+      }
+    };
+    loadLatestCall();
+    return () => {
+      isMounted = false;
+    };
+  }, [agentId, clientId]);
 
   const handleStartCall = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -67,6 +88,7 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
       const result = await api.startPhoneTest(clientId, agentId, normalized);
       setCallResult(result);
       setIsPolling(true);
+      setShowDialForm(false);
       pollCountRef.current = 0;
     } catch (err: any) {
       const msg = err?.message || 'Failed to initiate outbound phone call.';
@@ -82,23 +104,22 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
     }
   };
 
-  // Poll for CallSession updates after initiation
+  // Poll for CallSession updates after initiation or when active
   useEffect(() => {
-    if (!isPolling || !callResult) return;
+    if (!isPolling && callSession?.status !== 'ACTIVE') return;
 
     const poll = async () => {
       pollCountRef.current += 1;
       try {
         const response = await api.getClientCalls({ agentId, tenantId: clientId, limit: 5 });
-        const calls = response.calls || [];
-        // Match the latest call for this test deployment or caller phone, fallback to latest call for agent
+        const calls = response.calls || (response as any).sessions || [];
         const normalized = normalizePhoneNumber(phoneNumber);
         const match =
           calls.find(
-            (c) =>
-              (callResult.deploymentId && c.deploymentId === callResult.deploymentId) ||
+            (c: any) =>
+              (callResult?.deploymentId && c.deploymentId === callResult.deploymentId) ||
               (c.callerNumber && normalized && c.callerNumber.includes(normalized.slice(-8))) ||
-              (c.roomName && callResult.callId && c.roomName.includes(callResult.callId)) ||
+              (c.roomName && callResult?.callId && c.roomName.includes(callResult.callId)) ||
               (c.agentId === agentId)
           ) || calls[0];
 
@@ -119,20 +140,21 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
     };
 
     pollIntervalRef.current = window.setInterval(poll, 2000);
-    poll(); // immediate initial check
+    poll(); // immediate check
 
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
       }
     };
-  }, [isPolling, callResult, agentId, clientId, phoneNumber]);
+  }, [isPolling, callSession?.status, callResult, agentId, clientId, phoneNumber]);
 
   const handleReset = () => {
     setCallResult(null);
     setCallSession(null);
     setIsPolling(false);
     setError(null);
+    setShowDialForm(true);
     setExpandedTurns({});
   };
 
@@ -150,11 +172,11 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
 
       // Query client calls for latest session
       const response = await api.getClientCalls({ agentId, tenantId: clientId, limit: 5 });
-      const calls = response.calls || [];
+      const calls = response.calls || (response as any).sessions || [];
       const normalized = normalizePhoneNumber(phoneNumber);
       const match =
         calls.find(
-          (c) =>
+          (c: any) =>
             (callResult?.deploymentId && c.deploymentId === callResult.deploymentId) ||
             (c.callerNumber && normalized && c.callerNumber.includes(normalized.slice(-8))) ||
             (c.roomName && callResult?.callId && c.roomName.includes(callResult.callId)) ||
@@ -261,9 +283,9 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
           </div>
         )}
 
-        {/* Phone Input Form (when no call is active) */}
-        {!callResult && (
-          <form onSubmit={handleStartCall} className="space-y-5 max-w-lg mx-auto">
+        {/* Phone Input Form (when no session is shown or toggled open) */}
+        {(!callSession || showDialForm) && !isPolling && (
+          <form onSubmit={handleStartCall} className="space-y-5 max-w-lg mx-auto mb-6 p-5 bg-[#fafaf9] border border-[#e7e5e4] rounded-2xl">
             <div>
               <label className="block text-xs font-medium text-[#57534e] uppercase tracking-wider mb-2">
                 Destination Phone Number
@@ -307,45 +329,46 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
               )}
             </button>
 
-            <button
-              type="button"
-              onClick={handleGetCallTranscript}
-              disabled={fetchingTranscript}
-              className="w-full el-btn-outline py-2.5 text-xs flex items-center justify-center gap-2"
-            >
-              {fetchingTranscript ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-[#0c0a09]" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>Fetching Recent Call Transcript...</span>
-                </>
-              ) : (
-                <>
-                  <span>📜</span>
-                  <span>Get Latest Call Transcript</span>
-                </>
-              )}
-            </button>
+            {!callSession && (
+              <button
+                type="button"
+                onClick={handleGetCallTranscript}
+                disabled={fetchingTranscript}
+                className="w-full el-btn-outline py-2.5 text-xs flex items-center justify-center gap-2"
+              >
+                {fetchingTranscript ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-3.5 w-3.5 text-[#0c0a09]" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Fetching Recent Call Transcript...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>📜</span>
+                    <span>Get Latest Call Transcript</span>
+                  </>
+                )}
+              </button>
+            )}
 
-            <div className="p-4 bg-blue-50/70 border border-blue-200/80 rounded-xl">
-              <h4 className="text-xs font-semibold text-blue-900 mb-1.5 flex items-center gap-1.5">
+            <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl">
+              <h4 className="text-xs font-semibold text-blue-900 mb-1 flex items-center gap-1.5">
                 <span>ℹ️</span>
                 <span>Testing Flow</span>
               </h4>
-              <ul className="text-[11px] text-blue-800 space-y-1">
+              <ul className="text-[11px] text-blue-800 space-y-0.5">
                 <li>• Plivo PSTN dials your phone number directly.</li>
                 <li>• When answered, the pipeline connects to Pipecat realtime voice engine.</li>
-                <li>• All startup stages, conversation turns, and tool executions are instrumented.</li>
-                <li>• A complete timed transcript and latency breakdown will appear upon completion.</li>
+                <li>• Complete timed transcript and latency breakdown will appear upon completion.</li>
               </ul>
             </div>
           </form>
         )}
 
         {/* Live Call In-Progress Banner */}
-        {callResult && isPolling && !callSession && (
+        {isPolling && !callSession && (
           <div className="p-5 bg-emerald-50/90 border border-emerald-200 rounded-2xl space-y-4">
             <div className="flex items-center gap-3">
               <div className="relative flex items-center justify-center w-3 h-3">
@@ -360,16 +383,18 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
               </div>
             </div>
 
-            <div className="p-3 bg-white/80 border border-emerald-100 rounded-xl text-xs space-y-1 text-emerald-900 font-mono">
-              <div className="flex justify-between">
-                <span className="text-[#777169]">Call Request UUID:</span>
-                <span>{callResult.callId || 'Initiated'}</span>
+            {callResult && (
+              <div className="p-3 bg-white/80 border border-emerald-100 rounded-xl text-xs space-y-1 text-emerald-900 font-mono">
+                <div className="flex justify-between">
+                  <span className="text-[#777169]">Call Request UUID:</span>
+                  <span>{callResult.callId || 'Initiated'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#777169]">Deployment ID:</span>
+                  <span>{callResult.deploymentId}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-[#777169]">Deployment ID:</span>
-                <span>{callResult.deploymentId}</span>
-              </div>
-            </div>
+            )}
 
             <p className="text-xs text-emerald-800">
               Please answer the phone call and speak naturally. When you hang up, the complete time-aligned transcript and timing breakdown will appear automatically.
@@ -411,7 +436,7 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
         )}
 
         {/* Active/Completed Call Results */}
-        {callResult && callSession && (
+        {callSession && (
           <div className="space-y-6 mt-4">
             {/* Call Status & Top Summary Banner */}
             <div className="p-5 bg-[#fafaf9] border border-[#e7e5e4] rounded-2xl space-y-4">
@@ -433,6 +458,11 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
                   <span className="text-xs font-mono text-[#777169]">
                     Duration: {callSession.durationSeconds}s
                   </span>
+                  {callSession.callerNumber && (
+                    <span className="text-xs font-mono text-[#777169]">
+                      Caller: {callSession.callerNumber}
+                    </span>
+                  )}
                   {callSession.primaryLanguage && (
                     <span className="text-xs bg-[#f5f5f4] text-[#57534e] px-2 py-0.5 rounded">
                       {callSession.primaryLanguage}
@@ -463,10 +493,16 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
                     )}
                   </button>
                   <button
-                    onClick={handleReset}
-                    className="el-btn-outline px-3 py-1.5 text-xs font-medium"
+                    onClick={() => setShowDialForm(!showDialForm)}
+                    className="el-btn-outline px-3 py-1.5 text-xs font-medium bg-white"
                   >
-                    Test Another Call
+                    {showDialForm ? 'Hide Dial Form ▲' : '📞 Dial New Call ▼'}
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className="el-btn-outline px-3 py-1.5 text-xs font-medium text-[#777169]"
+                  >
+                    Clear View
                   </button>
                 </div>
               </div>
@@ -507,7 +543,7 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
               </div>
             </div>
 
-            {/* STARTUP LATENCY BREAKDOWN (PART 6) */}
+            {/* STARTUP LATENCY BREAKDOWN */}
             <div className="el-card p-5 space-y-3">
               <h4 className="text-sm font-semibold text-[#0c0a09] flex items-center justify-between">
                 <span>⏱️ Startup Latency Breakdown</span>
@@ -581,7 +617,7 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
               </div>
             </div>
 
-            {/* SPEAKER CONVERSATION TRANSCRIPT (PART 3 & 4) */}
+            {/* SPEAKER CONVERSATION TRANSCRIPT */}
             <div className="el-card p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold text-[#0c0a09] flex items-center gap-2">
@@ -698,101 +734,101 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
                           </div>
                         )}
 
-                            {/* Expandable Per-Turn Stage Breakdown (Phase 16E) */}
-                            {isExpanded && matchedTiming && (
-                              <div className="p-3 bg-white border border-[#e7e5e4] rounded-lg text-xs space-y-2 font-mono text-[#57534e]">
-                                <div className="font-sans font-semibold text-[#0c0a09] text-[11px]">
-                                  Granular Stage Breakdown (Turn {index + 1}):
-                                </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                                  <div>
-                                    <span className="text-[#777169]">Speech Stop → STT:</span>{' '}
-                                    <span className="font-bold text-[#0c0a09]">
-                                      {matchedTiming.speechStopToFinalTranscriptMs || matchedTiming.vadStopToSttFinalMs || '—'}ms
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-[#777169]">STT → Aggregation:</span>{' '}
-                                    <span className="font-bold text-[#0c0a09]">
-                                      {matchedTiming.finalTranscriptToAggregationMs || matchedTiming.sttFinalToAggregationMs || '—'}ms
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-[#777169]">Aggregation → LLM Req:</span>{' '}
-                                    <span className="font-bold text-[#0c0a09]">
-                                      {matchedTiming.aggregationToLLMRequestMs || matchedTiming.aggregationToLlmStartMs || '—'}ms
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-[#777169]">LLM Provider TTFT:</span>{' '}
-                                    <span className="font-bold text-[#0c0a09]">
-                                      {matchedTiming.llmRequestToFirstOutputMs || matchedTiming.llmStartToFirstOutputMs || '—'}ms
-                                    </span>
-                                  </div>
-                                </div>
+                        {/* Expandable Per-Turn Stage Breakdown */}
+                        {isExpanded && matchedTiming && (
+                          <div className="p-3 bg-white border border-[#e7e5e4] rounded-lg text-xs space-y-2 font-mono text-[#57534e]">
+                            <div className="font-sans font-semibold text-[#0c0a09] text-[11px]">
+                              Granular Stage Breakdown (Turn {index + 1}):
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                              <div>
+                                <span className="text-[#777169]">Speech Stop → STT:</span>{' '}
+                                <span className="font-bold text-[#0c0a09]">
+                                  {matchedTiming.speechStopToFinalTranscriptMs || matchedTiming.vadStopToSttFinalMs || '—'}ms
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[#777169]">STT → Aggregation:</span>{' '}
+                                <span className="font-bold text-[#0c0a09]">
+                                  {matchedTiming.finalTranscriptToAggregationMs || matchedTiming.sttFinalToAggregationMs || '—'}ms
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[#777169]">Aggregation → LLM Req:</span>{' '}
+                                <span className="font-bold text-[#0c0a09]">
+                                  {matchedTiming.aggregationToLLMRequestMs || matchedTiming.aggregationToLlmStartMs || '—'}ms
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[#777169]">LLM Provider TTFT:</span>{' '}
+                                <span className="font-bold text-[#0c0a09]">
+                                  {matchedTiming.llmRequestToFirstOutputMs || matchedTiming.llmStartToFirstOutputMs || '—'}ms
+                                </span>
+                              </div>
+                            </div>
 
-                                {/* Additional LLM & Tool Generation Details */}
-                                {(matchedTiming.llmHttpRequestMs !== undefined || matchedTiming.llmToFirstToolDeltaMs !== undefined || matchedTiming.firstToolDeltaToToolCompleteMs !== undefined) && (
-                                  <div className="pt-1.5 border-t border-[#f5f5f4] grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px] text-[#777169]">
-                                    {matchedTiming.llmHttpRequestMs !== undefined && (
-                                      <div>
-                                        <span>HTTP Dispatch / Connect:</span>{' '}
-                                        <span className="font-bold text-[#0c0a09]">{matchedTiming.llmHttpRequestMs}ms</span>
-                                      </div>
-                                    )}
-                                    {matchedTiming.llmToFirstToolDeltaMs !== undefined && (
-                                      <div>
-                                        <span>LLM → Tool Call Delta:</span>{' '}
-                                        <span className="font-bold text-[#0c0a09]">{matchedTiming.llmToFirstToolDeltaMs}ms</span>
-                                      </div>
-                                    )}
-                                    {matchedTiming.firstToolDeltaToToolCompleteMs !== undefined && (
-                                      <div>
-                                        <span>Tool JSON Generation:</span>{' '}
-                                        <span className="font-bold text-amber-900">{matchedTiming.firstToolDeltaToToolCompleteMs}ms</span>
-                                      </div>
-                                    )}
+                            {/* Additional LLM & Tool Generation Details */}
+                            {(matchedTiming.llmHttpRequestMs !== undefined || matchedTiming.llmToFirstToolDeltaMs !== undefined || matchedTiming.firstToolDeltaToToolCompleteMs !== undefined) && (
+                              <div className="pt-1.5 border-t border-[#f5f5f4] grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px] text-[#777169]">
+                                {matchedTiming.llmHttpRequestMs !== undefined && (
+                                  <div>
+                                    <span>HTTP Dispatch / Connect:</span>{' '}
+                                    <span className="font-bold text-[#0c0a09]">{matchedTiming.llmHttpRequestMs}ms</span>
                                   </div>
                                 )}
+                                {matchedTiming.llmToFirstToolDeltaMs !== undefined && (
+                                  <div>
+                                    <span>LLM → Tool Call Delta:</span>{' '}
+                                    <span className="font-bold text-[#0c0a09]">{matchedTiming.llmToFirstToolDeltaMs}ms</span>
+                                  </div>
+                                )}
+                                {matchedTiming.firstToolDeltaToToolCompleteMs !== undefined && (
+                                  <div>
+                                    <span>Tool JSON Generation:</span>{' '}
+                                    <span className="font-bold text-amber-900">{matchedTiming.firstToolDeltaToToolCompleteMs}ms</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
-                                {/* TTS Stage Details */}
-                                <div className="pt-1.5 border-t border-[#f5f5f4] grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px] text-[#777169]">
-                                  <div>
-                                    <span>LLM Output → TTS Start:</span>{' '}
-                                    <span className="font-bold text-[#0c0a09]">{matchedTiming.llmFirstOutputToTtsStartMs || '—'}ms</span>
-                                  </div>
-                                  <div>
-                                    <span>TTS Start → First Audio:</span>{' '}
-                                    <span className="font-bold text-[#0c0a09]">{matchedTiming.ttsStartToFirstAudioMs || '—'}ms</span>
-                                  </div>
-                                  <div>
-                                    <span>E2E Speech Stop → Audio:</span>{' '}
-                                    <span className="font-bold text-emerald-800">{matchedTiming.speechStopToFirstAudioMs || '—'}ms</span>
-                                  </div>
+                            {/* TTS Stage Details */}
+                            <div className="pt-1.5 border-t border-[#f5f5f4] grid grid-cols-2 sm:grid-cols-3 gap-2 text-[10px] text-[#777169]">
+                              <div>
+                                <span>LLM Output → TTS Start:</span>{' '}
+                                <span className="font-bold text-[#0c0a09]">{matchedTiming.llmFirstOutputToTtsStartMs || '—'}ms</span>
+                              </div>
+                              <div>
+                                <span>TTS Start → First Audio:</span>{' '}
+                                <span className="font-bold text-[#0c0a09]">{matchedTiming.ttsStartToFirstAudioMs || '—'}ms</span>
+                              </div>
+                              <div>
+                                <span>E2E Speech Stop → Audio:</span>{' '}
+                                <span className="font-bold text-emerald-800">{matchedTiming.speechStopToFirstAudioMs || '—'}ms</span>
+                              </div>
+                            </div>
+
+                            {/* Tool details if this turn used a tool */}
+                            {matchedTiming.tools && matchedTiming.tools.length > 0 && (
+                              <div className="mt-2 pt-2 border-t border-[#f5f5f4] text-[11px] text-purple-900 bg-purple-50/60 p-2 rounded space-y-1">
+                                <div className="font-semibold">
+                                  Tool Handler Execution:{' '}
+                                  {matchedTiming.tools.map((t: any) => `${t.name} (${t.durationMs}ms)`).join(', ')}
                                 </div>
-
-                                {/* Tool details if this turn used a tool */}
-                                {matchedTiming.tools && matchedTiming.tools.length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-[#f5f5f4] text-[11px] text-purple-900 bg-purple-50/60 p-2 rounded space-y-1">
-                                    <div className="font-semibold">
-                                      Tool Handler Execution:{' '}
-                                      {matchedTiming.tools.map((t) => `${t.name} (${t.durationMs}ms)`).join(', ')}
-                                    </div>
-                                    {matchedTiming.toolResultToPostToolLlmStartMs !== undefined && (
-                                      <div className="text-[10px] text-purple-800">
-                                        Tool Result → Post-Tool LLM Dispatch: {matchedTiming.toolResultToPostToolLlmStartMs}ms
-                                        {matchedTiming.postToolLlmToFirstOutputMs !== undefined && (
-                                          <span> | Post-Tool LLM TTFT: {matchedTiming.postToolLlmToFirstOutputMs}ms</span>
-                                        )}
-                                        {matchedTiming.postToolTTSToFirstAudioMs !== undefined && (
-                                          <span> | Post-Tool TTS Audio: {matchedTiming.postToolTTSToFirstAudioMs}ms</span>
-                                        )}
-                                      </div>
+                                {matchedTiming.toolResultToPostToolLlmStartMs !== undefined && (
+                                  <div className="text-[10px] text-purple-800">
+                                    Tool Result → Post-Tool LLM Dispatch: {matchedTiming.toolResultToPostToolLlmStartMs}ms
+                                    {matchedTiming.postToolLlmToFirstOutputMs !== undefined && (
+                                      <span> | Post-Tool LLM TTFT: {matchedTiming.postToolLlmToFirstOutputMs}ms</span>
+                                    )}
+                                    {matchedTiming.postToolTTSToFirstAudioMs !== undefined && (
+                                      <span> | Post-Tool TTS Audio: {matchedTiming.postToolTTSToFirstAudioMs}ms</span>
                                     )}
                                   </div>
                                 )}
                               </div>
                             )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -800,7 +836,7 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
               )}
             </div>
 
-            {/* SAFE PHONE NUMBER TRACE DIAGNOSTICS (PART 8) */}
+            {/* SAFE PHONE NUMBER TRACE DIAGNOSTICS */}
             {phoneTraces.length > 0 && (
               <div className="el-card p-5 space-y-3">
                 <h4 className="text-sm font-semibold text-[#0c0a09] flex items-center gap-2">
@@ -838,7 +874,7 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
               </div>
             )}
 
-            {/* UNIFIED RAW CALL TIMELINE (PART 1 & 5) */}
+            {/* UNIFIED RAW CALL TIMELINE */}
             <div className="el-card p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-semibold text-[#0c0a09] flex items-center gap-2">

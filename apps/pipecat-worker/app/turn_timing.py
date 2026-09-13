@@ -175,6 +175,8 @@ class TurnTimingTracker:
         self.first_llm_output: Optional[float] = None  # First text token delta
         self.llm_first_releasable_text: Optional[float] = None  # First complete clause/sentence
         self.text_released_to_tts: Optional[float] = None  # Text released/dispatched to TTS
+        self.post_tool_text_released_to_tts: Optional[float] = None  # Post-tool text released to TTS
+        self.last_user_transcript: Optional[str] = None  # Recent user transcript for heuristic fallbacks
         self.tool_call_delta: Optional[float] = None  # First tool call delta
         self.last_tool_delta: Optional[float] = None  # Last tool call delta
         self.tool_delta_count: int = 0
@@ -253,6 +255,8 @@ class TurnTimingTracker:
         self.llm_first_provider_response = None
         self.first_llm_output = None
         self.llm_first_releasable_text = None
+        self.text_released_to_tts = None
+        self.post_tool_text_released_to_tts = None
         self.tool_call_delta = None
         self.last_tool_delta = None
         self.tool_delta_count = 0
@@ -330,6 +334,7 @@ class TurnTimingTracker:
         now = ts if ts is not None else time.perf_counter()
         self.stt_final = now
         if transcript:
+            self.last_user_transcript = transcript
             trace = safe_phone_trace(transcript)
             if trace.get("phoneObserved"):
                 self.active_phone_trace = trace
@@ -475,14 +480,18 @@ class TurnTimingTracker:
 
         self.record_event("tool_executed", end_time, tool=tool_name, durationMs=duration_ms, success=success)
 
-    def record_text_released_to_tts(self, ts: Optional[float] = None):
-        """Records timestamp when first aggregated text clause/sentence is released to TTS."""
-        if self.text_released_to_tts is not None:
-            return
+    def record_text_released_to_tts(self, ts: Optional[float] = None, is_post_tool: bool = False):
+        """Records timestamp when first aggregated text clause/sentence of the assistant response is released to TTS."""
         now = ts if ts is not None else time.perf_counter()
-        self.text_released_to_tts = now
-        self.llm_first_releasable_text = now
-        self.record_event("text_released_to_tts", now)
+        if is_post_tool or self.post_tool_llm_start is not None or self.has_pending_tool_activity():
+            if self.post_tool_text_released_to_tts is None:
+                self.post_tool_text_released_to_tts = now
+                self.record_event("post_tool_text_released_to_tts", now)
+        else:
+            if self.text_released_to_tts is None:
+                self.text_released_to_tts = now
+                self.llm_first_releasable_text = now
+                self.record_event("text_released_to_tts", now)
 
     def record_tts_start(self, ts: Optional[float] = None):
         now = ts if ts is not None else time.perf_counter()
@@ -688,8 +697,19 @@ class TurnTimingTracker:
         aggregation_to_first_audio_ms = diff_ms(effective_first_audio, self.user_aggregation_finalized, "aggregationToFirstAudioMs")
 
         # 14. llm_first_output_to_tts_start_ms / llmToTTSStartMs = tts_start - first_llm_output
-        first_output_ref = self.first_llm_output or self.first_post_tool_llm_output
-        llm_first_text_to_release_ms = diff_ms(self.text_released_to_tts, first_output_ref, "llmFirstTextToReleaseMs")
+        is_tool_turn = bool(self.tool_executions or self.post_tool_llm_start is not None)
+        if is_tool_turn and self.first_post_tool_llm_output is not None:
+            first_output_ref = self.first_post_tool_llm_output
+            release_ref = self.post_tool_text_released_to_tts or self.text_released_to_tts
+        else:
+            first_output_ref = self.first_llm_output
+            release_ref = self.text_released_to_tts
+
+        if release_ref is not None and first_output_ref is not None and release_ref >= first_output_ref:
+            llm_first_text_to_release_ms = diff_ms(release_ref, first_output_ref, "llmFirstTextToReleaseMs")
+        else:
+            llm_first_text_to_release_ms = None
+
         llm_first_output_to_tts_start_ms = diff_ms(self.tts_start, first_output_ref, "llmFirstOutputToTtsStartMs")
         llm_first_text_to_tts_start_ms = llm_first_output_to_tts_start_ms
         llm_to_tts_start_ms = llm_first_output_to_tts_start_ms

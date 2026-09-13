@@ -91,8 +91,8 @@ try:
         FunctionCallResultFrame,
     )
     from pipecat.pipeline.pipeline import Pipeline
-    from pipecat.pipeline.runner import WorkerRunner
-    from pipecat.pipeline.task import PipelineParams, PipelineWorker
+    from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+    from pipecat.workers.runner import WorkerRunner
     from pipecat.processors.aggregators.llm_response_universal import (
         LLMContext,
         LLMContextAggregatorPair,
@@ -395,6 +395,22 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             active_lang = self._language_manager.current_language
         elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
             active_lang = self._runtime_config.language.primary
+
+        # Fallback check against current user transcript if active_lang is still English
+        if (active_lang.startswith("en") or active_lang == "en-IN") and self._language_manager:
+            user_text = getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or ""
+            if user_text:
+                from app.language_manager import (
+                    DEVANAGARI_REGEX,
+                    HINDI_LATIN_MARKERS_REGEX,
+                    MARATHI_LATIN_MARKERS_REGEX,
+                    match_supported_language,
+                )
+                supported = self._language_manager.supported_languages
+                if any(l.startswith("hi") for l in supported) and (DEVANAGARI_REGEX.search(user_text) or HINDI_LATIN_MARKERS_REGEX.search(user_text)):
+                    active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
+                elif any(l.startswith("mr") for l in supported) and MARATHI_LATIN_MARKERS_REGEX.search(user_text):
+                    active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
 
         base_code = active_lang.split("-")[0]
         filler_phrase = (
@@ -757,24 +773,33 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                 await self.push_frame(frame, direction)
                 return
 
-            if self._turn_tracker:
-                self._turn_tracker.record_tts_stop()
-                if self._turn_tracker.record_turn_complete_once():
-                    self._turn_tracker.emit_turn_metrics_log()
-                    self._turn_tracker.start_new_turn()
+            # Guard: If this TTSStoppedFrame is from an early tool acknowledgement filler,
+            # do not complete or split the conversational turn; wait for the actual assistant response.
+            is_early_filler_stop = bool(
+                self._turn_tracker
+                and self._turn_tracker.early_ack_sent is not None
+                and self._turn_tracker.first_post_tool_llm_output is None
+            )
 
-            if self._assistant_chunks:
-                full_agent_text = "".join(self._assistant_chunks).strip()
-                if full_agent_text and self._transcript_collector:
-                    stt_t = self._timing_tracker.get("last_stt_transcript_time")
-                    first_tok_t = self._timing_tracker.get("first_llm_token_time")
-                    ttft_ms = (first_tok_t - stt_t) * 1000 if (first_tok_t and stt_t) else None
-                    self._transcript_collector.record_agent_message(
-                        response=full_agent_text,
-                        active_language=self._primary_language,
-                        ttft_ms=ttft_ms,
-                    )
-                self._assistant_chunks = []
+            if not is_early_filler_stop:
+                if self._turn_tracker:
+                    self._turn_tracker.record_tts_stop()
+                    if self._turn_tracker.record_turn_complete_once():
+                        self._turn_tracker.emit_turn_metrics_log()
+                        self._turn_tracker.start_new_turn()
+
+                if self._assistant_chunks:
+                    full_agent_text = "".join(self._assistant_chunks).strip()
+                    if full_agent_text and self._transcript_collector:
+                        stt_t = self._timing_tracker.get("last_stt_transcript_time")
+                        first_tok_t = self._timing_tracker.get("first_llm_token_time")
+                        ttft_ms = (first_tok_t - stt_t) * 1000 if (first_tok_t and stt_t) else None
+                        self._transcript_collector.record_agent_message(
+                            response=full_agent_text,
+                            active_language=self._primary_language,
+                            ttft_ms=ttft_ms,
+                        )
+                    self._assistant_chunks = []
 
         elif isinstance(frame, (FunctionCallsStartedFrame, FunctionCallInProgressFrame, FunctionCallResultFrame)):
             if self._turn_tracker:
@@ -1477,6 +1502,7 @@ async def websocket_plivo_endpoint(
 
         tts_service = SarvamTTSService(
             api_key=settings.SARVAM_API_KEY,
+            sample_rate=stream_sample_rate,
             settings=SarvamTTSService.Settings(**tts_settings_kwargs),
         )
         # Phase 21A & 22D: Early Release Phrase & Clause Aggregator (fast first chunk dispatch)
@@ -1491,7 +1517,15 @@ async def websocket_plivo_endpoint(
         @tts_service.event_handler("on_tts_request")
         async def on_tts_request(service, context_id: str, text: str):
             now_mono = time.perf_counter()
-            turn_tracker.record_text_released_to_tts(now_mono)
+            # Isolate early tool filler from assistant text release timing
+            is_early_filler = bool(
+                turn_tracker.early_ack_sent is not None
+                and turn_tracker.first_post_tool_llm_output is None
+                and turn_tracker.has_pending_tool_activity()
+            )
+            if not is_early_filler:
+                is_post_tool = bool(turn_tracker.has_pending_tool_activity() or turn_tracker.post_tool_llm_start is not None)
+                turn_tracker.record_text_released_to_tts(now_mono, is_post_tool=is_post_tool)
             logger.info(f"[TTS Release] Text released to TTS (context_id={context_id}, len={len(text)}): '{text[:40]}...'")
 
         @tts_service.event_handler("on_connected")

@@ -64,8 +64,32 @@ class RuntimeAgentConfigService:
         if not agent or not version:
             raise ValueError("Corrupt deployment: missing associated agent or version snapshot")
 
-        # Parse configuration snapshot
-        cfg = version.configuration or {}
+        # Query latest version to overlay authoritative mutable business variables without requiring redeploy
+        latest_v_stmt = (
+            select(AgentVersion)
+            .where(AgentVersion.agentId == agent.id)
+            .order_by(AgentVersion.versionNumber.desc())
+            .limit(1)
+        )
+        latest_v_res = await self.session.execute(latest_v_stmt)
+        latest_v = latest_v_res.scalar_one_or_none()
+
+        # Parse configuration: Start with deployed version snapshot for stable agent behavior
+        import copy
+        cfg = copy.deepcopy(version.configuration or {})
+
+        # Overlay authoritative current mutable variables, business information, and identity from latest version
+        if latest_v and latest_v.configuration and isinstance(latest_v.configuration, dict):
+            latest_cfg = latest_v.configuration
+            if "variables" in latest_cfg and latest_cfg["variables"]:
+                cfg["variables"] = copy.deepcopy(latest_cfg["variables"])
+            if "businessInformation" in latest_cfg and latest_cfg["businessInformation"]:
+                cfg["businessInformation"] = copy.deepcopy(latest_cfg["businessInformation"])
+            if "identity" in latest_cfg and isinstance(latest_cfg["identity"], dict):
+                if "identity" not in cfg or not isinstance(cfg["identity"], dict):
+                    cfg["identity"] = {}
+                cfg["identity"].update(copy.deepcopy(latest_cfg["identity"]))
+
         voice_cfg = cfg.get("voice", {})
         lang_cfg = cfg.get("language", {})
         runtime_cfg = cfg.get("runtime", {}) or cfg.get("runtimeSettings", {})
@@ -99,10 +123,20 @@ class RuntimeAgentConfigService:
             supported_langs=supported_langs
         )
 
-        greeting = (
+        raw_greeting = (
             identity_cfg.get("greeting")
             or cfg.get("greeting")
             or "Hello! How can I assist you today?"
+        )
+        input_vars_list = vars_cfg.get("input", vars_cfg.get("inputVariables", [])) if isinstance(vars_cfg, dict) else []
+        runtime_ctx_map = vars_cfg.get("runtimeContext", {}) if isinstance(vars_cfg, dict) else {}
+
+        from ..domain.variable_resolver import resolve_prompt_variables
+        resolved_greeting = resolve_prompt_variables(
+            raw_greeting,
+            variables=input_vars_list,
+            runtime_context=runtime_ctx_map,
+            config=cfg
         )
 
         # Build tools list dynamically from canonical tool registry and agent bindings
@@ -123,7 +157,7 @@ class RuntimeAgentConfigService:
             ),
             prompt=RuntimePromptConfig(
                 compiled_system_prompt=compiled_prompt,
-                greeting=greeting,
+                greeting=resolved_greeting,
                 timezone=timezone
             ),
             voice=RuntimeVoiceConfig(
@@ -161,8 +195,8 @@ class RuntimeAgentConfigService:
                 tools=resolved_tool_defs
             ),
             variables=RuntimeVariableConfig(
-                input_variables=vars_cfg.get("input", vars_cfg.get("inputVariables", [])),
-                output_variables=vars_cfg.get("output", vars_cfg.get("outputVariables", [])),
-                runtime_context=vars_cfg.get("runtimeContext", {})
+                input_variables=input_vars_list,
+                output_variables=vars_cfg.get("output", vars_cfg.get("outputVariables", [])) if isinstance(vars_cfg, dict) else [],
+                runtime_context=runtime_ctx_map
             )
         )

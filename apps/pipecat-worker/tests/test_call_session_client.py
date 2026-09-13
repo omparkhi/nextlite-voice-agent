@@ -455,7 +455,7 @@ def test_websocket_config_failure_no_active_session(client, monkeypatch):
 
 def test_websocket_successful_lifecycle_active_and_completed(client, monkeypatch):
     """Successful config creates ACTIVE session and completes with COMPLETED PATCH."""
-    from pipecat.pipeline.runner import WorkerRunner
+    from pipecat.workers.runner import WorkerRunner
 
     created_sessions: List[Dict[str, Any]] = []
     updated_sessions: List[Dict[str, Any]] = []
@@ -536,7 +536,7 @@ def test_websocket_successful_lifecycle_active_and_completed(client, monkeypatch
 
 def test_websocket_pipeline_failure_marks_failed(client, monkeypatch):
     """Pipeline fatal exception marks call session as FAILED."""
-    from pipecat.pipeline.runner import WorkerRunner
+    from pipecat.workers.runner import WorkerRunner
 
     updated_sessions: List[Dict[str, Any]] = []
 
@@ -641,7 +641,7 @@ def test_trusted_call_context_immutability():
 
 def test_caller_cannot_override_tenant_or_agent(client, monkeypatch):
     """Caller injecting malicious tenantId in query params or start payload is ignored."""
-    from pipecat.pipeline.runner import WorkerRunner
+    from pipecat.workers.runner import WorkerRunner
 
     created_sessions: List[Dict[str, Any]] = []
 
@@ -703,7 +703,7 @@ def test_caller_cannot_override_tenant_or_agent(client, monkeypatch):
 
 def test_dynamic_multi_tenant_session_isolation(client, monkeypatch):
     """Multi-tenant isolation: Tenant A session and Tenant B session do not crosstalk."""
-    from pipecat.pipeline.runner import WorkerRunner
+    from pipecat.workers.runner import WorkerRunner
 
     created_sessions: Dict[str, Dict[str, Any]] = {}
     updated_sessions: Dict[str, Dict[str, Any]] = {}

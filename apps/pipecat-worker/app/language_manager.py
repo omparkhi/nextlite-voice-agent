@@ -292,10 +292,7 @@ def build_language_instruction(language_code: str) -> str:
     return (
         f"\n\n=== ACTIVE CONVERSATION LANGUAGE POLICY ===\n"
         f"- Active Conversation Language: {lang_name} ({norm})\n"
-        f"{code_switching_guidance}\n"
-        f"- LATEST USER INTENT: Always prioritize answering the user's latest question directly first (e.g. today's date, operating hours, fees/pricing, location) before continuing any prior conversational step.\n"
-        f"- SHORT UTTERANCES: Interpret short utterances (e.g. \"हाँ\", \"नहीं\", \"नहीं नहीं\", \"Okay\") in context of the previous turn rather than treating them as language changes.\n"
-        f"- PHONE NUMBER SEMANTICS: If the caller says \"यही नंबर है\" or \"use this number\", use incoming caller phone if available; if not available, politely ask for their number without claiming fake caller ID."
+        f"{code_switching_guidance}"
     )
 
 def build_full_instructions(base_instructions: str, language_code: str) -> str:
@@ -396,8 +393,17 @@ class ConversationLanguageManager:
                 details=reason_detail
             )
             
-        if detected_language_code and detected_language_code != "unknown":
-            matched = match_supported_language(detected_language_code, self._supported)
+        candidate_code = detected_language_code
+        if not candidate_code or candidate_code == "unknown":
+            trimmed = (transcript or "").strip()
+            if trimmed:
+                if any(normalize_language_code(l).startswith("mr") for l in self._supported) and MARATHI_LATIN_MARKERS_REGEX.search(trimmed):
+                    candidate_code = "mr-IN"
+                elif any(normalize_language_code(l).startswith("hi") for l in self._supported) and (DEVANAGARI_REGEX.search(trimmed) or HINDI_LATIN_MARKERS_REGEX.search(trimmed)):
+                    candidate_code = "hi-IN"
+
+        if candidate_code and candidate_code != "unknown":
+            matched = match_supported_language(candidate_code, self._supported)
             if matched:
                 if matched != self._current:
                     if is_reliable_automatic_switch(transcript, matched, self._current):
@@ -432,7 +438,7 @@ class ConversationLanguageManager:
                 current_language=self._current,
                 reason="none",
                 decision="REJECTED",
-                details=f"Detected language ({detected_language_code}) not in configured supportedLanguages"
+                details=f"Detected language ({candidate_code}) not in configured supportedLanguages"
             )
             
         return ProcessTurnResult(

@@ -78,7 +78,7 @@ def test_context_and_aggregator_pair_init():
 def test_phase4_pipeline_assembly():
     """Test complete Phase 4 conversational voice pipeline assembly with Pipecat Worker."""
     from pipecat.pipeline.pipeline import Pipeline
-    from pipecat.pipeline.task import PipelineParams, PipelineWorker
+    from pipecat.pipeline.worker import PipelineParams, PipelineWorker
     from pipecat.processors.aggregators.llm_response_universal import (
         LLMContext,
         LLMContextAggregatorPair,

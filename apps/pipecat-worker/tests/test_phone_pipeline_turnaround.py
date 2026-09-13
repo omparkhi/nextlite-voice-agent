@@ -23,8 +23,8 @@ from pipecat.turns.user_turn_strategies import (
     ExternalUserTurnStopStrategy,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import WorkerRunner
-from pipecat.pipeline.task import PipelineParams, PipelineWorker
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.workers.runner import WorkerRunner
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 

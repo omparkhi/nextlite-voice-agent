@@ -54,6 +54,9 @@ def create_knowledge_tool_factory(
 
         if not raw_query or not isinstance(raw_query, str) or not raw_query.strip():
             failure_result = {
+                "status": "error",
+                "knowledge_found": False,
+                "information": [],
                 "results": [],
                 "error": "Query parameter must not be empty.",
             }
@@ -77,18 +80,26 @@ def create_knowledge_tool_factory(
             
             if not response.results:
                 result = {
+                    "status": "success",
+                    "knowledge_found": False,
+                    "information": [],
                     "results": [],
                     "message": "No relevant information found in the knowledge base for this query.",
                 }
             else:
                 sanitized_results = []
+                info_list = []
                 for item in response.results:
                     sanitized_results.append({
                         "content": item.content,
                         "relevanceScore": round(item.score, 2),
                     })
+                    info_list.append(item.content)
                 
                 result = {
+                    "status": "success",
+                    "knowledge_found": True,
+                    "information": info_list,
                     "results": sanitized_results,
                 }
                 
@@ -105,6 +116,9 @@ def create_knowledge_tool_factory(
             )
             
             result = {
+                "status": "error",
+                "knowledge_found": False,
+                "information": [],
                 "results": [],
                 "error": safe_error_message,
             }

@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     POC_SECRET_KEY: str = ""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "apps/pipecat-worker/.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )

@@ -188,34 +188,25 @@ def validate_variable_value(val: Any, var_type: str) -> bool:
             
     return True
 
-def resolve_prompt_variables(
-    text: str,
+def build_effective_variable_map(
     variables: Optional[List[Dict[str, Any]]] = None,
     runtime_context: Optional[Dict[str, Any]] = None,
     config: Optional[Dict[str, Any]] = None
-) -> str:
+) -> Dict[str, str]:
     """
-    Resolves variable placeholders {variableName} within prompt/instruction text.
+    Builds an authoritative map of effective variable names and their current string values.
     Enforces the precedence:
-      1. Core variable defaults
-      2. Configuration identity / businessInformation fields
-      3. Agent-specific configured variables (Input Variables)
-      4. Trusted runtime / session context (highest precedence for dynamic values)
+      1. Configuration identity / businessInformation fields (Base)
+      2. Agent-specific configured variables (Input Variables)
+      3. Trusted runtime / session context (Highest precedence for dynamic values)
     """
-    if not text or not isinstance(text, str):
-        return text or ""
-    
-    # 1. Normalize copied variable references (e.g. svguserName -> {userName})
-    normalized = normalize_variable_references(text)
-    
-    # 2. Build resolution map
     resolution_map: Dict[str, str] = {}
-            
+
     # Tier 1: Configuration identity / business info
     if config and isinstance(config, dict):
         ident = config.get("identity") or {}
         biz = config.get("businessInformation") or {}
-        
+
         if ident.get("agentName") or ident.get("displayName") or ident.get("name"):
             resolution_map["agentName"] = str(ident.get("agentName") or ident.get("displayName") or ident.get("name"))
         if ident.get("businessName") or biz.get("businessName"):
@@ -233,7 +224,7 @@ def resolve_prompt_variables(
         if biz.get("customFacts") and isinstance(biz["customFacts"], dict):
             for k, v in biz["customFacts"].items():
                 resolution_map[k] = str(v)
-                
+
     # Tier 2: Configured Agent Variables (input variables)
     if variables and isinstance(variables, list):
         for var in variables:
@@ -243,13 +234,37 @@ def resolve_prompt_variables(
                     val = var.get("defaultValue") if var.get("defaultValue") is not None else var.get("value")
                     if val is not None and str(val).strip():
                         resolution_map[k] = str(val).strip()
-                        
+
     # Tier 3: Trusted Runtime Context
     if runtime_context and isinstance(runtime_context, dict):
         for k, v in runtime_context.items():
             if v is not None:
                 resolution_map[k] = str(v)
-                
+
+    return resolution_map
+
+def resolve_prompt_variables(
+    text: str,
+    variables: Optional[List[Dict[str, Any]]] = None,
+    runtime_context: Optional[Dict[str, Any]] = None,
+    config: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Resolves variable placeholders {variableName} within prompt/instruction text.
+    """
+    if not text or not isinstance(text, str):
+        return text or ""
+
+    # 1. Normalize copied variable references (e.g. svguserName -> {userName})
+    normalized = normalize_variable_references(text)
+
+    # 2. Build resolution map
+    resolution_map = build_effective_variable_map(
+        variables=variables,
+        runtime_context=runtime_context,
+        config=config
+    )
+
     # 3. Replace {varName} and {{varName}}
     def replace_placeholder(match: re.Match) -> str:
         var_name = match.group(1)
@@ -257,7 +272,7 @@ def resolve_prompt_variables(
             return resolution_map[var_name]
         # If not in map, preserve placeholder for future runtime resolution or detection
         return match.group(0)
-    
+
     # Matches {varName} or {{varName}}
     resolved = re.sub(r"\{+([a-zA-Z0-9_]+)\}+", replace_placeholder, normalized)
     return resolved
