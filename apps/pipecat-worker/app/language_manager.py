@@ -28,14 +28,16 @@ LANGUAGE_DISPLAY_NAMES: Dict[str, str] = {
     "brx-IN": "Bodo", "brx": "Bodo",
 }
 
-def normalize_language_code(code: str) -> str:
+def normalize_language_code(code: Any) -> str:
     if not code:
         return "en-IN"
-    trimmed = code.strip().replace("_", "-")
-    if trimmed.lower() == "unknown":
+    if hasattr(code, "value"):
+        code = code.value
+    code_str = str(code).strip().replace("_", "-")
+    if code_str.lower() == "unknown":
         return "unknown"
 
-    lower = trimmed.lower()
+    lower = code_str.lower()
     short_map = {
         "en": "en-IN", "hi": "hi-IN", "mr": "mr-IN", "bn": "bn-IN",
         "gu": "gu-IN", "kn": "kn-IN", "ml": "ml-IN", "od": "od-IN", "or": "od-IN",
@@ -48,17 +50,17 @@ def normalize_language_code(code: str) -> str:
     if lower in short_map:
         return short_map[lower]
         
-    parts = trimmed.split("-")
+    parts = code_str.split("-")
     if len(parts) >= 2 and parts[0] and parts[1]:
         return f"{parts[0].lower()}-{parts[1].upper()}"
         
-    return trimmed
+    return code_str
 
-def get_language_display_name(code: str) -> str:
+def get_language_display_name(code: Any) -> str:
     if not code:
         return "English"
     normalized = normalize_language_code(code)
-    return LANGUAGE_DISPLAY_NAMES.get(normalized) or LANGUAGE_DISPLAY_NAMES.get(code) or code
+    return LANGUAGE_DISPLAY_NAMES.get(normalized) or LANGUAGE_DISPLAY_NAMES.get(str(code)) or str(code)
 
 def match_supported_language(candidate: str, supported_languages: List[str]) -> Optional[str]:
     if not candidate or not supported_languages:
@@ -219,31 +221,111 @@ def detect_explicit_language_request(text: str) -> Optional[str]:
 INDIC_SCRIPT_REGEX = re.compile(r"[\u0900-\u0D7F]")
 DEVANAGARI_REGEX = re.compile(r"[\u0900-\u097F]")
 
-MARATHI_DEVANAGARI_REGEX = re.compile(
-    r"\b(?:आहे|आहेत|नाही|नाहीत|नाव|लिहायचं|लिहायचे|लिहायची|लिहाचं|करायचं|करायचे|करायची|हवं|हवा|हवी|पाहिजे|भेटायचं|घ्यायचं|सांगा|सांग|बोला|बोल|द्या|कधी|कुठे|कसा|कशी|कसे|कोण|काय|किती|माझं|माझे|माझी|मला|तुम्हाला|आम्हाला|त्यांना|होता|होती|होते|मराठी|मराठीत|दुपारी|सकाळी|संध्याकाळी|उद्या|परवा|चालू|पत्ता|दवाखाना|तपासणी|नोंदणी|घ्या|द्या)\b|"
-    r"(?:ायचं|ायची|ायचा|ायचे|ावं|णार|लोय|ल्या|मध्ये|बद्दल|साठी|कडून|वरून)\b",
-    re.IGNORECASE
-)
+HINDI_DEVANAGARI_TOKENS = {
+    "है", "हैं", "था", "थी", "थे", "होगी", "होगा", "होंगे", "हूँ", "हू", "चाहिए",
+    "बताओ", "बताइए", "करो", "कीजिए", "कर", "करना", "करेंगे", "करूँगा", "सकता", "सकती", "सकते",
+    "सकेंगे", "मिलना", "मिलेंगे", "मिलेगा", "मिलेगी", "लेना", "देंगे", "दीजिए", "दे", "दो",
+    "कल", "आज", "परसों", "समय", "तारीख", "नहीं", "हाँ", "मुझे", "मेरा", "मेरी", "मेरे",
+    "आप", "आपको", "आपका", "आपकी", "आपके", "हम", "हमारा", "हमारी", "हमारे", "तुम", "तुम्हारा",
+    "तुम्हारी", "तुम्हारे", "कहाँ", "कौन", "कौनसा", "कितना", "कितनी", "कितने", "बोलो", "बोल",
+    "बात", "लिए", "में", "से", "को", "का", "की", "के", "नाम", "लिखना", "दर्ज", "करवाना",
+    "अपॉइंटमेंट", "हिंदी", "हिन्दी", "क्या", "कब", "कैसे", "पूछना", "लगेगी", "लगेगा", "फीस",
+    "डॉक्टर", "दवाखाना", "क्लीनिक", "टाइम", "स्लॉट", "सुबह", "दोपहर", "शाम", "बजे", "ठीक",
+    "अच्छा", "जी", "नमस्ते", "शुक्रिया", "धन्यवाद", "आऊँगा", "आएँगे", "आना"
+}
 
-HINDI_DEVANAGARI_REGEX = re.compile(
-    r"\b(?:है|हैं|था|थी|थे|होगी|होगा|होंगे|चाहिए|बताओ|बताइए|करो|कीजिए|सकता|सकती|सकते|मिलना|लेना|देंगे|दीजिए|कल|परसों|समय|तारीख|नहीं|हाँ|मुझे|आप|आपको|कहाँ|कौन|कौनसा|कितना|कितनी|कितने|बोलो|बात|लिए|में|से|को|नाम|लिखना|दर्ज|करवाना|अपॉइंटमेंट|हिंदी|हिन्दी)\b",
-    re.IGNORECASE
-)
+MARATHI_DEVANAGARI_TOKENS = {
+    "आहे", "आहेत", "नाही", "नाहीत", "नाव", "वय", "पत्ता", "दवाखाना", "तपासणी",
+    "नोंदणी", "करा", "कराल", "करायचं", "करायचे", "करायची", "लिहायचं", "लिहायचे",
+    "लिहायची", "लिहाचं", "भेटायचं", "भेटायचे", "घ्यायचं", "द्या", "द्यायचं",
+    "सांगा", "सांग", "बोला", "बोल", "हवं", "हवा", "हवी", "पाहिजे", "कधी", "कुठे",
+    "कसा", "कशी", "कसे", "कोण", "काय", "किती", "माझं", "माझे", "माझी", "मला",
+    "तुम्हाला", "तुमचं", "तुमचा", "तुमची", "तुम्ही", "आम्हाला", "आमचं", "आमचा", "आमची",
+    "त्यांना", "होता", "होती", "होते", "होतं", "झाला", "झाली", "झालं", "झाले", "केलं",
+    "केला", "केली", "केले", "उद्या", "परवा", "सकाळी", "दुपारी", "संध्याकाळी",
+    "रात्री", "वाजता", "मध्ये", "बद्दल", "साठी", "वरून", "कडून", "चालू", "चालेल",
+    "मराठी", "मराठीत", "हो", "नक्की"
+}
+
+MARATHI_SUFFIXES = ("ायचं", "ायची", "ायचे", "ायचा", "ावं", "णार", "लोय", "ल्या", "च्या", "मध्ये")
+
+HINDI_LATIN_TOKENS = {
+    "kya", "kab", "kaise", "kahan", "kaha", "kaun", "kaunsa", "kitna", "kitni", "kitne",
+    "aap", "aapka", "aapki", "aapke", "mujhe", "mera", "meri", "mere", "hum", "humko",
+    "humara", "humari", "chahiye", "hai", "hain", "tha", "thi", "the", "hoga", "hogi", "hoge",
+    "batao", "bataiye", "karo", "kijiye", "kar", "kiya", "ki", "diya", "di", "de", "do",
+    "liya", "li", "le", "sakta", "sakti", "sakte", "skte", "skta", "skti", "milna", "milenge",
+    "milega", "milegi", "lena", "denge", "dijiye", "aaj", "kal", "samay", "tarikh", "nahi",
+    "nahin", "na", "haan", "ha", "bhai", "bolo", "baat", "liye", "mein", "mai", "me", "se",
+    "ko", "kyu", "kyon", "theek", "achha", "accha", "acche", "abhi", "toh", "sahab",
+    "aunga", "aungi", "subah", "dopahar", "shaam"
+}
+
+MARATHI_LATIN_TOKENS = {
+    "madhe", "cha", "chi", "che", "chya", "ahe", "aahe", "ahet", "hota", "hoti", "hote", "hotam",
+    "kay", "hava", "have", "havi", "sanga", "bola", "shaktat", "shakta", "bhetayche", "ghyayche",
+    "dya", "dyayche", "udya", "divas", "yancha", "yanchi", "sathi", "mala", "tumhi", "amhi",
+    "tumcha", "tumchi", "tumche", "amcha", "amchi", "kiti", "koni", "konti", "kadhi", "kuthun",
+    "kuthe", "lihacha", "lihayche", "pahije", "zhala", "jhala", "zhali", "jhali", "zhale",
+    "jhale", "kela", "keli", "kele", "kel", "nahi", "nahit", "ho", "nakki", "aata", "pan",
+    "chaleel", "chalel"
+}
+
+ENGLISH_WORDS_TOKENS = {
+    "i", "you", "he", "she", "it", "we", "they", "my", "your", "his", "her", "our", "their",
+    "what", "when", "where", "which", "who", "whom", "whose", "why", "how", "is", "am", "are",
+    "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will",
+    "would", "shall", "should", "can", "could", "may", "might", "must", "doctor", "clinic",
+    "appointment", "schedule", "available", "cancel", "reschedule", "timing", "morning",
+    "evening", "afternoon", "please", "thank", "thanks", "hello", "hey", "want", "book",
+    "need", "like", "today", "tomorrow"
+}
 
 HINDI_LATIN_MARKERS_REGEX = re.compile(
-    r"\b(?:kya|aap|aapka|aapki|aapke|mujhe|hum|humko|mera|meri|mere|tumhara|tumhari|tumhare|sab|sabko|chahiye|hai|hain|tha|thi|the|hoga|hogi|hoge|batao|bataiye|karo|kijiye|kar|kiya|ki|diya|di|de|liya|li|le|sakta|sakti|sakte|skte|skta|skti|milna|lena|denge|dijiye|aaj|kal|samay|tarikh|nahi|nahin|na|haan|ha|bhai|kaha|kahan|kaun|kaunsa|kitna|kitni|kitne|bolo|baat|liye|mein|mai|me|se|ko|kyu|kyon|kaise|theek|achha|accha|acche|abhi|toh)\b",
+    r"\b(?:" + "|".join(sorted(HINDI_LATIN_TOKENS, key=len, reverse=True)) + r")\b",
     re.IGNORECASE
 )
 
 MARATHI_LATIN_MARKERS_REGEX = re.compile(
-    r"\b(?:madhe|cha|chi|che|chya|ahe|aahe|ahet|hota|hoti|hote|kay|hava|have|havi|sanga|bola|shaktat|shakta|bhetayche|ghyayche|dya|udya|divas|yancha|yanchi|sathi|mala|tumhi|amhi|kiti|koni|konti|kadhi|kuthun|kuthe|lihacha|lihayche|pahije|zhala|jhala|zhali|jhali|zhale|jhale|kela|keli|kele|kel|nahi|nahit|ho|nakki|nakkki|aata|pan)\b",
+    r"\b(?:" + "|".join(sorted(MARATHI_LATIN_TOKENS, key=len, reverse=True)) + r")\b",
+    re.IGNORECASE
+)
+
+HINDI_DEVANAGARI_REGEX = re.compile(
+    r"(?:^|[^\w\u0900-\u097F])(?:" + "|".join(sorted(HINDI_DEVANAGARI_TOKENS, key=len, reverse=True)) + r")(?=[^\w\u0900-\u097F]|$)",
+    re.IGNORECASE
+)
+
+MARATHI_DEVANAGARI_REGEX = re.compile(
+    r"(?:^|[^\w\u0900-\u097F])(?:" + "|".join(sorted(MARATHI_DEVANAGARI_TOKENS, key=len, reverse=True)) + r")(?=[^\w\u0900-\u097F]|$)",
     re.IGNORECASE
 )
 
 ENGLISH_WORDS_MARKERS_REGEX = re.compile(
-    r"\b(?:i|you|he|she|it|we|they|my|your|his|her|our|their|what|when|where|which|who|whom|whose|why|how|is|am|are|was|were|be|been|being|have|has|had|do|does|did|will|would|shall|should|can|could|may|might|must|doctor|clinic|appointment|schedule|available|cancel|reschedule|timing|morning|evening|afternoon|please|thank|thanks|hello|hey)\b",
+    r"\b(?:" + "|".join(sorted(ENGLISH_WORDS_TOKENS, key=len, reverse=True)) + r")\b",
     re.IGNORECASE
 )
+
+def extract_language_token_scores(text: str) -> Dict[str, int]:
+    if not text or not isinstance(text, str):
+        return {"hi": 0, "mr": 0, "en": 0}
+    clean = re.sub(r"[^\w\s\u0900-\u0D7F]", " ", text)
+    tokens = [w.strip() for w in clean.split() if w.strip()]
+    
+    hi_score = 0
+    mr_score = 0
+    en_score = 0
+    
+    for t in tokens:
+        lower = t.lower()
+        if t in HINDI_DEVANAGARI_TOKENS or lower in HINDI_LATIN_TOKENS:
+            hi_score += 1
+        if t in MARATHI_DEVANAGARI_TOKENS or lower in MARATHI_LATIN_TOKENS or any(t.endswith(s) for s in MARATHI_SUFFIXES):
+            mr_score += 1
+        if lower in ENGLISH_WORDS_TOKENS:
+            en_score += 1
+            
+    return {"hi": hi_score, "mr": mr_score, "en": en_score}
 
 def is_reliable_automatic_switch(transcript: str, candidate_language: str, current_language: str) -> bool:
     if not transcript or not isinstance(transcript, str):
@@ -262,27 +344,26 @@ def is_reliable_automatic_switch(transcript: str, candidate_language: str, curre
     cand_base = cand_norm.split("-")[0].lower() if cand_norm else ""
     curr_base = curr_norm.split("-")[0].lower() if curr_norm else ""
     
+    scores = extract_language_token_scores(trimmed)
+    
     if cand_base == "en" and curr_base != "en":
         if INDIC_SCRIPT_REGEX.search(trimmed):
             return False
-        if curr_base == "hi" and (HINDI_DEVANAGARI_REGEX.search(trimmed) or HINDI_LATIN_MARKERS_REGEX.search(trimmed)):
+        if scores["hi"] > 0 or scores["mr"] > 0:
             return False
-        if curr_base == "mr" and (MARATHI_DEVANAGARI_REGEX.search(trimmed) or MARATHI_LATIN_MARKERS_REGEX.search(trimmed)):
-            return False
-        # To reliably auto-switch to English from an Indian language, require authentic English markers
-        if not ENGLISH_WORDS_MARKERS_REGEX.search(trimmed):
+        if scores["en"] == 0:
             return False
         return len(words) >= 2
 
     if cand_base == "mr":
-        if MARATHI_DEVANAGARI_REGEX.search(trimmed) or MARATHI_LATIN_MARKERS_REGEX.search(trimmed):
+        if scores["mr"] > scores["hi"] and scores["mr"] >= 1:
             return True
-        return len(words) >= 2
+        return len(words) >= 2 and scores["mr"] >= 1
 
     if cand_base == "hi":
-        if HINDI_DEVANAGARI_REGEX.search(trimmed) or HINDI_LATIN_MARKERS_REGEX.search(trimmed):
+        if scores["hi"] > scores["mr"] and scores["hi"] >= 1:
             return True
-        return len(words) >= 2
+        return len(words) >= 2 and scores["hi"] >= 1
         
     return len(words) >= 2
 
@@ -497,8 +578,10 @@ class ConversationLanguageManager:
                 mr_supported = any(normalize_language_code(l).startswith("mr") for l in self._supported)
                 en_supported = any(normalize_language_code(l).startswith("en") for l in self._supported)
 
-                hi_matches = (len(HINDI_DEVANAGARI_REGEX.findall(trimmed)) + len(HINDI_LATIN_MARKERS_REGEX.findall(trimmed))) if hi_supported else 0
-                mr_matches = (len(MARATHI_DEVANAGARI_REGEX.findall(trimmed)) + len(MARATHI_LATIN_MARKERS_REGEX.findall(trimmed))) if mr_supported else 0
+                scores = extract_language_token_scores(trimmed)
+                hi_matches = scores["hi"] if hi_supported else 0
+                mr_matches = scores["mr"] if mr_supported else 0
+                en_matches = scores["en"] if en_supported else 0
 
                 if hi_supported and hi_matches > mr_matches:
                     candidate_code = "hi-IN"
@@ -519,13 +602,13 @@ class ConversationLanguageManager:
                 elif any(normalize_language_code(l).startswith("kn") for l in self._supported) and re.search(r"[\u0C80-\u0CFF]", trimmed):
                     candidate_code = "kn-IN"
                 elif en_supported and not INDIC_SCRIPT_REGEX.search(trimmed):
-                    if ENGLISH_WORDS_MARKERS_REGEX.search(trimmed):
+                    if en_matches > 0:
                         candidate_code = "en-IN"
                     else:
                         candidate_code = self._current
                 elif DEVANAGARI_REGEX.search(trimmed):
-                    # Default Devanagari fallback if neither matched: check if primary is mr vs hi
-                    candidate_code = self._primary if self._primary.startswith("mr") else "hi-IN"
+                    # If neither matched specific tokens, keep current language to avoid random flips
+                    candidate_code = self._current
 
         if candidate_code and candidate_code != "unknown":
             matched = match_supported_language(candidate_code, self._supported)
