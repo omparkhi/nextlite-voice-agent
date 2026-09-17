@@ -2539,16 +2539,18 @@ async def websocket_plivo_endpoint(
 
         # 8. Instantiate Sarvam Realtime STT Service
         startup_tracker.record_stage("stt_service_create_start")
+        initial_stt_lang = language_manager.get_stt_initial_language()
         logger.info(
             f"[SarvamRealtimeSTT Config] Initializing SarvamRealtimeSTTService | model={stt_model} | "
-            f"stream_type=fast | sample_rate={stream_sample_rate} | language={language_manager.current_language}"
+            f"stream_type=fast | sample_rate={stream_sample_rate} | language={initial_stt_lang} "
+            f"(primary={language_manager.primary_language})"
         )
         stt_service = SarvamRealtimeSTTService(
             api_key=settings.SARVAM_API_KEY,
             sample_rate=stream_sample_rate,
             settings=SarvamRealtimeSTTService.Settings(
                 model=stt_model,
-                language_code=language_manager.current_language or "en-IN",
+                language_code=initial_stt_lang,
                 stream_type="fast",
             ),
             endpointing="vad",

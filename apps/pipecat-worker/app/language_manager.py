@@ -86,6 +86,7 @@ EXPLICIT_LANGUAGE_RULES = [
     {
         "languageCode": "en-IN",
         "patterns": [
+            re.compile(r"^(?:english|इंग्लिश|इंग्रजी)\s*(?:please|me|mein|madhe|it)?$", re.IGNORECASE),
             re.compile(r"(?:can|could|please|let'?s|would)\s+(?:you\s+)?(?:speak|talk|continue|switch)\s+(?:in|to|with)\s+english", re.IGNORECASE),
             re.compile(r"(?:speak|talk|continue|switch)\s+(?:in|to)\s+english", re.IGNORECASE),
             re.compile(r"talk\s+to\s+me\s+in\s+english", re.IGNORECASE),
@@ -104,6 +105,7 @@ EXPLICIT_LANGUAGE_RULES = [
     {
         "languageCode": "hi-IN",
         "patterns": [
+            re.compile(r"^(?:hindi|हिन्दी|हिंदी)\s*(?:please|me|mein|mai|karo|bolo)?$", re.IGNORECASE),
             re.compile(r"(?:क्या\s*आप\s*)?(?:हिंदी|हिन्दी)\s*में\s*(?:बात\s*कर\s*सकते\s*हो|बात\s*कर\s*सकते\s*हैं|बात\s*करो|बोलो|बोल\s*सकते\s*हो|बोल\s*सकते\s*हैं|बात\s*कीजिए|संभाषण|बताओ|बताइए)", re.IGNORECASE),
             re.compile(r"(?:हिंदी|हिन्दी)\s*(?:बोलो|बताओ|बताइए|बोल\s*सकते\s*हो|बात\s*करो)", re.IGNORECASE),
             re.compile(r"(?:kya\s+)?(?:aap\s+)?(?:hindi|हिन्दी|हिंदी)\s*(?:me(?:in)?|mai|m)?\s*(?:baat\s*kar\s*sakte\s*ho|baat\s*kr\s*skte\s*ho|baat\s*kar\s*sakte\s*hain|baat\s*kr\s*skte\s*hn|baat\s*karo|baat\s*kijiye|bolo|bol\s*sakte\s*ho|bol\s*skte\s*ho|bolte\s*ho|aati\s*hai|batao|bataiye)", re.IGNORECASE),
@@ -122,6 +124,7 @@ EXPLICIT_LANGUAGE_RULES = [
     {
         "languageCode": "mr-IN",
         "patterns": [
+            re.compile(r"^(?:marathi|मराठी)\s*(?:please|madhe|t|it|bola|sanga)?$", re.IGNORECASE),
             re.compile(r"(?:तुम्ही\s*)?मराठीत\s*(?:बोला|बोल|सांगा|बोलू\s*शकता\s*का|संभाषण\s*करा)", re.IGNORECASE),
             re.compile(r"मराठी\s*मध्ये\s*(?:बोला|बोल|सांगा|बोलू\s*शकता\s*का)", re.IGNORECASE),
             re.compile(r"मराठी\s*भाषा\s*वापरा", re.IGNORECASE),
@@ -189,7 +192,7 @@ EXPLICIT_LANGUAGE_RULES = [
     {
         "languageCode": "te-IN",
         "patterns": [
-            re.compile(r"తెలుగులో\s*(?:మాట్లాడండి|చెప్పండి)", re.IGNORECASE),
+            re.compile(r"తెలుగులో\s*(?:ಮಾట్లాಡండి|చెప్పండి)", re.IGNORECASE),
             re.compile(r"(?:speak|talk|continue|switch)\s+(?:in|to)\s+telugu", re.IGNORECASE),
             re.compile(r"\btelugulo\s+matladandi\b", re.IGNORECASE),
         ]
@@ -228,12 +231,17 @@ HINDI_DEVANAGARI_REGEX = re.compile(
 )
 
 HINDI_LATIN_MARKERS_REGEX = re.compile(
-    r"\b(?:kya|aap|mujhe|hum|humko|chahiye|hai|hain|tha|thi|the|hoga|hogi|hoge|batao|bataiye|karo|kijiye|sakta|sakti|sakte|skte|skta|skti|milna|lena|denge|dijiye|aaj|kal|samay|tarikh|nahi|nahin|haan|bhai|kaha|kahan|kaun|kaunsa|kitna|kitni|kitne|bolo|baat|liye|mein|mai|se|ko|kyu|kyon|kaise)\b",
+    r"\b(?:kya|aap|aapka|aapki|aapke|mujhe|hum|humko|mera|meri|mere|tumhara|tumhari|tumhare|sab|sabko|chahiye|hai|hain|tha|thi|the|hoga|hogi|hoge|batao|bataiye|karo|kijiye|kar|kiya|ki|diya|di|de|liya|li|le|sakta|sakti|sakte|skte|skta|skti|milna|lena|denge|dijiye|aaj|kal|samay|tarikh|nahi|nahin|na|haan|ha|bhai|kaha|kahan|kaun|kaunsa|kitna|kitni|kitne|bolo|baat|liye|mein|mai|me|se|ko|kyu|kyon|kaise|theek|achha|accha|acche|abhi|toh)\b",
     re.IGNORECASE
 )
 
 MARATHI_LATIN_MARKERS_REGEX = re.compile(
-    r"\b(?:madhe|cha|chi|che|chya|ahe|aahe|ahet|hota|hoti|kay|hava|have|havi|sanga|bola|shaktat|shakta|bhetayche|ghyayche|dya|udya|divas|yancha|yanchi|sathi|mala|tumhi|amhi|kiti|koni|konti|kadhi|kuthun|kuthe|lihacha|lihayche|pahije)\b",
+    r"\b(?:madhe|cha|chi|che|chya|ahe|aahe|ahet|hota|hoti|hote|kay|hava|have|havi|sanga|bola|shaktat|shakta|bhetayche|ghyayche|dya|udya|divas|yancha|yanchi|sathi|mala|tumhi|amhi|kiti|koni|konti|kadhi|kuthun|kuthe|lihacha|lihayche|pahije|zhala|jhala|zhali|jhali|zhale|jhale|kela|keli|kele|kel|nahi|nahit|ho|nakki|nakkki|aata|pan)\b",
+    re.IGNORECASE
+)
+
+ENGLISH_WORDS_MARKERS_REGEX = re.compile(
+    r"\b(?:i|you|he|she|it|we|they|my|your|his|her|our|their|what|when|where|which|who|whom|whose|why|how|is|am|are|was|were|be|been|being|have|has|had|do|does|did|will|would|shall|should|can|could|may|might|must|doctor|clinic|appointment|schedule|available|cancel|reschedule|timing|morning|evening|afternoon|please|thank|thanks|hello|hey)\b",
     re.IGNORECASE
 )
 
@@ -260,6 +268,9 @@ def is_reliable_automatic_switch(transcript: str, candidate_language: str, curre
         if curr_base == "hi" and (HINDI_DEVANAGARI_REGEX.search(trimmed) or HINDI_LATIN_MARKERS_REGEX.search(trimmed)):
             return False
         if curr_base == "mr" and (MARATHI_DEVANAGARI_REGEX.search(trimmed) or MARATHI_LATIN_MARKERS_REGEX.search(trimmed)):
+            return False
+        # To reliably auto-switch to English from an Indian language, require authentic English markers
+        if not ENGLISH_WORDS_MARKERS_REGEX.search(trimmed):
             return False
         return len(words) >= 2
 
@@ -292,7 +303,9 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
     )
     
     universal_human_rules = (
-        "- HUMAN PERSONA & TONE: Speak warmly and naturally like a human receptionist on a phone call. Keep replies brief (1–2 short sentences, under 15 words).\n"
+        "- TASK STATE CONTINUITY (CRITICAL): When the caller changes language or speaks in a new language, NEVER restart the conversation, NEVER re-introduce yourself or repeat initial greetings, and NEVER re-ask questions that were already answered. Seamlessly continue the conversation, acknowledge any question or remark directly, and advance the workflow in the new language.\n"
+        f"- LANGUAGE STICKINESS (CRITICAL): You MUST speak ONLY in {lang_name} for your entire response and all subsequent turns until the user explicitly requests another language. Do NOT flip back to previously spoken languages even if the conversation history was predominantly in another language.\n"
+        "- HUMAN PERSONA & TONE: Speak warmly, naturally, and concisely like a human clinic receptionist on a phone call. Keep replies brief (1–2 short sentences, under 15 words).\n"
         "- BANNED AI PHRASES: NEVER say 'system access', 'database', 'I am an AI', 'system limitations', 'access permissions', or 'system error'. Speak strictly like a helpful staff member.\n"
         "- SLOT GROUPING: When collecting caller information, ask naturally related questions together rather than interrogating one by one.\n"
         "- DIRECT DATE INQUIRIES: When asking for dates or timings, ask directly and simply without lecturing about current day, date, or calendar calculations."
@@ -303,13 +316,13 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
             code_switching_guidance = (
                 f"{universal_human_rules}\n"
                 "- Respond strictly in Pure Devanagari Hindi Unicode script.\n"
-                "- CRITICAL SCRIPT RULE: Write 100% in Devanagari Unicode characters (e.g. 'आपका नाम और उम्र क्या है?'). NEVER output Latin/Romanized letters (e.g. NEVER say 'aapka', 'naam', 'umr', 'age', 'kya', 'hai').\n"
+                "- CRITICAL SCRIPT RULE: Write 100% in Devanagari Unicode characters (e.g. 'आपका नाम और उम्र क्या है?'). NEVER output Latin/Romanized letters.\n"
                 "- CRITICAL VOCABULARY RULE: You MUST speak in Pure Hindi without mixing English words or English numbers.\n"
                 "- STRICT VOCABULARY REPLACEMENTS:\n"
-                "  * Never use 'help' -> use 'मदद' (e.g. 'मैं आपकी क्या मदद कर सकता हूँ?').\n"
-                "  * Never use 'age' -> use 'उम्र' / 'आयु' (e.g. 'आपका नाम और उम्र क्या है?').\n"
-                "  * Never use 'name' -> use 'नाम' (e.g. 'आपका नाम क्या है?').\n"
-                "  * Never use 'appointment' or 'booking' -> use 'अपॉइंटमेंट' / 'समय निश्चित करना' / 'पक्का करना' (e.g. 'हाँ, अपॉइंटमेंट बुक कर देता हूँ').\n"
+                "  * Never use 'help' -> use 'मदद'.\n"
+                "  * Never use 'age' -> use 'उम्र' / 'आयु'.\n"
+                "  * Never use 'name' -> use 'नाम'.\n"
+                "  * Never use 'appointment' or 'booking' -> use 'अपॉइंटमेंट' / 'समय निश्चित करना'.\n"
                 "  * Never use 'timing' or 'slot' -> use 'समय'.\n"
                 "  * Never use 'date' -> use 'तारीख'.\n"
                 "  * Never write English digits like '22' or '12' -> write full words in Hindi (e.g. 'बाईस', 'बारह').\n"
@@ -320,24 +333,25 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
             code_switching_guidance = (
                 f"{universal_human_rules}\n"
                 "- Respond in Hindi (conversational Hinglish).\n"
-                "- CRITICAL RULE: You MUST speak in Hindi/Hinglish now. If the caller asks in Hindi ('क्या आप हिंदी में बात कर सकते हैं?', 'हिंदी में बोलो', 'kya aap hindi me baat kar sakte ho'), reply in fluent Hindi (e.g. 'हाँ, मैं हिंदी में बात कर सकता हूँ। बताइए मैं आपकी क्या help करूँ?').\n"
+                "- CRITICAL RULE: You MUST speak in natural conversational Hindi/Hinglish now.\n"
+                "- If the caller asks to speak in Hindi or asks a question in Hindi, reply directly in fluent Hindi/Hinglish (e.g. 'हाँ जी, बताइए!' or answer their question immediately). Do NOT repeat the initial clinic greeting.\n"
                 "- Speak natural conversational Hinglish (Hindi + English). Do not force archaic or textbook Hindi.\n"
                 "- Keep standard business/everyday terms in English naturally (e.g. appointment, booking, timing, date, age, location, team, fees, pricing, WhatsApp, payment, confirm).\n"
                 "- DO NOT use stiff literary Hindi translations like 'पंजीकरण', 'दिनांक', 'आयु', 'पुष्टि'. Use 'booking', 'date', 'age', 'confirm'.\n"
-                "- DO NOT switch the entire conversation to English merely because the caller uses English words or numbers."
+                "- DO NOT switch back to Marathi or English unless the caller explicitly asks."
             )
     elif base_lang == "mr":
         if is_pure_mode:
             code_switching_guidance = (
                 f"{universal_human_rules}\n"
                 "- Respond strictly in Pure Devanagari Marathi Unicode script.\n"
-                "- CRITICAL SCRIPT RULE: Write 100% in Devanagari Unicode characters (e.g. 'तुमचं नाव आणि वय काय आहे?'). NEVER output Latin/Romanized letters (e.g. NEVER say 'tumcha', 'naaw', 'aani', 'age', 'kay', 'aah').\n"
+                "- CRITICAL SCRIPT RULE: Write 100% in Devanagari Unicode characters (e.g. 'तुमचं नाव आणि वय काय आहे?'). NEVER output Latin/Romanized letters.\n"
                 "- CRITICAL VOCABULARY RULE: You MUST speak in Pure Marathi without mixing English words or English numbers.\n"
                 "- STRICT VOCABULARY REPLACEMENTS:\n"
-                "  * Never use 'help' -> use 'मदत' (e.g. 'मी तुमची काय मदत करू शकतो?').\n"
-                "  * Never use 'age' -> use 'वय' (e.g. 'तुमचं नाव आणि वय काय आहे?').\n"
-                "  * Never use 'name' or 'naaw' -> use 'नाव' (e.g. 'तुमचं नाव काय आहे?').\n"
-                "  * Never use 'appointment' or 'booking' -> use 'अपॉइंटमेंट' / 'वेळ निश्चित करणे' / 'नक्की करणे' (e.g. 'हो नक्की, अपॉइंटमेंट बुक करून देतो').\n"
+                "  * Never use 'help' -> use 'मदत'.\n"
+                "  * Never use 'age' -> use 'वय'.\n"
+                "  * Never use 'name' or 'naaw' -> use 'नाव'.\n"
+                "  * Never use 'appointment' or 'booking' -> use 'अपॉइंटमेंट' / 'वेळ निश्चित करणे'.\n"
                 "  * Never use 'timing' or 'slot' -> use 'वेळ' / 'वेळेची सोय'.\n"
                 "  * Never use 'date' -> use 'तारीख'.\n"
                 "  * Never write English digits like '22' or '12' -> write full words in Marathi (e.g. 'बावीस', 'बारा').\n"
@@ -348,18 +362,20 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
             code_switching_guidance = (
                 f"{universal_human_rules}\n"
                 "- Respond in Marathi (conversational Minglish).\n"
-                "- CRITICAL RULE: You MUST speak in Marathi/Minglish now. If the caller asks in Marathi ('तुम्ही मराठीत बोलू शकता का?', 'मराठीत बोला'), reply in fluent Marathi (e.g. 'हो, मी मराठीत बोलू शकतो. सांगा मी तुमची काय help करू?').\n"
+                "- CRITICAL RULE: You MUST speak in natural conversational Marathi/Minglish now.\n"
+                "- If the caller asks to speak in Marathi or asks a question in Marathi, reply directly in fluent Marathi/Minglish (e.g. 'हो नक्की, बोला!' or answer their question immediately). Do NOT repeat the initial clinic greeting.\n"
                 "- Speak natural conversational Minglish (Marathi + English). Do not force archaic or textbook Marathi.\n"
                 "- Use natural everyday conversational pronouns: Use 'तुमचं / तुम्ही' (never use archaic formal 'आपले / आपली').\n"
                 "- Keep standard business/everyday terms in English naturally (e.g. appointment, booking, timing, date, age, location, place, team, fees, pricing, WhatsApp, payment, confirm).\n"
-                "- DO NOT use stiff literary Marathi translations like 'नोंदणी', 'दिनांक', 'वयमर्यादा', 'पुष्टीकरण', 'शुल्करचना', 'भेट'. Use 'appointment booking', 'date', 'timing', 'age', 'confirm', 'fees', 'location'.\n"
-                "- DO NOT switch the entire conversation to English merely because the caller uses English words or numbers."
+                "- DO NOT use stiff literary Marathi translations like 'नोंदणी', 'दिनांक', 'वयमर्यादा', 'पुष्टीकरण', 'शुल्करचना'. Use 'appointment booking', 'date', 'timing', 'age', 'confirm', 'fees', 'location'.\n"
+                "- DO NOT switch back to Hindi or English unless the caller explicitly asks."
             )
     else:
         code_switching_guidance = (
             f"{universal_human_rules}\n"
             f"- Respond in {lang_name}.\n"
-            f"- CRITICAL RULE: You MUST speak in {lang_name} now. If the caller asked in English, reply in English ('Yes, I can speak in English. How can I help you today?').\n"
+            f"- CRITICAL RULE: You MUST speak in natural {lang_name} now.\n"
+            f"- If the caller asks in English or asks a question in English, reply directly in clear, warm English (e.g. 'Sure, go ahead!' or answer their question immediately). Do NOT repeat the initial clinic greeting.\n"
             f"- Maintain this language as the active conversation language until the user explicitly requests another supported language or clearly switches."
         )
         
@@ -503,7 +519,10 @@ class ConversationLanguageManager:
                 elif any(normalize_language_code(l).startswith("kn") for l in self._supported) and re.search(r"[\u0C80-\u0CFF]", trimmed):
                     candidate_code = "kn-IN"
                 elif en_supported and not INDIC_SCRIPT_REGEX.search(trimmed):
-                    candidate_code = "en-IN"
+                    if ENGLISH_WORDS_MARKERS_REGEX.search(trimmed):
+                        candidate_code = "en-IN"
+                    else:
+                        candidate_code = self._current
                 elif DEVANAGARI_REGEX.search(trimmed):
                     # Default Devanagari fallback if neither matched: check if primary is mr vs hi
                     candidate_code = self._primary if self._primary.startswith("mr") else "hi-IN"
