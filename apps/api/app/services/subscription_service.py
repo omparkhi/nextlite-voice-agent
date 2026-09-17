@@ -212,7 +212,6 @@ class SubscriptionService:
             assigned_name = plan_name or f"{plan_template['name']} ({'Yearly' if is_yearly else 'Monthly'})"
         
         now = datetime.utcnow()
-        period_end = now + timedelta(days=365 if is_yearly else 30)
 
         sub.planTier = tier_upper
         sub.planName = assigned_name
@@ -226,8 +225,14 @@ class SubscriptionService:
         if admin_notes is not None:
             sub.adminNotes = admin_notes
         sub.status = SubscriptionStatus.ACTIVE
-        sub.startedAt = now
-        sub.currentPeriodEnd = period_end
+        
+        # Only initialize startedAt if this is a brand new subscription or currently unset
+        if not sub.startedAt:
+            sub.startedAt = now
+            sub.currentPeriodEnd = now + timedelta(days=365 if is_yearly else 30)
+        elif not sub.currentPeriodEnd or sub.currentPeriodEnd < now:
+            sub.currentPeriodEnd = now + timedelta(days=365 if is_yearly else 30)
+
         sub.updatedAt = now
 
         await self.session.commit()

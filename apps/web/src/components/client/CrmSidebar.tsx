@@ -52,7 +52,7 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
       ),
     },
     {
-      name: 'Follow-ups',
+      name: 'WhatsApp CRM',
       path: '/dashboard/follow-ups',
       badge: 'WhatsApp',
       icon: (

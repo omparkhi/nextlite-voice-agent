@@ -45,8 +45,8 @@ class RuntimeVoiceConfig(CamelModel):
 class RuntimeLanguageConfig(CamelModel):
     primary: str = "en-IN"
     supported_languages: List[str] = Field(default_factory=lambda: ["en-IN"])
-    auto_detect_enabled: Optional[bool] = False
-    language_switching_enabled: Optional[bool] = False
+    auto_detect_enabled: Optional[bool] = True
+    language_switching_enabled: Optional[bool] = True
 
 class RuntimeNudgeConfig(CamelModel):
     enabled: bool = True

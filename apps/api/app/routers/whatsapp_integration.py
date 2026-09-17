@@ -44,31 +44,34 @@ async def resolve_effective_tenant_id(
     tenant_id_param: Optional[str] = None,
     x_tenant_key: Optional[str] = Header(None, alias="X-Tenant-Key"),
 ) -> uuid.UUID:
-    """Resolves tenant UUID from request param, header key, or falls back to active clinic tenant with agents."""
-    if tenant_id_param:
-        try:
-            return uuid.UUID(tenant_id_param)
-        except ValueError:
-            pass
+    """Strictly resolves and validates tenant UUID from request param or header key.
+    
+    Security: Fallback to arbitrary tenants is prohibited to prevent cross-tenant data leakage.
+    """
+    raw_key = tenant_id_param or x_tenant_key
+    if not raw_key or not str(raw_key).strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant ID is required. Please pass 'tenantId' in query/body or provide the 'X-Tenant-Key' header."
+        )
 
-    if x_tenant_key:
-        try:
-            return uuid.UUID(x_tenant_key)
-        except ValueError:
-            pass
+    try:
+        target_uuid = uuid.UUID(str(raw_key).strip())
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid tenantId format: '{raw_key}' is not a valid UUID."
+        )
 
-    # Priority 1: Fallback to the active tenant that has configured voice agents
-    res_agent_tenant = await db.execute(select(Agent.tenantId).where(Agent.tenantId.isnot(None)).limit(1))
-    agent_tenant_id = res_agent_tenant.scalar_one_or_none()
-    if agent_tenant_id:
-        return agent_tenant_id
+    # Verify tenant exists in database
+    t_check = await db.execute(select(Tenant.id).where(Tenant.id == target_uuid))
+    if not t_check.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tenant workspace '{target_uuid}' not found."
+        )
 
-    # Priority 2: Fallback to first tenant in database
-    res = await db.execute(select(Tenant).limit(1))
-    t = res.scalar_one_or_none()
-    if not t:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No active tenant found in system")
-    return t.id
+    return target_uuid
 
 
 def norm_slot_time(t: str) -> str:
@@ -237,3 +240,23 @@ async def cancel_whatsapp_appointment(
         "message": f"Appointment {target_number} has been cancelled",
         "appointment": updated,
     }
+
+
+@router.get("/appointments")
+async def list_whatsapp_appointments(
+    tenantId: Optional[str] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    x_tenant_key: Optional[str] = Header(None, alias="X-Tenant-Key"),
+):
+    """Lists appointments booked via the WhatsApp integration."""
+    effective_tenant_id = await resolve_effective_tenant_id(db, tenantId, x_tenant_key)
+    crm = CRMService(db)
+    return await crm.list_appointments(
+        tenant_id=effective_tenant_id,
+        limit=limit,
+        offset=offset,
+        booked_by="WHATSAPP"
+    )
+

@@ -34,8 +34,8 @@ def normalize_language_code(code: Any) -> str:
     if hasattr(code, "value"):
         code = code.value
     code_str = str(code).strip().replace("_", "-")
-    if code_str.lower() == "unknown":
-        return "unknown"
+    if code_str.lower() in ("unknown", "auto"):
+        return code_str.lower()
 
     lower = code_str.lower()
     short_map = {
@@ -107,10 +107,11 @@ EXPLICIT_LANGUAGE_RULES = [
     {
         "languageCode": "hi-IN",
         "patterns": [
-            re.compile(r"^(?:hindi|हिन्दी|हिंदी)\s*(?:please|me|mein|mai|karo|bolo)?$", re.IGNORECASE),
-            re.compile(r"(?:क्या\s*आप\s*)?(?:हिंदी|हिन्दी)\s*में\s*(?:बात\s*कर\s*सकते\s*हो|बात\s*कर\s*सकते\s*हैं|बात\s*करो|बोलो|बोल\s*सकते\s*हो|बोल\s*सकते\s*हैं|बात\s*कीजिए|संभाषण|बताओ|बताइए)", re.IGNORECASE),
-            re.compile(r"(?:हिंदी|हिन्दी)\s*(?:बोलो|बताओ|बताइए|बोल\s*सकते\s*हो|बात\s*करो)", re.IGNORECASE),
-            re.compile(r"(?:kya\s+)?(?:aap\s+)?(?:hindi|हिन्दी|हिंदी)\s*(?:me(?:in)?|mai|m)?\s*(?:baat\s*kar\s*sakte\s*ho|baat\s*kr\s*skte\s*ho|baat\s*kar\s*sakte\s*hain|baat\s*kr\s*skte\s*hn|baat\s*karo|baat\s*kijiye|bolo|bol\s*sakte\s*ho|bol\s*skte\s*ho|bolte\s*ho|aati\s*hai|batao|bataiye)", re.IGNORECASE),
+            re.compile(r"^(?:hindi|हिन्दी|हिंदी)\s*(?:please|me|mein|mai|karo|karu|karun|bolo|bol|bhai)?$", re.IGNORECASE),
+            re.compile(r"(?:क्या\s*आप\s*)?(?:हिंदी|हिन्दी)\s*(?:में|मे)?\s*(?:बात\s*(?:कर\s*सकते\s*हो|कर\s*सकते\s*हैं|करो|करू|करु|करूँ|करेंगे|कीजिए|कीजिये|कर\s*भाई|कर)|बोलो|बोल\s*सकते\s*हो|बोल\s*सकते\s*हैं|बोल\s*भाई|बताओ|बताइए|संभाषण)", re.IGNORECASE),
+            re.compile(r"(?:हिंदी|हिन्दी)\s*(?:में|मे)?\s*(?:बात\s*(?:करो|करू|करु|करूँ|कीजिए|कीजिये|कर\s*भाई|कर)|बोलो|बोल|बताओ|बताइए)", re.IGNORECASE),
+            re.compile(r"(?:kya\s+)?(?:aap\s+)?(?:hindi|हिन्दी|हिंदी)\s*(?:me(?:in)?|mai|m)?\s*(?:baat\s*(?:kar\s*sakte\s*ho|kr\s*skte\s*ho|kar\s*sakte\s*hain|kr\s*skte\s*hn|karo|karu|karun|kijiye|kijiyega|kar\s*bhai|kar)|bolo|bol\s*sakte\s*ho|bol\s*skte\s*ho|bol\s*bhai|bolte\s*ho|aati\s*hai|batao|bataiye)", re.IGNORECASE),
+            re.compile(r"\bhindi\s*(?:mein|me|mai)?\s*(?:baat\s*karu|baat\s*karo|baat\s*kar|bolo|bol)\s*(?:bhai|bhiya|yaar)?\b", re.IGNORECASE),
             re.compile(r"(?:can|could|please|let'?s|would)\s+(?:you\s+)?(?:speak|talk|continue|switch)\s+(?:in|to|with)\s+hindi", re.IGNORECASE),
             re.compile(r"(?:speak|talk|continue|switch)\s+(?:in|to)\s+hindi", re.IGNORECASE),
             re.compile(r"talk\s+to\s+me\s+in\s+hindi", re.IGNORECASE),
@@ -126,13 +127,13 @@ EXPLICIT_LANGUAGE_RULES = [
     {
         "languageCode": "mr-IN",
         "patterns": [
-            re.compile(r"^(?:marathi|मराठी)\s*(?:please|madhe|t|it|bola|sanga)?$", re.IGNORECASE),
-            re.compile(r"(?:तुम्ही\s*)?मराठीत\s*(?:बोला|बोल|सांगा|बोलू\s*शकता\s*का|संभाषण\s*करा)", re.IGNORECASE),
+            re.compile(r"^(?:marathi|मराठी)\s*(?:please|madhe|t|it|bola|bol|sanga|bhawa|bhava|dada)?$", re.IGNORECASE),
+            re.compile(r"(?:तुम्ही\s*)?मराठीत?\s*(?:मध्ये|त|मधे)?\s*(?:बोला|बोल|सांगा|बोलू\s*शकता\s*का|संभाषण\s*करा|बोल\s*भावा|बोल\s*दादा)", re.IGNORECASE),
             re.compile(r"मराठी\s*मध्ये\s*(?:बोला|बोल|सांगा|बोलू\s*शकता\s*का)", re.IGNORECASE),
             re.compile(r"मराठी\s*भाषा\s*वापरा", re.IGNORECASE),
             re.compile(r"मराठी\s*बोला", re.IGNORECASE),
             re.compile(r"मराठी\s*सांगा", re.IGNORECASE),
-            re.compile(r"(?:tumhi\s+)?(?:marathi|मराठी)\s*(?:madhe|t|it|me)?\s*(?:bolu\s*shakta\s*ka|bola|bol|sanga|baat\s*karo|bol\s*sakte\s*ho)", re.IGNORECASE),
+            re.compile(r"(?:tumhi\s+)?(?:marathi|मराठी)\s*(?:madhe|t|it|me|mhadhe)?\s*(?:bolu\s*shakta\s*ka|bola|bol|sanga|baat\s*karo|bol\s*sakte\s*ho|bol\s*bhawa|bol\s*bhava|bol\s*dada)", re.IGNORECASE),
             re.compile(r"\bmarathit\s*(?:bola|bol|sanga)\b", re.IGNORECASE),
             re.compile(r"\bmarathi\s*madhe\s*(?:bola|bol|sanga)\b", re.IGNORECASE),
             re.compile(r"(?:can|could|please|let'?s|would)\s+(?:you\s+)?(?:speak|talk|continue|switch)\s+(?:in|to|with)\s+marathi", re.IGNORECASE),
@@ -194,7 +195,7 @@ EXPLICIT_LANGUAGE_RULES = [
     {
         "languageCode": "te-IN",
         "patterns": [
-            re.compile(r"తెలుగులో\s*(?:ಮಾట్లాಡండి|చెప్పండి)", re.IGNORECASE),
+            re.compile(r"తెలుగులో\s*(?:ಮಾట్లాಡಂಡಿ|చెప్పండి)", re.IGNORECASE),
             re.compile(r"(?:speak|talk|continue|switch)\s+(?:in|to)\s+telugu", re.IGNORECASE),
             re.compile(r"\btelugulo\s+matladandi\b", re.IGNORECASE),
         ]
@@ -223,7 +224,7 @@ DEVANAGARI_REGEX = re.compile(r"[\u0900-\u097F]")
 
 HINDI_DEVANAGARI_TOKENS = {
     "है", "हैं", "था", "थी", "थे", "होगी", "होगा", "होंगे", "हूँ", "हू", "चाहिए",
-    "बताओ", "बताइए", "करो", "कीजिए", "कर", "करना", "करेंगे", "करूँगा", "सकता", "सकती", "सकते",
+    "बताओ", "बताइए", "बता", "करो", "करू", "करु", "करूँ", "कीजिए", "कीजिये", "कर", "करना", "करेंगे", "करूँगा", "सकता", "सकती", "सकते",
     "सकेंगे", "मिलना", "मिलेंगे", "मिलेगा", "मिलेगी", "लेना", "देंगे", "दीजिए", "दे", "दो",
     "कल", "आज", "परसों", "समय", "तारीख", "नहीं", "हाँ", "मुझे", "मेरा", "मेरी", "मेरे",
     "आप", "आपको", "आपका", "आपकी", "आपके", "हम", "हमारा", "हमारी", "हमारे", "तुम", "तुम्हारा",
@@ -231,7 +232,8 @@ HINDI_DEVANAGARI_TOKENS = {
     "बात", "लिए", "में", "से", "को", "का", "की", "के", "नाम", "लिखना", "दर्ज", "करवाना",
     "अपॉइंटमेंट", "हिंदी", "हिन्दी", "क्या", "कब", "कैसे", "पूछना", "लगेगी", "लगेगा", "फीस",
     "डॉक्टर", "दवाखाना", "क्लीनिक", "टाइम", "स्लॉट", "सुबह", "दोपहर", "शाम", "बजे", "ठीक",
-    "अच्छा", "जी", "नमस्ते", "शुक्रिया", "धन्यवाद", "आऊँगा", "आएँगे", "आना"
+    "अच्छा", "जी", "नमस्ते", "शुक्रिया", "धन्यवाद", "आऊँगा", "आएँगे", "आना", "बारे", "थोड़ा",
+    "थोडा", "भाई", "सेवा", "सेवाएं", "सुविधा"
 }
 
 MARATHI_DEVANAGARI_TOKENS = {
@@ -244,7 +246,7 @@ MARATHI_DEVANAGARI_TOKENS = {
     "त्यांना", "होता", "होती", "होते", "होतं", "झाला", "झाली", "झालं", "झाले", "केलं",
     "केला", "केली", "केले", "उद्या", "परवा", "सकाळी", "दुपारी", "संध्याकाळी",
     "रात्री", "वाजता", "मध्ये", "बद्दल", "साठी", "वरून", "कडून", "चालू", "चालेल",
-    "मराठी", "मराठीत", "हो", "नक्की"
+    "मराठी", "मराठीत", "हो", "नक्की", "आणि", "थोडे", "थोडं", "भावा", "दादा", "माहिती"
 }
 
 MARATHI_SUFFIXES = ("ायचं", "ायची", "ायचे", "ायचा", "ावं", "णार", "लोय", "ल्या", "च्या", "मध्ये")
@@ -386,7 +388,7 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
     universal_human_rules = (
         "- TASK STATE CONTINUITY (CRITICAL): When the caller changes language or speaks in a new language, NEVER restart the conversation, NEVER re-introduce yourself or repeat initial greetings, and NEVER re-ask questions that were already answered. Seamlessly continue the conversation, acknowledge any question or remark directly, and advance the workflow in the new language.\n"
         f"- LANGUAGE STICKINESS (CRITICAL): You MUST speak ONLY in {lang_name} for your entire response and all subsequent turns until the user explicitly requests another language. Do NOT flip back to previously spoken languages even if the conversation history was predominantly in another language.\n"
-        "- HUMAN PERSONA & TONE: Speak warmly, naturally, and concisely like a human clinic receptionist on a phone call. Keep replies brief (1–2 short sentences, under 15 words).\n"
+        "- HUMAN PERSONA & TONE: Speak warmly, naturally, and concisely like a human receptionist on a phone call. Keep replies brief (1–2 short sentences, under 15 words).\n"
         "- BANNED AI PHRASES: NEVER say 'system access', 'database', 'I am an AI', 'system limitations', 'access permissions', or 'system error'. Speak strictly like a helpful staff member.\n"
         "- SLOT GROUPING: When collecting caller information, ask naturally related questions together rather than interrogating one by one.\n"
         "- DIRECT DATE INQUIRIES: When asking for dates or timings, ask directly and simply without lecturing about current day, date, or calendar calculations."
@@ -415,7 +417,7 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
                 f"{universal_human_rules}\n"
                 "- Respond in Hindi (conversational Hinglish).\n"
                 "- CRITICAL RULE: You MUST speak in natural conversational Hindi/Hinglish now.\n"
-                "- If the caller asks to speak in Hindi or asks a question in Hindi, reply directly in fluent Hindi/Hinglish (e.g. 'हाँ जी, बताइए!' or answer their question immediately). Do NOT repeat the initial clinic greeting.\n"
+                "- If the caller asks to speak in Hindi or asks a question in Hindi, reply directly in fluent Hindi/Hinglish (e.g. 'हाँ जी, बताइए!' or answer their question immediately). Do NOT repeat the initial greeting.\n"
                 "- Speak natural conversational Hinglish (Hindi + English). Do not force archaic or textbook Hindi.\n"
                 "- Keep standard business/everyday terms in English naturally (e.g. appointment, booking, timing, date, age, location, team, fees, pricing, WhatsApp, payment, confirm).\n"
                 "- DO NOT use stiff literary Hindi translations like 'पंजीकरण', 'दिनांक', 'आयु', 'पुष्टि'. Use 'booking', 'date', 'age', 'confirm'.\n"
@@ -444,7 +446,7 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
                 f"{universal_human_rules}\n"
                 "- Respond in Marathi (conversational Minglish).\n"
                 "- CRITICAL RULE: You MUST speak in natural conversational Marathi/Minglish now.\n"
-                "- If the caller asks to speak in Marathi or asks a question in Marathi, reply directly in fluent Marathi/Minglish (e.g. 'हो नक्की, बोला!' or answer their question immediately). Do NOT repeat the initial clinic greeting.\n"
+                "- If the caller asks to speak in Marathi or asks a question in Marathi, reply directly in fluent Marathi/Minglish (e.g. 'हो नक्की, बोला!' or answer their question immediately). Do NOT repeat the initial greeting.\n"
                 "- Speak natural conversational Minglish (Marathi + English). Do not force archaic or textbook Marathi.\n"
                 "- Use natural everyday conversational pronouns: Use 'तुमचं / तुम्ही' (never use archaic formal 'आपले / आपली').\n"
                 "- Keep standard business/everyday terms in English naturally (e.g. appointment, booking, timing, date, age, location, place, team, fees, pricing, WhatsApp, payment, confirm).\n"
@@ -456,7 +458,7 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
             f"{universal_human_rules}\n"
             f"- Respond in {lang_name}.\n"
             f"- CRITICAL RULE: You MUST speak in natural {lang_name} now.\n"
-            f"- If the caller asks in English or asks a question in English, reply directly in clear, warm English (e.g. 'Sure, go ahead!' or answer their question immediately). Do NOT repeat the initial clinic greeting.\n"
+            f"- If the caller asks in English or asks a question in English, reply directly in clear, warm English (e.g. 'Sure, go ahead!' or answer their question immediately). Do NOT repeat the initial greeting.\n"
             f"- Maintain this language as the active conversation language until the user explicitly requests another supported language or clearly switches."
         )
         
@@ -490,8 +492,9 @@ class ConversationLanguageManager:
         if self._primary not in self._supported:
             self._supported.insert(0, self._primary)
             
-        self._auto_detect = auto_detect_enabled is not False
-        self._language_switching = language_switching_enabled is not False
+        is_multi_lang = len(self._supported) > 1
+        self._auto_detect = auto_detect_enabled if auto_detect_enabled is not None else (is_multi_lang or True)
+        self._language_switching = language_switching_enabled if language_switching_enabled is not None else (is_multi_lang or True)
         self._language_style = (language_style or "mixed").lower()
         self._current = self._primary
 
@@ -520,7 +523,9 @@ class ConversationLanguageManager:
         return self._current
 
     def get_stt_initial_language(self) -> str:
-        return "unknown" if self._auto_detect else self._primary
+        if self._auto_detect or len(self._supported) > 1:
+            return "auto"
+        return self._primary
 
     def get_tts_current_language(self) -> str:
         return self._current
@@ -571,7 +576,7 @@ class ConversationLanguageManager:
             )
             
         candidate_code = detected_language_code
-        if not candidate_code or candidate_code == "unknown":
+        if not candidate_code or candidate_code in ("unknown", "auto"):
             trimmed = (transcript or "").strip()
             if trimmed:
                 hi_supported = any(normalize_language_code(l).startswith("hi") for l in self._supported)
@@ -610,7 +615,7 @@ class ConversationLanguageManager:
                     # If neither matched specific tokens, keep current language to avoid random flips
                     candidate_code = self._current
 
-        if candidate_code and candidate_code != "unknown":
+        if candidate_code and candidate_code not in ("unknown", "auto"):
             matched = match_supported_language(candidate_code, self._supported)
             if matched:
                 if matched != self._current:

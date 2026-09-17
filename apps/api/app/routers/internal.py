@@ -3,7 +3,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, desc
+from ..logging import logger
 from ..db import get_db
 from ..auth import require_worker
 from ..schemas import RuntimeAgentConfig
@@ -139,6 +140,83 @@ async def finalize_call_session(
     )
     if not finalized:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call session not found")
+
+    # ── Auto-sync CRM Lead for 100% Lead Capture ───────────────────────────
+    try:
+        existing_lead_res = await session.execute(
+            select(Lead).where(Lead.callSessionId == call_uuid)
+        )
+        existing_lead = existing_lead_res.scalar_one_or_none()
+
+        if not existing_lead and finalized.tenantId:
+            # Check if an Appointment was booked during this call
+            appt_res = await session.execute(
+                select(Appointment).where(
+                    Appointment.callSessionId == call_uuid,
+                    Appointment.tenantId == finalized.tenantId
+                ).order_by(desc(Appointment.createdAt)).limit(1)
+            )
+            appt = appt_res.scalar_one_or_none()
+
+            raw_phone = finalized.callerNumber or "+910000000000"
+            lead_num = f"LEAD-{str(uuid.uuid4())[:6].upper()}"
+
+            if appt:
+                # Scenario A: Appointment Booked -> High Priority Qualified Lead
+                lead = Lead(
+                    tenantId=finalized.tenantId,
+                    agentId=finalized.agentId,
+                    callSessionId=call_uuid,
+                    leadNumber=lead_num,
+                    customerName=appt.customerName or "Appointment Patient",
+                    customerPhone=appt.customerPhone or raw_phone,
+                    requirement=f"Appointment Booked: {appt.title} on {appt.bookingDate} at {appt.bookingTime}",
+                    status=LeadStatus.QUALIFIED,
+                    priority=LeadPriority.HIGH,
+                    notes=appt.notes or (transcript_text[:500] if transcript_text else None)
+                )
+                session.add(lead)
+            elif duration > 0 or transcript_text or (isinstance(transcript, list) and len(transcript) > 0):
+                # Scenario B: Inquiry Call -> Capture Lead with inquiry context
+                req_summary = "General Voice Inquiry"
+                if transcript_text and transcript_text.strip():
+                    lines = [ln.strip() for ln in transcript_text.split("\n") if ln.strip()]
+                    user_lines = [ln for ln in lines if ln.lower().startswith("user:") or ln.lower().startswith("caller:")]
+                    if user_lines:
+                        first_q = user_lines[0].split(":", 1)[-1].strip()
+                        if len(first_q) >= 4:
+                            req_summary = f"Inquiry: {first_q[:200]}"
+                    elif len(lines) > 0:
+                        first_q = lines[0].split(":", 1)[-1].strip()
+                        req_summary = f"Inquiry: {first_q[:200]}"
+                elif isinstance(transcript, list) and len(transcript) > 0:
+                    user_turns = [t for t in transcript if isinstance(t, dict) and t.get("role") in ("user", "caller")]
+                    if user_turns:
+                        first_q = str(user_turns[0].get("text") or user_turns[0].get("content") or "").strip()
+                        if len(first_q) >= 4:
+                            req_summary = f"Inquiry: {first_q[:200]}"
+
+                cust_name = "Inquiry Caller"
+                if raw_phone and len(raw_phone) >= 4 and raw_phone != "+910000000000":
+                    cust_name = f"Inquiry Caller ({raw_phone[-4:]})"
+
+                lead = Lead(
+                    tenantId=finalized.tenantId,
+                    agentId=finalized.agentId,
+                    callSessionId=call_uuid,
+                    leadNumber=lead_num,
+                    customerName=cust_name,
+                    customerPhone=raw_phone,
+                    requirement=req_summary,
+                    status=LeadStatus.NEW,
+                    priority=LeadPriority.MEDIUM,
+                    notes=transcript_text[:500] if transcript_text else None
+                )
+                session.add(lead)
+
+    except Exception as lead_sync_err:
+        logger.warning(f"[Lead Ingestion] Auto-sync CRM lead notice for call {call_id}: {lead_sync_err}")
+
     await session.commit()
     
     now_iso = datetime.utcnow().isoformat()

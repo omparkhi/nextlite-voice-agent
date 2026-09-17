@@ -239,7 +239,7 @@ class CRMService:
     async def list_appointments(
         self, tenant_id: uuid.UUID, limit: int = 20, offset: int = 0,
         agent_id: Optional[uuid.UUID] = None, status: Optional[str] = None,
-        booking_date: Optional[str] = None
+        booking_date: Optional[str] = None, booked_by: Optional[str] = None
     ) -> Dict[str, Any]:
         query = select(Appointment).where(Appointment.tenantId == tenant_id)
         if agent_id:
@@ -251,6 +251,8 @@ class CRMService:
                 pass
         if booking_date:
             query = query.where(Appointment.bookingDate == booking_date)
+        if booked_by:
+            query = query.where(Appointment.bookedBy == booked_by)
 
         count_query = select(func.count()).select_from(query.subquery())
         total = (await self.session.execute(count_query)).scalar_one()

@@ -142,6 +142,34 @@ export function AgentDetail() {
     }
   };
 
+  const [publishingLive, setPublishingLive] = useState(false);
+  const [livePublishNotice, setLivePublishNotice] = useState<string | null>(null);
+
+  const handlePublishLiveUpdate = async () => {
+    if (!clientId || !agentId) return;
+    setPublishingLive(true);
+    setLivePublishNotice(null);
+    try {
+      const nextVerNum = (versions.length || 0) + 1;
+      const notes = `Live update: v${nextVerNum} at ${new Date().toLocaleTimeString()}`;
+      await api.saveAgentConfig(clientId, agentId, configuration, notes);
+      const res = await api.publishAgent(clientId, agentId, notes, configuration);
+      if (res.agent) {
+        setAgent(res.agent);
+        if (res.agent.versions) setVersions(res.agent.versions);
+      }
+      const cl = await api.getChecklist(clientId, agentId).catch(() => null);
+      if (cl) setChecklist(cl);
+      setSaveStatus('saved');
+      setLivePublishNotice(`✓ Version v${res.version?.versionNumber || nextVerNum} is now LIVE! Live call routing updated instantly.`);
+      setTimeout(() => setLivePublishNotice(null), 6000);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update live agent');
+    } finally {
+      setPublishingLive(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50 text-gray-500 text-xs font-medium">
@@ -150,7 +178,7 @@ export function AgentDetail() {
     );
   }
 
-  const isLive = agent?.status === 'LIVE';
+  const isLive = agent?.status === 'LIVE' || agent?.status === 'READY' || !!agent?.activeDeployment;
 
   return (
     <div className="h-full flex flex-col bg-white text-gray-900 overflow-hidden font-sans">
@@ -176,7 +204,7 @@ export function AgentDetail() {
             </h1>
 
             <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 text-xs font-medium border border-gray-200">
-              <span>v{versions.length || 1}</span>
+              <span>v{versions[0]?.versionNumber || versions.length || 1}</span>
               <span>·</span>
               <span className={isLive ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>
                 {isLive ? 'LIVE' : 'Draft'}
@@ -185,10 +213,12 @@ export function AgentDetail() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {/* Save Status Indicator */}
-          <span className="text-xs text-gray-500 font-medium">
-            {saveStatus === 'saving' ? (
+          <span className="text-xs text-gray-500 font-medium mr-1">
+            {publishingLive ? (
+              <span className="text-emerald-600 font-semibold animate-pulse">Syncing Live...</span>
+            ) : saveStatus === 'saving' ? (
               <span className="text-amber-600 font-semibold animate-pulse">Saving...</span>
             ) : saveStatus === 'unsaved' ? (
               <span className="text-amber-600 font-semibold">● Unsaved changes</span>
@@ -205,16 +235,16 @@ export function AgentDetail() {
                 alert(`Copied Tenant ID (Client Key): ${clientId}`);
               }
             }}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors flex items-center gap-1"
+            className="px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors flex items-center gap-1"
             title="Copy Tenant ID for WhatsApp Bot API"
           >
-            <span>📋 Copy Tenant ID</span>
+            <span>📋 Tenant ID</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowResetModal(true)}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-colors flex items-center gap-1"
+            className="px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-colors flex items-center gap-1"
             title="Clear all test call logs, appointments, and leads"
           >
             <span>🗑️ Reset Data</span>
@@ -223,7 +253,7 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setShowPromptPreview(true)}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 transition-colors flex items-center gap-1"
+            className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 transition-colors flex items-center gap-1"
           >
             <span>🔍 Prompt Preview</span>
           </button>
@@ -231,7 +261,7 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={() => setShowTestModal(true)}
-            className="px-4 py-1.5 rounded-full text-xs font-semibold bg-black hover:bg-gray-800 text-white transition-colors flex items-center gap-1.5 shadow-2xs"
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-black hover:bg-gray-800 text-white transition-colors flex items-center gap-1.5 shadow-2xs"
           >
             <span>📞 Test agent</span>
           </button>
@@ -239,21 +269,63 @@ export function AgentDetail() {
           <button
             type="button"
             onClick={handleSaveDraft}
-            disabled={saving}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 disabled:opacity-50 transition-colors"
+            disabled={saving || publishingLive}
+            className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving...' : 'Save Draft'}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setShowPublishModal(true)}
-            className="px-4 py-1.5 rounded-full text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors shadow-2xs flex items-center gap-1"
-          >
-            <span>🚀 Publish Agent</span>
-          </button>
+          {isLive ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowPublishModal(true)}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 transition-colors flex items-center gap-1"
+                title="Manage Phone Number (DID) and Subscription Plan"
+              >
+                <span>⚙️ Phone & Plan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePublishLiveUpdate}
+                disabled={publishingLive || saving}
+                className="px-4 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+                title="Publish changes instantly to live calls without resetting billing or number"
+              >
+                {publishingLive ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span>Publishing Live...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>⚡ Publish Changes Live</span>
+                  </>
+                )}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowPublishModal(true)}
+              className="px-4 py-1.5 rounded-full text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors shadow-2xs flex items-center gap-1"
+            >
+              <span>🚀 Publish & Go Live</span>
+            </button>
+          )}
         </div>
       </header>
+
+      {livePublishNotice && (
+        <div className="bg-emerald-600 text-white text-xs px-4 py-2 text-center font-medium flex items-center justify-between shadow-xs animate-in slide-in-from-top-2">
+          <span className="mx-auto">{livePublishNotice}</span>
+          <button onClick={() => setLivePublishNotice(null)} className="text-white/80 hover:text-white font-bold text-sm">✕</button>
+        </div>
+      )}
 
       {resetNotice && (
         <div className="bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-xs px-4 py-2 text-center font-medium flex items-center justify-between">

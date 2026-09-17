@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     PLIVO_AUTH_ID: Optional[str] = None
     PLIVO_AUTH_TOKEN: Optional[str] = None
     PLIVO_CALLER_ID: Optional[str] = None
+    PLIVO_STREAM_HOST: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=(".env", "apps/api/.env"),

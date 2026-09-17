@@ -83,7 +83,7 @@ export function PublishAndChannelModal({
   // Step 4: Module 3 Go Live & Final Handover state
   const [isGoingLive, setIsGoingLive] = useState<boolean>(false);
   const [goLiveSuccess, setGoLiveSuccess] = useState<boolean>(false);
-  const [resetTestData, setResetTestData] = useState<boolean>(true);
+  const [resetTestData, setResetTestData] = useState<boolean>(false);
   const [forwardingCodes, setForwardingCodes] = useState<Record<string, string> | null>(null);
   const [handoverText, setHandoverText] = useState<string | null>(null);
   const [copiedHandover, setCopiedHandover] = useState<boolean>(false);
@@ -314,33 +314,49 @@ export function PublishAndChannelModal({
 
         {/* Step Progress Bar */}
         <div className="px-6 pt-3 pb-2 bg-white border-b border-gray-100 flex items-center justify-between text-xs">
-          <div className={`flex items-center gap-1.5 font-medium ${step === 'review' ? 'text-amber-600 font-bold' : 'text-emerald-600'}`}>
+          <button
+            type="button"
+            onClick={() => setStep('review')}
+            className={`flex items-center gap-1.5 font-medium hover:opacity-80 transition-opacity ${step === 'review' ? 'text-amber-600 font-bold' : 'text-emerald-600'}`}
+          >
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 'review' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
               {step !== 'review' ? '✓' : '1'}
             </span>
             <span>Version Lock</span>
-          </div>
+          </button>
           <div className="w-8 h-0.5 bg-gray-200" />
-          <div className={`flex items-center gap-1.5 font-medium ${step === 'channel' ? 'text-amber-600 font-bold' : ['plan', 'complete'].includes(step) ? 'text-emerald-600' : 'text-gray-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 'channel' ? 'bg-amber-100 text-amber-800' : ['plan', 'complete'].includes(step) ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500'}`}>
+          <button
+            type="button"
+            onClick={() => setStep('channel')}
+            className={`flex items-center gap-1.5 font-medium hover:opacity-80 transition-opacity ${step === 'channel' ? 'text-amber-600 font-bold' : ['plan', 'complete'].includes(step) ? 'text-emerald-600' : 'text-gray-600'}`}
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 'channel' ? 'bg-amber-100 text-amber-800' : ['plan', 'complete'].includes(step) ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700'}`}>
               {['plan', 'complete'].includes(step) ? '✓' : '2'}
             </span>
             <span>Channel & DID</span>
-          </div>
+          </button>
           <div className="w-8 h-0.5 bg-gray-200" />
-          <div className={`flex items-center gap-1.5 font-medium ${step === 'plan' ? 'text-amber-600 font-bold' : step === 'complete' ? 'text-emerald-600' : 'text-gray-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 'plan' ? 'bg-amber-100 text-amber-800' : step === 'complete' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500'}`}>
+          <button
+            type="button"
+            onClick={() => setStep('plan')}
+            className={`flex items-center gap-1.5 font-medium hover:opacity-80 transition-opacity ${step === 'plan' ? 'text-amber-600 font-bold' : step === 'complete' ? 'text-emerald-600' : 'text-gray-600'}`}
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 'plan' ? 'bg-amber-100 text-amber-800' : step === 'complete' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700'}`}>
               {step === 'complete' ? '✓' : '3'}
             </span>
             <span>Pricing Plan</span>
-          </div>
+          </button>
           <div className="w-8 h-0.5 bg-gray-200" />
-          <div className={`flex items-center gap-1.5 font-medium ${step === 'complete' ? 'text-emerald-600 font-bold' : 'text-gray-400'}`}>
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 'complete' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500'}`}>
+          <button
+            type="button"
+            onClick={() => setStep('complete')}
+            className={`flex items-center gap-1.5 font-medium hover:opacity-80 transition-opacity ${step === 'complete' ? 'text-emerald-600 font-bold' : 'text-gray-600'}`}
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${step === 'complete' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-700'}`}>
               4
             </span>
             <span>Ready</span>
-          </div>
+          </button>
         </div>
 
         {/* Body Content */}
@@ -818,7 +834,7 @@ export function PublishAndChannelModal({
                   </div>
 
                   {/* Pre-launch Data Reset Option */}
-                  <div className="p-3.5 bg-indigo-50/70 border border-indigo-100 rounded-xl">
+                  <div className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl">
                     <label className="flex items-start gap-3 cursor-pointer select-none">
                       <input
                         type="checkbox"
@@ -828,11 +844,11 @@ export function PublishAndChannelModal({
                       />
                       <div className="space-y-0.5">
                         <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
-                          <span>Purge pre-launch test data & reset usage meters to 0 mins</span>
-                          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-semibold uppercase">Recommended</span>
+                          <span>Reset sandbox operational data & clear test logs</span>
+                          <span className="text-[10px] bg-gray-200 text-gray-700 px-1.5 py-0.2 rounded font-semibold uppercase">Initial Launch Only</span>
                         </span>
                         <p className="text-[11px] text-gray-600 leading-relaxed">
-                          Clears mock test calls, appointments, and leads recorded during development. Ensures client's live billing starts with clean 0% usage and 100% quota available.
+                          Leave unchecked to preserve all existing call sessions, appointments, leads, and billing quota. Only check this if onboarding a brand-new clinic for the first time.
                         </p>
                       </div>
                     </label>
@@ -972,21 +988,46 @@ export function PublishAndChannelModal({
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                onClick={handleLockAndPublish}
-                disabled={isPublishing}
-                className="px-5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-full disabled:opacity-50 transition-colors shadow-2xs flex items-center gap-1.5"
-              >
-                {isPublishing ? (
-                  <span>Locking Version...</span>
-                ) : (
-                  <>
-                    <span>Lock Version & Proceed</span>
-                    <span>→</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsPublishing(true);
+                    setPhoneError(null);
+                    try {
+                      await api.saveAgentConfig(clientId, agentId, configuration, notes);
+                      const res = await api.publishAgent(clientId, agentId, notes, configuration);
+                      setPublishedVersion(res.version);
+                      onSuccess(res.agent);
+                      onClose();
+                    } catch (err: any) {
+                      setPhoneError(err.message || 'Failed to publish agent version');
+                    } finally {
+                      setIsPublishing(false);
+                    }
+                  }}
+                  disabled={isPublishing}
+                  className="px-4 py-2 text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-full disabled:opacity-50 transition-colors"
+                  title="Lock version and update live routing immediately"
+                >
+                  ✓ Lock & Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLockAndPublish}
+                  disabled={isPublishing}
+                  className="px-5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-full disabled:opacity-50 transition-colors shadow-2xs flex items-center gap-1.5"
+                >
+                  {isPublishing ? (
+                    <span>Locking Version...</span>
+                  ) : (
+                    <>
+                      <span>Lock & Next Step</span>
+                      <span>→</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </>
           )}
 

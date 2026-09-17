@@ -43,7 +43,10 @@ class TelephonyService:
                 "api_id": "mock-api-id"
             }
 
-        caller_id = settings.PLIVO_CALLER_ID or "+918031707681"
+        caller_id = settings.PLIVO_CALLER_ID
+        if not caller_id:
+            logger.error("[TelephonyService] PLIVO_CALLER_ID is not configured in environment")
+            return {"error": "PLIVO_CALLER_ID is required for outbound calls"}
         url = f"https://api.plivo.com/v1/Account/{settings.PLIVO_AUTH_ID}/Call/"
         auth_bytes = f"{settings.PLIVO_AUTH_ID}:{settings.PLIVO_AUTH_TOKEN}".encode("utf-8")
         auth_header = f"Basic {base64.b64encode(auth_bytes).decode('utf-8')}"

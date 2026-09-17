@@ -335,6 +335,7 @@ export function ClientAppointments() {
           >
             <option value="ALL">All Sources</option>
             <option value="AGENT">AI Voice Agent</option>
+            <option value="WHATSAPP">WhatsApp Bot</option>
             <option value="RECEPTIONIST">Desk Walk-in</option>
           </select>
 
@@ -450,16 +451,6 @@ export function ClientAppointments() {
                             className="el-btn-outline h-7 px-2.5 text-[11px] bg-white group-hover:border-[#0c0a09]"
                           >
                             Manage
-                          </button>
-                          <button
-                            onClick={() => handleOpenWhatsApp(appt)}
-                            className="el-btn-outline h-7 px-2.5 text-[11px] bg-white text-[#15803d] hover:bg-[#f0fdf4] flex items-center gap-1"
-                            title="Send WhatsApp Confirmation"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                            </svg>
-                            <span>Confirm</span>
                           </button>
                         </div>
                       </td>
@@ -696,7 +687,7 @@ export function ClientAppointments() {
                   disabled={bookingSubmitting || slotAvailable === false}
                   className="el-btn-primary px-5 py-2 text-xs bg-[#0c0a09] text-white rounded-xl hover:bg-[#292524] disabled:opacity-50"
                 >
-                  {bookingSubmitting ? 'Confirming...' : 'Save & Confirm Walk-in'}
+                  {bookingSubmitting ? 'Saving...' : 'Save Walk-in Appointment'}
                 </button>
               </div>
             </form>

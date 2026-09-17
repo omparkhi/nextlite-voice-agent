@@ -342,6 +342,7 @@ export interface Agent {
   createdAt: string;
   updatedAt: string;
   template?: { id: string; name: string; industry: string; description?: string };
+  activeDeployment?: { id: string; versionId: string; environment: string; status: string } | null;
   versions?: AgentVersion[];
   tools?: AgentTool[];
 }

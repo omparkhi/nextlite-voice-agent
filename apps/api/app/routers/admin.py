@@ -1023,8 +1023,8 @@ async def set_agent_inbound_number(
     # Auto-sync Plivo cloud XML application attachment
     if provider == "plivo" and settings.PLIVO_AUTH_ID and settings.PLIVO_AUTH_TOKEN:
         try:
-            ngrok_host = settings.PLIVO_STREAM_HOST or "dandelion-gigantic-challenge.ngrok-free.dev"
-            target_answer_url = f"https://{ngrok_host}/api/v1/telephony/plivo/inbound"
+            stream_host = settings.PLIVO_STREAM_HOST or request.headers.get("host", "localhost:8000")
+            target_answer_url = f"https://{stream_host}/api/v1/telephony/plivo/inbound"
             auth = (settings.PLIVO_AUTH_ID, settings.PLIVO_AUTH_TOKEN)
             base_plivo = f"https://api.plivo.com/v1/Account/{settings.PLIVO_AUTH_ID}"
             clean_digits = re.sub(r"[^\d]", "", norm_phone)
@@ -1140,7 +1140,7 @@ async def go_live_agent(
     client_uuid = uuid.UUID(client_id)
     agent_uuid = uuid.UUID(agent_id)
     body = body or {}
-    reset_test_data = body.get("resetTestData", True)
+    reset_test_data = body.get("resetTestData", False)
 
     crm_service = CRMService(session)
     agent_service = AgentService(session)
@@ -1155,7 +1155,7 @@ async def go_live_agent(
     if not agent_data:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
 
-    # 2. Reset Test Data if requested
+    # 2. Reset Test Data only if explicitly requested (e.g. sandbox wipe)
     deleted_counts = {}
     if reset_test_data:
         reset_res = await crm_service.reset_tenant_data(client_uuid)
@@ -1188,7 +1188,7 @@ async def go_live_agent(
                 versionId=latest_ver.id,
                 environment=DeploymentEnvironment.PRODUCTION,
                 status=DeploymentStatus.ACTIVE,
-                createdBy=auth_user.userId,
+                createdBy=user_id,
                 deployedAt=now,
                 createdAt=now,
                 updatedAt=now
@@ -1211,8 +1211,10 @@ async def go_live_agent(
     sub = sub_res.scalar_one_or_none()
     if sub:
         sub.status = SubscriptionStatus.ACTIVE
-        sub.currentPeriodStart = now
-        sub.currentPeriodEnd = now + timedelta(days=365 if sub.billingCycle == "yearly" else 30)
+        if not sub.startedAt:
+            sub.startedAt = now
+        if not sub.currentPeriodEnd or sub.currentPeriodEnd < now:
+            sub.currentPeriodEnd = now + timedelta(days=365 if sub.billingCycle == "yearly" else 30)
         sub.updatedAt = now
 
     # 6. Fetch Linked Phone Number (DID)
