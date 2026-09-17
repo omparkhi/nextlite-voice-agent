@@ -8,6 +8,7 @@ from ..db import get_db
 from ..auth import require_worker
 from ..schemas import RuntimeAgentConfig
 from ..services.runtime_config_service import RuntimeAgentConfigService
+from ..services.crm_service import CRMService
 from ..repositories import CallSessionRepository, AppointmentRepository, KnowledgeRepository
 from ..models import CallStatus, CallDirection, Appointment, Lead, AppointmentStatus, LeadStatus, LeadPriority, Deployment
 
@@ -50,6 +51,18 @@ async def get_runtime_config_by_path(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e)
         )
+
+@router.get("/deployments/active")
+async def get_active_deployments(
+    authenticated: bool = Depends(require_worker),
+    session: AsyncSession = Depends(get_db)
+):
+    """Returns list of active deployment IDs for worker cache pre-warming."""
+    from ..models import DeploymentStatus
+    stmt = select(Deployment.id).where(Deployment.status == DeploymentStatus.ACTIVE)
+    res = await session.execute(stmt)
+    active_ids = [str(d_id) for d_id in res.scalars().all()]
+    return {"deployments": active_ids}
 
 @router.post("/call-sessions", status_code=status.HTTP_201_CREATED)
 async def create_call_session(
@@ -159,20 +172,19 @@ async def create_internal_appointment(
     tenant_id_str = payload.get("tenantId")
     agent_id_str = payload.get("agentId")
 
-    effective_tenant_id: Optional[uuid.UUID] = None
-    effective_agent_id: Optional[uuid.UUID] = None
+    if tenant_id_str:
+        effective_tenant_id = uuid.UUID(tenant_id_str)
+    if agent_id_str:
+        effective_agent_id = uuid.UUID(agent_id_str)
 
-    if dep_id_str:
+    if (not effective_tenant_id or not effective_agent_id) and dep_id_str:
         dep_res = await session.execute(select(Deployment).where(Deployment.id == uuid.UUID(dep_id_str)))
         dep = dep_res.scalar_one_or_none()
         if dep:
-            effective_tenant_id = dep.tenantId
-            effective_agent_id = dep.agentId
-
-    if not effective_tenant_id and tenant_id_str:
-        effective_tenant_id = uuid.UUID(tenant_id_str)
-    if not effective_agent_id and agent_id_str:
-        effective_agent_id = uuid.UUID(agent_id_str)
+            if not effective_tenant_id:
+                effective_tenant_id = dep.tenantId
+            if not effective_agent_id:
+                effective_agent_id = dep.agentId
 
     if not effective_tenant_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not determine tenantId for appointment")
@@ -184,11 +196,112 @@ async def create_internal_appointment(
     service_type = payload.get("title") or payload.get("serviceType") or payload.get("service") or "General Appointment"
     apt_date = payload.get("bookingDate") or payload.get("appointmentDate") or payload.get("date") or "Tomorrow"
     apt_time = payload.get("bookingTime") or payload.get("appointmentTime") or payload.get("time") or "10:00 AM"
-    phone = payload.get("customerPhone") or payload.get("phone") or "+910000000000"
+    phone = payload.get("customerPhone") or payload.get("phone")
     call_session_id = uuid.UUID(payload["callSessionId"]) if payload.get("callSessionId") else None
+
+    # Inherit caller phone number from active CallSession if phone is missing or dummy
+    if (not phone or phone == "+910000000000") and call_session_id:
+        cs_res = await session.execute(select(CallSession).where(CallSession.id == call_session_id))
+        cs = cs_res.scalar_one_or_none()
+        if cs and cs.callerNumber and cs.callerNumber != "none" and cs.callerNumber != "+910000000000":
+            phone = cs.callerNumber
+
+    if not phone:
+        phone = "+910000000000"
+
+    # Handle age, place/location details
+    age = payload.get("age")
+    place = payload.get("place") or payload.get("location")
+    raw_notes = payload.get("notes")
+
+    meta = dict(payload.get("metadata") or {})
+    detail_notes = []
+    if age is not None and str(age).strip():
+        meta["age"] = str(age).strip()
+        detail_notes.append(f"Age: {str(age).strip()}")
+    if place and str(place).strip():
+        meta["place"] = str(place).strip()
+        meta["location"] = str(place).strip()
+        detail_notes.append(f"Place: {str(place).strip()}")
+    if raw_notes and str(raw_notes).strip():
+        detail_notes.append(str(raw_notes).strip())
+    combined_notes = "; ".join(detail_notes) if detail_notes else None
+
+    # Check for session-level deduplication to prevent duplicate rows within the same call session
+    if call_session_id:
+        existing_cs_res = await session.execute(
+            select(Appointment).where(
+                Appointment.callSessionId == call_session_id,
+                Appointment.tenantId == effective_tenant_id,
+                Appointment.status.in_([
+                    AppointmentStatus.SCHEDULED,
+                    AppointmentStatus.REQUESTED,
+                ])
+            )
+        )
+        existing_cs_appt = existing_cs_res.scalars().first()
+        if existing_cs_appt:
+            existing_cs_appt.customerName = customer_name
+            existing_cs_appt.customerPhone = phone
+            existing_cs_appt.title = service_type
+            existing_cs_appt.bookingDate = apt_date
+            existing_cs_appt.bookingTime = apt_time
+            if age is not None and str(age).strip():
+                existing_cs_appt.age = str(age).strip()
+            if place and str(place).strip():
+                existing_cs_appt.place = str(place).strip()
+            existing_cs_appt.notes = combined_notes
+            existing_cs_appt.metadataJson = meta
+            existing_cs_appt.updatedAt = datetime.utcnow()
+            await session.commit()
+            return {
+                "success": True,
+                "id": str(existing_cs_appt.id),
+                "appointmentNumber": existing_cs_appt.appointmentNumber,
+                "status": "SCHEDULED",
+                "serviceType": service_type,
+                "appointmentDate": apt_date,
+                "appointmentTime": apt_time,
+                "customerName": customer_name,
+                "customerPhone": phone,
+                "resourceName": existing_cs_appt.resourceName,
+                "bookedBy": existing_cs_appt.bookedBy,
+                "isUpdated": True
+            }
+
+    import re
+    def _norm_time(t: str) -> str:
+        if not t:
+            return ""
+        clean = re.sub(r"\s+", " ", t.strip().upper())
+        if re.match(r"^\d:\d{2}\s*(AM|PM)$", clean):
+            clean = "0" + clean
+        return clean
+
+    # Slot Conflict Check: Prevent duplicate bookings for the same date and time
+    norm_target_time = _norm_time(apt_time)
+    existing_slot_res = await session.execute(
+        select(Appointment).where(
+            Appointment.tenantId == effective_tenant_id,
+            Appointment.bookingDate == apt_date,
+            Appointment.status.in_([
+                AppointmentStatus.SCHEDULED,
+                AppointmentStatus.REQUESTED,
+            ])
+        )
+    )
+    for existing in existing_slot_res.scalars().all():
+        if _norm_time(existing.bookingTime) == norm_target_time:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Slot {apt_time} on {apt_date} is already booked for patient '{existing.customerName}' ({existing.appointmentNumber})."
+            )
 
     apt_repo = AppointmentRepository(session)
     apt_number = await apt_repo.get_next_appointment_number(effective_tenant_id)
+    booked_by = payload.get("bookedBy") or "AGENT"
+    booked_by_name = payload.get("bookedByName") or ("AI Voice Assistant" if booked_by == "AGENT" else "Receptionist")
+    walk_in = bool(payload.get("walkIn", False))
 
     apt = Appointment(
         tenantId=effective_tenant_id,
@@ -201,8 +314,14 @@ async def create_internal_appointment(
         resourceName=payload.get("resourceName"),
         bookingDate=apt_date,
         bookingTime=apt_time,
-        status=AppointmentStatus.REQUESTED,
-        notes=payload.get("notes")
+        status=AppointmentStatus.SCHEDULED,
+        bookedBy=booked_by,
+        bookedByName=booked_by_name,
+        age=str(age).strip() if (age is not None and str(age).strip()) else None,
+        place=str(place).strip() if (place and str(place).strip()) else None,
+        walkIn=walk_in,
+        notes=combined_notes,
+        metadataJson=meta
     )
     await apt_repo.create(apt)
     await session.commit()
@@ -217,7 +336,89 @@ async def create_internal_appointment(
         "appointmentTime": apt_time,
         "customerName": customer_name,
         "customerPhone": phone,
+        "bookedBy": booked_by,
+        "bookedByName": booked_by_name,
         "resourceName": payload.get("resourceName")
+    }
+
+
+@router.get("/appointments/check-slots")
+async def check_internal_appointment_slots(
+    deployment_id: Optional[str] = Query(None, alias="deploymentId"),
+    tenant_id: Optional[str] = Query(None, alias="tenantId"),
+    booking_date: str = Query(..., alias="bookingDate"),
+    phone: Optional[str] = Query(None),
+    preferred_time: Optional[str] = Query(None, alias="preferredTime"),
+    authenticated: bool = Depends(require_worker),
+    session: AsyncSession = Depends(get_db)
+):
+    effective_tenant_id = None
+    if deployment_id:
+        dep_res = await session.execute(select(Deployment).where(Deployment.id == uuid.UUID(deployment_id)))
+        dep = dep_res.scalar_one_or_none()
+        if dep:
+            effective_tenant_id = dep.tenantId
+    elif tenant_id:
+        effective_tenant_id = uuid.UUID(tenant_id)
+
+    if not effective_tenant_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="deploymentId or tenantId required")
+
+    crm_service = CRMService(session)
+    return await crm_service.check_slots(
+        tenant_id=effective_tenant_id,
+        booking_date=booking_date,
+        phone=phone,
+        preferred_time=preferred_time,
+    )
+
+
+@router.post("/appointments/reschedule")
+async def reschedule_internal_appointment(
+    payload: Dict[str, Any],
+    authenticated: bool = Depends(require_worker),
+    session: AsyncSession = Depends(get_db)
+):
+    dep_id_str = payload.get("deploymentId")
+    tenant_id_str = payload.get("tenantId")
+    effective_tenant_id = None
+    if dep_id_str:
+        dep_res = await session.execute(select(Deployment).where(Deployment.id == uuid.UUID(dep_id_str)))
+        dep = dep_res.scalar_one_or_none()
+        if dep:
+            effective_tenant_id = dep.tenantId
+    elif tenant_id_str:
+        effective_tenant_id = uuid.UUID(tenant_id_str)
+
+    if not effective_tenant_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="deploymentId or tenantId required")
+
+    new_date = payload.get("newBookingDate") or payload.get("bookingDate") or payload.get("date")
+    new_time = payload.get("newBookingTime") or payload.get("bookingTime") or payload.get("time")
+    if not new_date or not new_time:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="newBookingDate and newBookingTime are required")
+
+    phone = payload.get("customerPhone") or payload.get("phone")
+    appt_id_str = payload.get("appointmentId")
+    appt_uuid = uuid.UUID(appt_id_str) if appt_id_str else None
+    reason = payload.get("reason")
+
+    crm_service = CRMService(session)
+    updated = await crm_service.reschedule_appointment(
+        tenant_id=effective_tenant_id,
+        new_date=new_date,
+        new_time=new_time,
+        appointment_id=appt_uuid,
+        phone=phone,
+        reason=reason,
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active appointment found to reschedule")
+
+    return {
+        "success": True,
+        "appointment": updated,
+        "message": f"Appointment rescheduled to {new_date} at {new_time}"
     }
 
 @router.post("/leads", status_code=status.HTTP_201_CREATED)
@@ -353,7 +554,7 @@ async def retrieve_knowledge(
         )
 
     top_k = int(payload.get("topK", 3))
-    threshold = float(payload.get("scoreThreshold", 0.65))
+    threshold = float(payload.get("scoreThreshold", 0.20))
 
     service = KnowledgeService(session)
     chunks = await service.retrieve_relevant_chunks(

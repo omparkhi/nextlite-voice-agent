@@ -14,6 +14,7 @@ import enum
 import inspect
 import json
 import math
+import re
 import struct
 import sys
 import time
@@ -57,7 +58,7 @@ from app.temporal_context import (
 from app.tools import ToolRuntimeContext, tool_registry
 from app.turn_timing import StartupTimingTracker, TurnTimingTracker, build_unified_call_timeline, log_phone_trace
 from app.aggregators import EarlyReleaseTextAggregator
-from pipecat.utils.types import NOT_GIVEN
+from pipecat.utils.types import NOT_GIVEN, assert_given
 
 # Top-level Pipecat imports for zero runtime import latency
 try:
@@ -102,7 +103,7 @@ try:
     from pipecat.serializers.plivo import PlivoFrameSerializer
     from pipecat.services.sarvam.llm import SarvamLLMService, SarvamLLMSettings
     from pipecat.services.sarvam.stt import SarvamRealtimeSTTService
-    from pipecat.services.sarvam.tts import SarvamTTSService
+    from pipecat.services.sarvam.tts import SarvamTTSService, traced_tts
     from pipecat.transports.websocket.fastapi import (
         FastAPIWebsocketParams,
         FastAPIWebsocketTransport,
@@ -111,6 +112,8 @@ try:
     from pipecat.turns.user_start import ExternalUserTurnStartStrategy
     from pipecat.turns.user_stop import ExternalUserTurnStopStrategy
     from pipecat.observers.user_bot_latency_observer import UserBotLatencyObserver
+    from pipecat.observers.loggers.metrics_log_observer import MetricsLogObserver
+    from pipecat.observers.loggers.transcription_log_observer import TranscriptionLogObserver
 except ImportError as e:
     FrameProcessor = object
     FrameDirection = None
@@ -159,10 +162,55 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.debug(f"[LLM Connection Pool] Background pre-warm notice: {e}")
 
+    # Proactive Multilingual Starter Audio Pre-warming
+    async def _prewarm_starters_task():
+        try:
+            if settings.SARVAM_API_KEY:
+                from app.phrase_audio_cache import global_phrase_audio_cache
+                for lang in ["mr-IN", "hi-IN", "en-IN"]:
+                    try:
+                        slot_reply = BOOKING_SLOT_COLLECTION_RESPONSES.get(lang)
+                        slot_reply_pure = BOOKING_SLOT_COLLECTION_PURE_RESPONSES.get(lang)
+                        add_phrases = [r for r in [slot_reply, slot_reply_pure] if r]
+                        count = await global_phrase_audio_cache.prewarm_starters(
+                            tenant_id="global",
+                            language=lang,
+                            voice_id=settings.PHASE2_TEST_VOICE_ID,
+                            model=settings.TTS_MODEL,
+                            sample_rate=8000,
+                            api_key=settings.SARVAM_API_KEY,
+                            additional_phrases=add_phrases,
+                        )
+                        logger.info(f"[Starter Cache Warming] Pre-warmed {count} phrases for language={lang}")
+                    except Exception as e:
+                        logger.debug(f"[Starter Cache Warming] Notice for lang={lang}: {e}")
+        except Exception as e:
+            logger.debug(f"[Starter Cache Warming] Background error: {e}")
+
+    async def _prewarm_active_deployments_task():
+        try:
+            await asyncio.sleep(0.5)
+            from app.runtime_config_client import RuntimeConfigClient
+            rc_client = RuntimeConfigClient(http_client=app.state.http_client)
+            await rc_client.prewarm_active_configs()
+        except Exception as e:
+            logger.debug(f"[RuntimeConfigCache Pre-warming] Notice: {e}")
+
+    from app.redis_client import listen_cache_invalidation_loop, close_worker_redis
     prewarm_task = asyncio.create_task(_prewarm_sarvam_llm())
+    starter_prewarm_task = asyncio.create_task(_prewarm_starters_task())
+    config_prewarm_task = asyncio.create_task(_prewarm_active_deployments_task())
+    invalidation_listener_task = asyncio.create_task(listen_cache_invalidation_loop())
     yield
+    if invalidation_listener_task and not invalidation_listener_task.done():
+        invalidation_listener_task.cancel()
+    await close_worker_redis()
     if prewarm_task and not prewarm_task.done():
         prewarm_task.cancel()
+    if starter_prewarm_task and not starter_prewarm_task.done():
+        starter_prewarm_task.cancel()
+    if config_prewarm_task and not config_prewarm_task.done():
+        config_prewarm_task.cancel()
     if hasattr(app.state, "sarvam_llm_http_client") and app.state.sarvam_llm_http_client:
         await app.state.sarvam_llm_http_client.aclose()
     if hasattr(app.state, "http_client") and app.state.http_client:
@@ -203,21 +251,191 @@ async def health_check():
     }
 
 
-@app.api_route("/plivo/test-xml", methods=["GET", "POST"])
-async def plivo_test_xml(
+@app.api_route("/api/v1/integrations/whatsapp/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_whatsapp_integration(request: Request, path: str):
+    """Proxies WhatsApp integration requests from port 8000 (ngrok) to port 3001 (NextLite Control Plane API)."""
+    target_url = f"http://localhost:3001/api/v1/integrations/whatsapp/{path}"
+    if request.query_params:
+        target_url += f"?{request.query_params}"
+
+    headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+    body = await request.body()
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            content=body,
+            timeout=10.0,
+        )
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers={k: v for k, v in resp.headers.items() if k.lower() not in ("content-length", "content-encoding", "transfer-encoding")},
+        )
+
+
+@app.post("/internal/cache/invalidate")
+async def invalidate_cache(
+    deployment_id: Optional[str] = Query(default=None, alias="deploymentId"),
+    all_entries: bool = Query(default=False, alias="all"),
+    re_warm: bool = Query(default=True, alias="reWarm"),
+):
+    """Event-driven cache invalidation and atomic re-warming webhook."""
+    from app.runtime_config_cache import runtime_config_cache
+    from app.greeting_cache import global_greeting_cache
+    from app.tools.knowledge_tool import global_knowledge_cache
+
+    if all_entries or not deployment_id:
+        runtime_config_cache.invalidate(None)
+        global_greeting_cache.clear()
+        global_knowledge_cache.invalidate(None)
+        logger.info("[Cache Invalidate] Purged all cache tiers across worker")
+        return {"status": "cleared_all", "timestamp": time.time()}
+
+    clean_id = deployment_id.strip()
+    runtime_config_cache.invalidate(clean_id)
+    global_knowledge_cache.invalidate(clean_id)
+    logger.info(f"[Cache Invalidate] Invalidated caches for deploymentId={clean_id}")
+
+    rewarmed = False
+    if re_warm and hasattr(app.state, "http_client"):
+        try:
+            client = RuntimeConfigClient(
+                api_url=settings.NEXTLITE_API_URL,
+                worker_secret=settings.WORKER_API_SECRET,
+                timeout_seconds=5.0,
+                http_client=app.state.http_client,
+            )
+            config = await client.get_runtime_config(clean_id)
+            if config:
+                rewarmed = True
+                logger.info(f"[Cache Invalidate] Atomically pre-warmed fresh config for deploymentId={clean_id}")
+        except Exception as e:
+            logger.warning(f"[Cache Invalidate] Re-warm notice for deploymentId={clean_id}: {e}")
+
+    return {
+        "status": "invalidated_and_warmed" if rewarmed else "invalidated",
+        "deployment_id": clean_id,
+        "rewarmed": rewarmed,
+        "timestamp": time.time(),
+    }
+
+
+@app.get("/internal/cache/stats")
+async def get_cache_stats():
+    """Returns real-time cache diagnostics and performance metrics."""
+    from app.runtime_config_cache import runtime_config_cache
+    from app.greeting_cache import global_greeting_cache
+    from app.phrase_audio_cache import global_phrase_audio_cache
+    from app.tools.knowledge_tool import global_knowledge_cache
+
+    return {
+        "status": "ok",
+        "runtime_config_cache": runtime_config_cache.get_stats(),
+        "greeting_cache_entries": len(getattr(global_greeting_cache, "_cache", {})),
+        "phrase_audio_cache_entries": len(getattr(global_phrase_audio_cache, "_cache", {})),
+        "knowledge_cache_hits": getattr(global_knowledge_cache, "_hits", 0),
+        "knowledge_cache_misses": getattr(global_knowledge_cache, "_misses", 0),
+    }
+
+
+@app.api_route("/api/v1/telephony/plivo/inbound", methods=["GET", "POST"])
+@app.api_route("/plivo/inbound", methods=["GET", "POST"])
+@app.api_route("/telephony/inbound", methods=["GET", "POST"])
+@app.api_route("/telephony/plivo/inbound", methods=["GET", "POST"])
+@app.api_route("/plivo/test-xml", methods=["GET", "POST"])  # Backward compatibility alias
+async def plivo_inbound_xml(
     request: Request,
     host: Optional[str] = None,
     deployment_id: Optional[str] = Query(default=None, alias="deploymentId"),
 ):
-    """Generate temporary Plivo XML for manual telephony testing."""
+    """Production Multi-Tenant Inbound Voice Gateway for Plivo PSTN Calls.
+    
+    Dynamically maps incoming carrier calls (by dialed virtual DID) to the client's
+    active AI receptionist deployment and returns bidirectional audio WebSocket Stream XML.
+    """
     server_host = host or request.headers.get("host", f"localhost:{settings.PORT}")
     scheme = "wss" if request.headers.get("x-forwarded-proto") == "https" or "https" in str(request.url) else "ws"
-    query_suffix = f"?deploymentId={deployment_id}" if deployment_id else ""
+    
+    # Extract caller number and call UUID from query params or POST form data
+    query_params = dict(request.query_params)
+    form_params = {}
+    if request.method == "POST":
+        try:
+            form_data = await request.form()
+            form_params = dict(form_data)
+        except Exception:
+            pass
+
+    caller_direction = (
+        query_params.get("Direction")
+        or query_params.get("direction")
+        or form_params.get("Direction")
+        or form_params.get("direction")
+    )
+    caller_from = (
+        query_params.get("From")
+        or query_params.get("from")
+        or query_params.get("CallerName")
+        or query_params.get("callerId")
+        or form_params.get("From")
+        or form_params.get("from")
+        or form_params.get("CallerName")
+        or form_params.get("callerId")
+    )
+    caller_to = (
+        query_params.get("To")
+        or query_params.get("to")
+        or form_params.get("To")
+        or form_params.get("to")
+    )
+    call_uuid = (
+        query_params.get("CallUUID")
+        or query_params.get("callId")
+        or query_params.get("ALegUUID")
+        or form_params.get("CallUUID")
+        or form_params.get("callId")
+        or form_params.get("ALegUUID")
+    )
+
+    if not deployment_id and caller_to:
+        try:
+            shared_http_client = getattr(request.app.state, "http_client", None)
+            cfg_client = RuntimeConfigClient(http_client=shared_http_client)
+            rc = await cfg_client.get_runtime_agent_config_by_phone(caller_to)
+            if rc and rc.deployment and rc.deployment.deployment_id:
+                deployment_id = rc.deployment.deployment_id
+                logger.info(f"[Plivo XML] Inbound call to {caller_to} automatically matched deploymentId={deployment_id}")
+        except Exception as lookup_err:
+            logger.warning(f"[Plivo XML] Inbound phone lookup notice for {caller_to}: {lookup_err}")
+
+    query_parts = []
+    if deployment_id:
+        query_parts.append(f"deploymentId={deployment_id}")
+    if caller_direction:
+        import urllib.parse
+        query_parts.append(f"direction={urllib.parse.quote_plus(str(caller_direction))}")
+    if caller_from:
+        import urllib.parse
+        query_parts.append(f"from={urllib.parse.quote_plus(str(caller_from))}")
+    if caller_to:
+        import urllib.parse
+        query_parts.append(f"to={urllib.parse.quote_plus(str(caller_to))}")
+    if call_uuid:
+        import urllib.parse
+        query_parts.append(f"callId={urllib.parse.quote_plus(str(call_uuid))}")
+
+    query_suffix = f"?{'&'.join(query_parts)}" if query_parts else ""
     ws_url = f"{scheme}://{server_host}/ws/plivo{query_suffix}"
+
+    import xml.sax.saxutils
+    xml_ws_url = xml.sax.saxutils.escape(ws_url)
 
     xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Stream bidirectional="true" keepCallAlive="true">{ws_url}</Stream>
+    <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=8000">{xml_ws_url}</Stream>
 </Response>"""
     return PlainResponse(content=xml_content, media_type="application/xml")
 
@@ -237,23 +455,126 @@ class DeterministicTestEchoProcessor(FrameProcessor):
 
 
 DEFAULT_EARLY_TOOL_ACK_PHRASES: Dict[str, str] = {
-    "en-IN": "Sure, let me check that for you.",
-    "en": "Sure, let me check that for you.",
-    "hi-IN": "जी, मैं अभी चेक कर लेता हूँ।",
-    "hi": "जी, मैं अभी चेक कर लेता हूँ।",
-    "mr-IN": "हो, मी लगेच तपासतो.",
-    "mr": "हो, मी लगेच तपासतो.",
-    "gu-IN": "હા, હું હમણાં જ તપાસ કરું છું.",
-    "gu": "હા, હું હમણાં જ તપાસ કરું છું.",
-    "bn-IN": "হ্যাঁ, আমি এখনই দেখছি।",
-    "bn": "হ্যাঁ, আমি এখনই দেখছি।",
-    "ta-IN": "சரிங்க, நான் இப்போதே பார்க்கிறேன்.",
-    "ta": "சரிங்க, நான் இப்போதே பார்க்கிறேன்.",
-    "te-IN": "సరేనండి, నేను ఇప్పుడే చూస్తాను.",
-    "te": "సరేనండి, నేను ఇప్పుడే చూస్తాను.",
-    "kn-IN": "ಖಂಡಿತ, ನಾನು ಈಗಲೇ ಪರಿಶೀಲಿಸುತ್ತೇನೆ.",
-    "kn": "ಖಂಡಿತ, ನಾನು ಈಗಲೇ ಪರಿಶೀಲಿಸುತ್ತೇನೆ.",
+    "en-IN": "Just a minute, let me check that for you.",
+    "en": "Just a minute, let me check that for you.",
+    "hi-IN": "एक मिनट, मैं अभी चेक कर लेता हूँ।",
+    "hi": "एक मिनट, मैं अभी चेक कर लेता हूँ।",
+    "mr-IN": "एक मिनिट, मी लगेच तपासतो.",
+    "mr": "एक मिनिट, मी लगेच तपासतो.",
+    "gu-IN": "એક મિનિટ, હું હમણાં જ તપાસ કરું છું.",
+    "gu": "એક મિનિટ, હું હમણાં જ તપાસ કરું છું.",
+    "bn-IN": "এক মিনিট, আমি এখনই দেখছি।",
+    "bn": "এক মিনিট, আমি এখনই দেখছি।",
+    "ta-IN": "ஒரு நிமிடம், நான் இப்போதே பார்க்கிறேன்.",
+    "ta": "ஒரு நிமிடம், நான் இப்போதே பார்க்கிறேன்.",
+    "te-IN": "ఒక్క నిమిషం, నేను ఇప్పుడే చూస్తాను.",
+    "te": "ఒక్క నిమిషం, నేను ఇప్పుడే చూస్తాను.",
+    "kn-IN": "ಒಂದು ನಿಮಿಷ, ನಾನು ಈಗಲೇ ಪರಿಶೀಲಿಸುತ್ತೇನೆ.",
+    "kn": "ಒಂದು ನಿಮಿಷ, ನಾನು ಈಗಲೇ ಪರಿಶೀಲಿಸುತ್ತೇನೆ.",
 }
+
+
+DEFAULT_CONVERSATIONAL_ACK_PHRASES: Dict[str, str] = {
+    "en-IN": "Sure,",
+    "en": "Sure,",
+    "hi-IN": "हाँ जी,",
+    "hi": "हाँ जी,",
+    "mr-IN": "होय,",
+    "mr": "होय,",
+    "gu-IN": "હા,",
+    "gu": "હા,",
+    "bn-IN": "হ্যাঁ,",
+    "bn": "হ্যাঁ,",
+    "ta-IN": "சரி,",
+    "ta": "சரி,",
+    "te-IN": "సరే,",
+    "te": "సరే,",
+    "kn-IN": "ಖಂಡಿತ,",
+    "kn": "ಖಂಡಿತ,",
+}
+
+# This acknowledgement is intentionally reserved for an explicit booking
+# request. Unlike a generic "yes/okay" filler it signals useful work and gives
+# the TTS path a short safe phrase before the LLM serializes a tool call.
+APPOINTMENT_INTENT_ACK_PHRASES: Dict[str, str] = {
+    "en-IN": "I'm taking your appointment details.",
+    "en": "I'm taking your appointment details.",
+    "hi-IN": "मैं आपकी अपॉइंटमेंट की जानकारी ले रहा हूँ।",
+    "hi": "मैं आपकी अपॉइंटमेंट की जानकारी ले रहा हूँ।",
+    "mr-IN": "मी तुमच्या अपॉइंटमेंटची माहिती घेत आहे.",
+    "mr": "मी तुमच्या अपॉइंटमेंटची माहिती घेत आहे.",
+}
+
+BOOKING_SLOT_COLLECTION_RESPONSES: Dict[str, str] = {
+    "mr-IN": "हो नक्की, appointment book करून देतो. तुमचं नाव आणि age काय आहे?",
+    "hi-IN": "जी बिल्कुल, मैं आपकी अपॉइंटमेंट बुक कर देता हूँ। आपका नाम और उम्र क्या है?",
+    "en-IN": "Sure, I'll help you book an appointment. May I know your name and age?",
+    "gu-IN": "હા ચોક્કસ, હું તમારી એપોઇન્ટમેન્ટ બુક કરી આપું છું. તમારું નામ અને ઉંમર જણાવશો?",
+    "ta-IN": "நிச்சயமாக, நான் உங்கள் அப்பாயின்ட்மென்ட்டை பதிவு செய்கிறேன். உங்கள் பெயர் மற்றும் வயதை சொல்ல முடியுமா?",
+    "te-IN": "తప్పకుండా, నేను మీ అపాయింట్‌మెంట్‌ని బుక్ చేస్తాను. మీ పేరు మరియు వయస్సు ఏమిటి?",
+    "kn-IN": "ಖಂಡಿತ, ನಾನು ನಿಮ್ಮ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಬುಕ್ ಮಾಡುತ್ತೇನೆ. ನಿಮ್ಮ ಹೆಸರು ಮತ್ತು ವಯಸ್ಸು ತಿಳಿಸುವಿರಾ?",
+    "bn-IN": "হ্যাঁ নিশ্চয়ই, আমি আপনার অ্যাপয়েন্টমেন্ট বুক করে দিচ্ছি। আপনার নাম এবং বয়স কি?",
+}
+
+BOOKING_SLOT_COLLECTION_PURE_RESPONSES: Dict[str, str] = {
+    "mr-IN": "हो नक्की, अपॉइंटमेंट बुक करून देतो. तुमचं नाव आणि वय काय आहे?",
+    "hi-IN": "जी बिल्कुल, मैं आपकी अपॉइंटमेंट बुक कर देता हूँ। आपका नाम और उम्र क्या है?",
+    "en-IN": "Sure, I'll help you book an appointment. May I know your name and age?",
+    "gu-IN": "હા ચોક્કસ, હું તમારી એપોઇન્ટમેન્ટ બુક કરી આપું છું. તમારું નામ અને ઉંમર જણાવશો?",
+    "ta-IN": "நிச்சயமாக, நான் உங்கள் அப்பாயின்ட்மென்ட்டை பதிவு செய்கிறேன். உங்கள் பெயர் மற்றும் வயதை சொல்ல முடியுமா?",
+    "te-IN": "తప్పకుండా, నేను మీ అపాయింట్‌మెంట్‌ని బుಕ್ చేస్తాను. మీ పేరు మరియు వయస్సు ఏమిటి?",
+    "kn-IN": "ಖಂಡಿತ, ನಾನು ನಿಮ್ಮ ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್ ಬುಕ್ ಮಾಡುತ್ತೇನೆ. ನಿಮ್ಮ ಹೆಸರು ಮತ್ತು ವಯಸ್ಸು ತಿಳಿಸುವಿರಾ?",
+    "bn-IN": "হ্যাঁ নিশ্চয়ই, আমি আপনার অ্যাপয়েন্টমেন্ট বুক করে দিচ্ছি। আপনার নাম এবং বয়স কি?",
+}
+
+
+def is_appointment_booking_intent(text: str) -> bool:
+    """Return true only for an explicit request to create an appointment."""
+    if not text or is_farewell_or_terminal_intent(text):
+        return False
+
+    normalized = text.casefold()
+    # Match any phonetic / script variation of appointment / consultation
+    has_appointment_concept = bool(
+        re.search(
+            r"\b(?:appointment|appt|consultation|visit|booking|slot)\b"
+            r"|अप[ॉाोऑअ]?[ईइय]?ं?[टण]?[मन्]?[ेटे]?[ंट्ट]?"
+            r"|अपॉइंटमेंट|अपॉईंटमेंट|अपॉईन्टमेंट|अॅपॉईंटमेंट|अपोइंटमेंट|बुकिंग",
+            normalized,
+        )
+    )
+    # Match any booking / scheduling / wanting action
+    has_booking_action = bool(
+        re.search(
+            r"\b(?:book|booking|schedule|reserve|fix|need|want)\b"
+            r"|कराय|करना|करनी|करवा|बुक|घ्याय|घेाय|हवी|हवा|पाहिजे|चाहिए|दाखवाय|भेटाय",
+            normalized,
+        )
+    )
+    # Direct short booking utterances like "appointment book", "booking karaychi hoti", etc.
+    return (has_appointment_concept and has_booking_action) or bool(
+        re.search(r"(?:appointment|अपॉ[ईं]ंटमेंट)\s*(?:बुक|book|पाहिजे|हवी|हवा|चाहिए)", normalized)
+    )
+
+
+
+def is_farewell_or_terminal_intent(text: str) -> bool:
+    """Checks whether the user utterance expresses a farewell, stop, or termination intent."""
+    if not text:
+        return False
+    t = text.strip().lower()
+    terminal_words = {
+        "bye", "goodbye", "बाय", "अलविदा", "बंद करा", "ठेवतो", "रुक", "थांब",
+        "stop", "disconnect", "hang up", "cut the call", "call disconnect"
+    }
+    words = t.split()
+    if len(words) <= 3 and any(w in terminal_words for w in words):
+        return True
+    return any(
+        kw in t for kw in [
+            "call cut", "bye bye", "बाय बाय", "फोन ठेवतो", "फोन कट करा", "रुकिए", "रहने दो"
+        ]
+    )
 
 
 class InstrumentedAsyncStream:
@@ -263,17 +584,22 @@ class InstrumentedAsyncStream:
         self,
         raw_stream: Any,
         timing_tracker: Optional[TurnTimingTracker] = None,
+        transcript_collector: Optional[CallTranscriptCollector] = None,
+        active_language: str = "en-IN",
         is_call_terminating_fn: Optional[Any] = None,
         early_ack_callback: Optional[Any] = None,
     ):
         self._raw_stream = raw_stream
         self._timing_tracker = timing_tracker
+        self._transcript_collector = transcript_collector
+        self._active_language = active_language
         self._is_call_terminating_fn = is_call_terminating_fn
         self._early_ack_callback = early_ack_callback
         self._first_chunk_seen = False
         self._in_tool_call = False
         self._early_ack_triggered = False
         self._iter = None
+        self._collected_tokens: List[str] = []
 
     def __aiter__(self):
         self._iter = self._raw_stream.__aiter__()
@@ -294,6 +620,14 @@ class InstrumentedAsyncStream:
                 self._in_tool_call = False
             if self._timing_tracker:
                 self._timing_tracker.record_llm_response_complete(now)
+            if self._collected_tokens and self._transcript_collector:
+                full_agent_text = "".join(self._collected_tokens).strip()
+                if full_agent_text:
+                    self._transcript_collector.record_agent_message(
+                        response=full_agent_text,
+                        active_language=self._active_language or "en-IN",
+                    )
+                self._collected_tokens = []
             raise
 
         if self._is_call_terminating_fn and self._is_call_terminating_fn():
@@ -307,6 +641,7 @@ class InstrumentedAsyncStream:
             delta = chunk.choices[0].delta
             if delta:
                 if getattr(delta, "tool_calls", None):
+                    self._collected_tokens.clear()
                     if not self._in_tool_call:
                         self._in_tool_call = True
                         if self._timing_tracker:
@@ -323,6 +658,9 @@ class InstrumentedAsyncStream:
                         if self._timing_tracker:
                             self._timing_tracker.record_tool_call_delta(now)
                 elif getattr(delta, "content", None):
+                    content_str = delta.content
+                    if content_str and isinstance(content_str, str):
+                        self._collected_tokens.append(content_str)
                     if self._in_tool_call:
                         if self._timing_tracker:
                             self._timing_tracker.record_tool_call_complete(now)
@@ -356,6 +694,121 @@ class InstrumentedAsyncStream:
         return getattr(self._raw_stream, name)
 
 
+class InstrumentedSarvamTTSService(SarvamTTSService):
+    """Production SarvamTTSService with zero-latency cached starter phrase audio injection.
+
+    When the LLM outputs a conversational starter (e.g. 'ठीक आहे', 'समजलं', 'हो', 'Sure', 'हाँ बिल्कुल'),
+    this service intercepts the clause, immediately appends the pre-warmed PCM audio chunks directly to the
+    active audio context (0ms TTS delay), and streams any remainder sentence text to the Sarvam WebSocket.
+    """
+
+    def __init__(
+        self,
+        *args,
+        tenant_id: Optional[str] = None,
+        language: Optional[str] = None,
+        voice_id: Optional[str] = None,
+        model_name: Optional[str] = None,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self._tenant_id = tenant_id or "default"
+        self._active_language = language or "en-IN"
+        self._voice_id = voice_id or "shubh"
+        self._model_name = model_name or "bulbul:v3"
+
+    def update_language_context(self, language: str):
+        self._active_language = language
+        if hasattr(self, "_settings") and self._settings:
+            self._settings.language = language
+        if hasattr(self, "_websocket") and self._websocket:
+            try:
+                import asyncio
+                asyncio.create_task(self._send_config())
+                logger.info(f"[TTS] Resent Sarvam TTS WebSocket config with target_language={language}")
+            except Exception as e:
+                logger.warning(f"[TTS] Failed to resend config on language update: {e}")
+
+    @traced_tts
+    async def run_tts(self, text: str, context_id: str):
+        from app.phrase_audio_cache import global_phrase_audio_cache
+        from pipecat.frames.frames import TTSAudioRawFrame, TTSStartedFrame, TTSStoppedFrame
+
+        sample_rate = getattr(self, "sample_rate", 8000)
+
+        # 1. Check for pre-rendered full phrase match (e.g. Turn 1 slot collection response)
+        full_match = global_phrase_audio_cache.get_full_phrase(
+            tenant_id=self._tenant_id,
+            language=self._active_language,
+            voice_id=self._voice_id,
+            model=self._model_name,
+            sample_rate=sample_rate,
+            phrase_text=text,
+        )
+        if full_match and full_match.is_telephony_safe(sample_rate):
+            logger.info(f"[TTSFastPath] Full response cache hit for text='{text[:30]}...' ({len(full_match.audio_chunks)} chunks)")
+            yield TTSStartedFrame(context_id=context_id)
+            for chunk in full_match.audio_chunks:
+                yield TTSAudioRawFrame(
+                    audio=chunk,
+                    sample_rate=sample_rate,
+                    num_channels=1,
+                    context_id=context_id,
+                )
+            yield TTSStoppedFrame(context_id=context_id)
+            return
+
+        # 2. Check for starter prefix match (e.g. "ठीक आहे, मी तपासतो...")
+        is_greeting_context = bool(
+            context_id == "greeting_fast_path"
+            or (hasattr(self, "_current_turn_type") and getattr(self, "_current_turn_type", None) == "greeting")
+        )
+        starter_match = global_phrase_audio_cache.match_starter(
+            text_chunk=text,
+            tenant_id=self._tenant_id,
+            language=self._active_language,
+            voice_id=self._voice_id,
+            model=self._model_name,
+            sample_rate=sample_rate,
+        )
+        if starter_match:
+            cached_starter, remainder = starter_match
+            # Avoid sentence splitting when remainder is a long uncached sentence (>15 chars or >2 words)
+            # or during call greeting context, as starter audio (~300ms) finishes long before Sarvam TTS
+            # network synthesis of the remainder completes (~2500ms), causing mid-sentence silence breaks.
+            is_long_uncached_remainder = bool(remainder and (len(remainder.strip()) > 15 or len(remainder.strip().split()) > 2))
+            if not is_greeting_context and not is_long_uncached_remainder:
+                logger.info(
+                    f"[TTSFastPath] Starter audio injected for text='{text[:30]}...' "
+                    f"({len(cached_starter.audio_chunks)} chunks, remainder='{remainder[:25]}...')"
+                )
+                yield TTSStartedFrame(context_id=context_id)
+                for chunk in cached_starter.audio_chunks:
+                    yield TTSAudioRawFrame(
+                        audio=chunk,
+                        sample_rate=sample_rate,
+                        num_channels=1,
+                        context_id=context_id,
+                    )
+                if remainder:
+                    async for frame in super().run_tts(remainder, context_id):
+                        # Suppress duplicate TTSStartedFrame since starter audio already started playback
+                        if not isinstance(frame, TTSStartedFrame):
+                            yield frame
+                else:
+                    yield TTSStoppedFrame(context_id=context_id)
+                return
+            else:
+                logger.debug(
+                    f"[TTSFastPath] Bypassing starter splitting for long sentence/greeting text='{text[:30]}...' "
+                    "to maintain contiguous streaming TTS audio"
+                )
+
+        # 3. Fallback to normal live Sarvam Bulbul WebSocket TTS
+        async for frame in super().run_tts(text, context_id):
+            yield frame
+
+
 class InstrumentedSarvamLLMService(SarvamLLMService):
     """Pipecat-native Sarvam service with granular HTTP dispatch, shared connection pool, stream timing, and safe early tool acknowledgement."""
 
@@ -363,19 +816,24 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         self,
         *args,
         timing_tracker: Optional[TurnTimingTracker] = None,
+        transcript_collector: Optional[CallTranscriptCollector] = None,
         http_client: Optional[httpx.AsyncClient] = None,
         is_call_terminating_fn: Optional[Any] = None,
         runtime_config: Optional[RuntimeAgentConfig] = None,
         language_manager: Optional[ConversationLanguageManager] = None,
+        tts_service: Optional[Any] = None,
         **kwargs,
     ):
         self._shared_http_client = http_client
-        super().__init__(*args, **kwargs)
         self._nextlite_timing_tracker = timing_tracker
+        self._transcript_collector = transcript_collector
         self._is_call_terminating_fn = is_call_terminating_fn
         self._runtime_config = runtime_config
         self._language_manager = language_manager
-        self._early_ack_sent_turn_id: Optional[str] = None
+        self._tts_service = tts_service
+        self._early_tool_ack_sent_turn_id: Optional[str] = None
+        self._early_conv_ack_sent_turn_id: Optional[str] = None
+        super().__init__(*args, **kwargs)
 
     async def _dispatch_early_tool_ack(self):
         """Dispatches an immediate non-committal filler phrase to TTS in the active language."""
@@ -385,9 +843,9 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             return
 
         current_turn_id = self._nextlite_timing_tracker.active_turn_id if self._nextlite_timing_tracker else None
-        if current_turn_id and self._early_ack_sent_turn_id == current_turn_id:
+        if current_turn_id and self._early_tool_ack_sent_turn_id == current_turn_id:
             return
-        self._early_ack_sent_turn_id = current_turn_id
+        self._early_tool_ack_sent_turn_id = current_turn_id
 
         # Resolve active language
         active_lang = "en-IN"
@@ -432,6 +890,114 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         except Exception as e:
             logger.warning(f"[EarlyToolAck] Failed to push early filler TTSSpeakFrame: {e}")
 
+    def _appointment_tool_is_available(self) -> bool:
+        """Only acknowledge an appointment action that this deployment can do."""
+        if not self._runtime_config or not self._runtime_config.tools.enabled:
+            return False
+        return any(
+            tool.enabled and tool.name == "book_appointment"
+            for tool in self._runtime_config.tools.tools
+        )
+
+    async def _dispatch_appointment_intent_ack(self, user_transcript: str) -> None:
+        """Speak one intent-gated action acknowledgement before LLM dispatch."""
+        if self._runtime_config and not getattr(self._runtime_config.runtime, "enable_appointment_intent_ack", False):
+            return
+        if not is_appointment_booking_intent(user_transcript):
+            return
+        if not self._appointment_tool_is_available():
+            return
+        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+            return
+
+        current_turn_id = self._nextlite_timing_tracker.active_turn_id if self._nextlite_timing_tracker else None
+        if current_turn_id and self._early_tool_ack_sent_turn_id == current_turn_id:
+            return
+        self._early_tool_ack_sent_turn_id = current_turn_id
+
+        active_lang = "en-IN"
+        if self._language_manager and getattr(self._language_manager, "current_language", None):
+            active_lang = self._language_manager.current_language
+        elif self._runtime_config and self._runtime_config.language:
+            active_lang = self._runtime_config.language.primary or active_lang
+
+        phrase = (
+            APPOINTMENT_INTENT_ACK_PHRASES.get(active_lang)
+            or APPOINTMENT_INTENT_ACK_PHRASES.get(active_lang.split("-")[0])
+            or APPOINTMENT_INTENT_ACK_PHRASES["en-IN"]
+        )
+        if self._nextlite_timing_tracker:
+            self._nextlite_timing_tracker.record_early_ack_sent(time.perf_counter())
+        logger.info(
+            f"[AppointmentIntentAck] Dispatched before LLM request "
+            f"(lang={active_lang}, turn_id={current_turn_id})"
+        )
+        try:
+            await self.push_frame(TTSSpeakFrame(text=phrase), FrameDirection.DOWNSTREAM)
+        except Exception as exc:
+            logger.warning(f"[AppointmentIntentAck] Failed to push TTS frame: {exc}")
+
+    async def _dispatch_early_conversational_ack(self, user_transcript: str = ""):
+        """Dispatches an immediate conversational acknowledgment particle to TTS in the active language."""
+        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+            return
+        if self._runtime_config and not getattr(self._runtime_config.runtime, "enable_conversational_early_ack", False):
+            return
+
+        current_turn_id = self._nextlite_timing_tracker.active_turn_id if self._nextlite_timing_tracker else None
+        if current_turn_id and self._early_conv_ack_sent_turn_id == current_turn_id:
+            return
+        self._early_conv_ack_sent_turn_id = current_turn_id
+
+        # Resolve active language
+        active_lang = "en-IN"
+        if self._language_manager and getattr(self._language_manager, "current_language", None):
+            active_lang = self._language_manager.current_language
+        elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
+            active_lang = self._runtime_config.language.primary
+
+        # Fallback check against current user transcript if active_lang is still English
+        user_text = user_transcript or (getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or "")
+        if (active_lang.startswith("en") or active_lang == "en-IN") and user_text:
+            from app.language_manager import (
+                DEVANAGARI_REGEX,
+                HINDI_LATIN_MARKERS_REGEX,
+                MARATHI_LATIN_MARKERS_REGEX,
+                match_supported_language,
+            )
+            supported = self._language_manager.supported_languages if self._language_manager else ["en-IN", "hi-IN", "mr-IN"]
+            if MARATHI_LATIN_MARKERS_REGEX.search(user_text):
+                active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
+            elif any(l.startswith("mr") for l in supported) and not any(l.startswith("hi") for l in supported) and DEVANAGARI_REGEX.search(user_text):
+                active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
+            elif DEVANAGARI_REGEX.search(user_text) or HINDI_LATIN_MARKERS_REGEX.search(user_text):
+                active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
+
+        base_code = active_lang.split("-")[0]
+        filler_phrase = (
+            DEFAULT_CONVERSATIONAL_ACK_PHRASES.get(active_lang)
+            or DEFAULT_CONVERSATIONAL_ACK_PHRASES.get(base_code)
+            or DEFAULT_CONVERSATIONAL_ACK_PHRASES["en-IN"]
+        )
+
+        now = time.perf_counter()
+        if self._nextlite_timing_tracker:
+            self._nextlite_timing_tracker.record_early_ack_sent(now)
+
+        # Notify text aggregator to deduplicate repeated affirmative particle from LLM stream
+        if self._tts_service and hasattr(self._tts_service, "_text_aggregator") and self._tts_service._text_aggregator:
+            if hasattr(self._tts_service._text_aggregator, "enable_leading_affirmation_deduplication"):
+                self._tts_service._text_aggregator.enable_leading_affirmation_deduplication(True)
+
+        logger.info(
+            f"[ConversationalEarlyAck] Dispatched conversational fast-path filler to TTS: '{filler_phrase}' "
+            f"(lang={active_lang}, turn_id={current_turn_id})"
+        )
+        try:
+            await self.push_frame(TTSSpeakFrame(text=filler_phrase), FrameDirection.DOWNSTREAM)
+        except Exception as e:
+            logger.warning(f"[ConversationalEarlyAck] Failed to push early filler TTSSpeakFrame: {e}")
+
     def create_client(
         self,
         api_key=None,
@@ -442,11 +1008,6 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         **kwargs,
     ):
         merged_headers = dict(default_headers or {})
-        from pipecat.services.sarvam._sdk import sdk_headers
-        merged_headers.update(sdk_headers())
-        if api_key:
-            merged_headers["api-subscription-key"] = api_key
-
         http_client = self._shared_http_client
         if http_client is None:
             from openai._base_client import DefaultAsyncHttpxClient
@@ -456,8 +1017,13 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
                 )
             )
 
+        from pipecat.services.sarvam._sdk import sdk_headers
+        merged_headers.update(sdk_headers())
+        if api_key:
+            merged_headers["api-subscription-key"] = api_key
+
         return AsyncOpenAI(
-            api_key=api_key,
+            api_key=api_key or settings.SARVAM_API_KEY,
             base_url=base_url or "https://api.sarvam.ai/v1",
             organization=organization,
             project=project,
@@ -496,19 +1062,116 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
                     yield
             return InstrumentedAsyncStream(_empty_gen(), timing_tracker=self._nextlite_timing_tracker, is_call_terminating_fn=self._is_call_terminating_fn)
 
+        messages = []
+        if hasattr(context, "get_messages"):
+            messages = context.get_messages()
+        elif hasattr(context, "messages"):
+            messages = context.messages
+        elif isinstance(context, list):
+            messages = context
+
+        is_post_tool = bool(messages and messages[-1].get("role") == "tool")
+        is_greeting = bool(
+            self._nextlite_timing_tracker
+            and (self._nextlite_timing_tracker.turn_type == "greeting" or getattr(self._nextlite_timing_tracker, "turn_count", 0) == 0)
+        )
+
+        if not is_post_tool:
+            last_user_message = next(
+                (
+                    message.get("content", "")
+                    for message in reversed(messages)
+                    if message.get("role") == "user" and isinstance(message.get("content"), str)
+                ),
+                "",
+            )
+            await self._dispatch_appointment_intent_ack(last_user_message)
+
+            # Turn-1 Booking Intent Fast-Path:
+            # If user explicitly requests booking without having given their details (e.g. "मला अपॉइंटमेंट बुक करायची आहे"):
+            # Return the slot collection question in < 1ms, skipping LLM GPU prefill completely.
+            user_msg_clean = last_user_message.strip().lower()
+            if (
+                self._appointment_tool_is_available()
+                and is_appointment_booking_intent(user_msg_clean)
+                and not re.search(r"\b(?:\d{1,2}|years?|वय|वर्षे|नाव|name)\b", user_msg_clean, re.IGNORECASE)
+            ):
+                active_lang = "en-IN"
+                if self._language_manager and getattr(self._language_manager, "current_language", None):
+                    active_lang = self._language_manager.current_language
+                elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
+                    active_lang = self._runtime_config.language.primary
+
+                is_pure_style = False
+                if self._language_manager and getattr(self._language_manager, "language_style", None) == "pure":
+                    is_pure_style = True
+                elif self._runtime_config and self._runtime_config.language and getattr(self._runtime_config.language, "language_style", None) == "pure":
+                    is_pure_style = True
+
+                resp_dict = BOOKING_SLOT_COLLECTION_PURE_RESPONSES if is_pure_style else BOOKING_SLOT_COLLECTION_RESPONSES
+                fast_reply = (
+                    resp_dict.get(active_lang)
+                    or resp_dict.get(active_lang.split("-")[0])
+                    or resp_dict["en-IN"]
+                )
+                logger.info(f"[FastPath Intent] Instant Turn-1 Slot Collection matched: '{fast_reply}' (lang={active_lang})")
+
+                from openai.types.chat import ChatCompletionChunk
+                from openai.types.chat.chat_completion_chunk import Choice, ChoiceDelta
+
+                async def _instant_booking_stream():
+                    yield ChatCompletionChunk(
+                        id="fast-turn1-intent",
+                        choices=[Choice(delta=ChoiceDelta(content=fast_reply), index=0, finish_reason="stop")],
+                        created=int(time.time()),
+                        model=self._settings.model,
+                        object="chat.completion.chunk",
+                    )
+
+                now_fast = time.perf_counter()
+                if self._nextlite_timing_tracker:
+                    self._nextlite_timing_tracker.record_llm_request_created(now_fast)
+                    self._nextlite_timing_tracker.record_llm_request(now_fast)
+                    self._nextlite_timing_tracker.record_llm_first_provider_response(now_fast)
+
+                return InstrumentedAsyncStream(
+                    _instant_booking_stream(),
+                    timing_tracker=self._nextlite_timing_tracker,
+                    transcript_collector=self._transcript_collector,
+                    active_language=active_lang,
+                    is_call_terminating_fn=self._is_call_terminating_fn,
+                )
+
         t0 = time.perf_counter()
         if self._nextlite_timing_tracker:
             self._nextlite_timing_tracker.record_llm_request_created(t0)
             self._nextlite_timing_tracker.record_llm_request(t0)
-        
-        raw_stream = await super().get_chat_completions(context)
+
+        adapter = self.get_llm_adapter()
+        params_from_context = adapter.get_llm_invocation_params(
+            context,
+            system_instruction=assert_given(self._settings.system_instruction),
+            convert_developer_to_user=not self.supports_developer_role,
+        )
+        params = self.build_chat_completion_params(params_from_context)
+
+        raw_stream = await self._client.chat.completions.create(**params)
+
         t1 = time.perf_counter()
         if self._nextlite_timing_tracker:
             self._nextlite_timing_tracker.record_llm_first_provider_response(t1)
 
+        active_lang = "en-IN"
+        if self._language_manager and getattr(self._language_manager, "current_language", None):
+            active_lang = self._language_manager.current_language
+        elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
+            active_lang = self._runtime_config.language.primary
+
         return InstrumentedAsyncStream(
             raw_stream,
             timing_tracker=self._nextlite_timing_tracker,
+            transcript_collector=self._transcript_collector,
+            active_language=active_lang,
             is_call_terminating_fn=self._is_call_terminating_fn,
             early_ack_callback=self._dispatch_early_tool_ack,
         )
@@ -822,6 +1485,16 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                     self._turn_tracker.start_new_turn()
 
         elif isinstance(frame, InterruptionFrame):
+            # Suppress interruptions during tool execution & confirmation audio release so the appointment confirmation plays completely without breaking mid-sentence
+            if self._turn_tracker and self._turn_tracker.has_pending_tool_activity():
+                logger.info("[Interruption] Suppressed interruption during active tool execution & confirmation audio release.")
+                return
+
+            # Suppress early line-noise interruptions during initial greeting playout so initial greeting plays completely without breaking
+            if self._turn_tracker and self._turn_tracker.turn_type == "greeting" and self._turn_tracker.greeting_completed is None:
+                logger.info("[Interruption] Suppressed early line-noise interruption during initial greeting playout.")
+                return
+
             logger.info("[Interruption] User speech interruption detected — clearing Plivo audio buffer")
             if self._startup_gate:
                 self._startup_gate.set_ready_for_user()
@@ -1013,6 +1686,7 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
         turn_tracker: Optional[TurnTimingTracker] = None,
         startup_tracker: Optional[StartupTimingTracker] = None,
         is_call_terminating_fn: Optional[Any] = None,
+        on_hangup_fn: Optional[Any] = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -1021,6 +1695,46 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
         self._turn_tracker = turn_tracker
         self._startup_tracker = startup_tracker
         self._is_call_terminating_fn = is_call_terminating_fn
+        self._on_hangup_fn = on_hangup_fn
+        self.last_inbound_audio_time = time.perf_counter()
+
+        # Dynamic Telephony Jitter Buffer Monitoring & Adaptive Pacing
+        self._last_inbound_ts: Optional[float] = None
+        self._jitter_samples: list = []
+        self._estimated_jitter_ms: float = 0.0
+        self._adaptive_pacing_window_ms: float = 20.0
+
+    def _update_jitter_estimate(self, now: float):
+        if self._last_inbound_ts is not None:
+            delta_ms = (now - self._last_inbound_ts) * 1000.0
+            # Expected interval for Plivo media frames is ~20ms
+            jitter = abs(delta_ms - 20.0)
+            self._jitter_samples.append(jitter)
+            if len(self._jitter_samples) > 20:
+                self._jitter_samples.pop(0)
+
+            avg_jitter = sum(self._jitter_samples) / len(self._jitter_samples)
+            self._estimated_jitter_ms = avg_jitter
+
+            # Dynamically adapt buffer pacing window:
+            # High jitter (> 35ms) -> Scale buffer window to 40ms to smooth out audio under poor mobile signals
+            # Normal jitter (< 15ms) -> Keep low latency 20ms window
+            if avg_jitter > 35.0 and self._adaptive_pacing_window_ms != 40.0:
+                self._adaptive_pacing_window_ms = 40.0
+                logger.info(f"[JitterBuffer] Network jitter detected ({avg_jitter:.1f}ms). Adapted audio buffer window to 40ms.")
+            elif avg_jitter < 15.0 and self._adaptive_pacing_window_ms != 20.0:
+                self._adaptive_pacing_window_ms = 20.0
+                logger.info(f"[JitterBuffer] Network signal stabilized ({avg_jitter:.1f}ms). Restored low-latency 20ms buffer window.")
+
+        self._last_inbound_ts = now
+
+    @property
+    def estimated_jitter_ms(self) -> float:
+        return self._estimated_jitter_ms
+
+    @property
+    def adaptive_pacing_window_ms(self) -> float:
+        return self._adaptive_pacing_window_ms
 
     async def deserialize(self, data: str | bytes):
         try:
@@ -1030,10 +1744,21 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
 
         event = message.get("event")
         if event in ("stop", "close"):
-            logger.info(f"[Plivo Event] Received terminal '{event}' event from Plivo — signaling EndFrame")
+            logger.info(f"[Plivo Event] Received terminal '{event}' event from Plivo — signaling EndFrame & terminating runner")
+            if self._on_hangup_fn:
+                try:
+                    if asyncio.iscoroutinefunction(self._on_hangup_fn):
+                        asyncio.create_task(self._on_hangup_fn())
+                    else:
+                        self._on_hangup_fn()
+                except Exception as e:
+                    logger.debug(f"[Plivo Event] on_hangup error: {e}")
             return EndFrame()
 
         if event == "media":
+            now_media = time.perf_counter()
+            self.last_inbound_audio_time = now_media
+            self._update_jitter_estimate(now_media)
             media = message.get("media", {})
             payload_base64 = media.get("payload")
             if not payload_base64:
@@ -1076,6 +1801,11 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
     async def serialize(self, frame: Frame) -> str | bytes | None:
         if self._is_call_terminating_fn and self._is_call_terminating_fn():
             return None
+
+        if isinstance(frame, InterruptionFrame):
+            if self._turn_tracker and self._turn_tracker.has_pending_tool_activity():
+                logger.info("[PlivoSerializer] Suppressed InterruptionFrame clearAudio during active tool execution & post-tool confirmation audio release.")
+                return None
 
         payload = await super().serialize(frame)
         try:
@@ -1143,6 +1873,8 @@ async def websocket_plivo_endpoint(
 
     # Per-call lifecycle state
     call_session_id: Optional[str] = None
+    call_session_holder: Dict[str, Optional[str]] = {"id": None}
+    call_session_task: Optional[asyncio.Task] = None
     transcript_collector = CallTranscriptCollector()
     trusted_context: Optional[TrustedCallContext] = None
     conversation_context: Optional[Any] = None
@@ -1161,7 +1893,7 @@ async def websocket_plivo_endpoint(
 
     async def finalize_call_session(final_status: str = "COMPLETED") -> None:
         """Atomically finalize call session in NextLite Control Plane exactly once."""
-        nonlocal is_finalized, is_finalizing, is_call_terminating, call_session_id
+        nonlocal is_finalized, is_finalizing, is_call_terminating, call_session_id, transcript_collector, call_session_holder, call_session_task
         is_call_terminating = True
         async with finalization_lock:
             if is_finalized or is_finalizing:
@@ -1175,12 +1907,15 @@ async def websocket_plivo_endpoint(
                 return
 
             # Ensure background CallSession creation task resolves before updating session
-            if not call_session_id and 'call_session_task' in locals() and call_session_task is not None:
+            if not call_session_id and call_session_holder.get("id"):
+                call_session_id = call_session_holder["id"]
+
+            if not call_session_id and call_session_task is not None:
                 try:
                     await asyncio.wait_for(asyncio.shield(call_session_task), timeout=5.0)
                 except Exception as task_err:
                     logger.warning(f"[CallSession] Background call_session_task wait encountered: {task_err}")
-                if 'call_session_holder' in locals() and call_session_holder.get("id"):
+                if call_session_holder.get("id"):
                     call_session_id = call_session_holder["id"]
 
             if not call_session_id:
@@ -1200,21 +1935,35 @@ async def websocket_plivo_endpoint(
             ended_at_iso = datetime.now(timezone.utc).isoformat()
             turns = summary.get("turns", [])
 
-            # Defensive sync with conversation_context if turns were empty
-            if len(turns) == 0 and conversation_context:
+            # Sync with conversation_context to guarantee complete, verbatim multi-turn transcript
+            if conversation_context:
                 msgs = conversation_context.get_messages()
-                for msg in msgs:
-                    role = msg.get("role")
-                    content = msg.get("content", "")
-                    if role == "user" and content:
-                        transcript_collector.record_user_turn(content)
-                    elif role == "assistant" and content and content != greeting_text:
-                        transcript_collector.record_agent_message(
-                            content,
-                            active_language=runtime_config.language.primary or "en-IN",
-                        )
-                summary = transcript_collector.end_call()
-                turns = summary.get("turns", [])
+                chat_msgs = [m for m in msgs if m.get("role") in ("user", "assistant") and m.get("content")]
+                collector_user_turns = [t for t in turns if t.get("user") is not None]
+                context_user_msgs = [m for m in chat_msgs if m.get("role") == "user"]
+                if len(context_user_msgs) > len(collector_user_turns) or len(turns) <= 1:
+                    fresh_collector = CallTranscriptCollector()
+                    for msg in chat_msgs:
+                        role = msg.get("role")
+                        content = msg.get("content", "")
+                        if role == "user" and content:
+                            fresh_collector.record_user_turn(
+                                transcript=content,
+                                detected_language=runtime_config.language.primary or "en-IN",
+                            )
+                        elif role == "assistant" and content:
+                            fresh_collector.record_agent_message(
+                                response=content,
+                                active_language=runtime_config.language.primary or "en-IN",
+                            )
+                    for err in transcript_collector.errors:
+                        fresh_collector.record_error(err.get("message", "Error"), source=err.get("source", "system"))
+                    for tool_name in transcript_collector.tools_used:
+                        if tool_name not in fresh_collector.tools_used:
+                            fresh_collector._tools_used.append(tool_name)
+                    summary = fresh_collector.end_call()
+                    turns = summary.get("turns", [])
+                    transcript_collector = fresh_collector
 
             plain_transcript = format_plain_transcript(turns)
 
@@ -1337,31 +2086,45 @@ async def websocket_plivo_endpoint(
         stream_sample_rate = int(media_format.get("sampleRate", 8000))
         logger.info(f"[Plivo MediaFormat] encoding={stream_encoding} | sampleRate={stream_sample_rate}")
 
-        # 2. Extract and Validate Authoritative deploymentId
+        # 2. Extract and Validate Authoritative deploymentId or Inbound DID
         resolved_deployment_id = extract_deployment_id(
             query_params=dict(websocket.query_params),
             start_payload=start_payload,
         )
+        inbound_phone = (
+            websocket.query_params.get("to")
+            or websocket.query_params.get("To")
+            or start_payload.get("to")
+            or start_payload.get("To")
+            or start_payload.get("calledNumber")
+        )
         startup_tracker.record_stage("deployment_id_resolved")
 
-        if not resolved_deployment_id:
-            logger.warning("Rejecting WebSocket connection: Missing deploymentId in query parameters or Plivo metadata")
+        if not resolved_deployment_id and not inbound_phone:
+            logger.warning("Rejecting WebSocket connection: Missing deploymentId and inbound phone number in parameters")
             await websocket.close(code=4002, reason="Missing or invalid deploymentId")
             return
 
-        logger.info(f"Resolved authoritative deploymentId={resolved_deployment_id} for stream_id={stream_id}")
+        if resolved_deployment_id:
+            logger.info(f"Resolved authoritative deploymentId={resolved_deployment_id} for stream_id={stream_id}")
+        else:
+            logger.info(f"Resolving authoritative config for inbound phone={inbound_phone} for stream_id={stream_id}")
 
         # 3. Request Authoritative RuntimeAgentConfig from NextLite Control Plane API using shared client pool
         runtime_config_client = RuntimeConfigClient(http_client=shared_http_client)
         startup_tracker.record_stage("runtime_config_start")
         startup_tracker.record_stage("runtime_config_request_start")
         try:
-            runtime_config = await runtime_config_client.get_runtime_agent_config(resolved_deployment_id)
+            if resolved_deployment_id:
+                runtime_config = await runtime_config_client.get_runtime_agent_config(resolved_deployment_id)
+            else:
+                runtime_config = await runtime_config_client.get_runtime_agent_config_by_phone(inbound_phone)
+                resolved_deployment_id = runtime_config.deployment.deployment_id
             startup_tracker.record_stage("runtime_config_resolved")
             startup_tracker.record_stage("runtime_config_response")
         except RuntimeConfigClientError as e:
             logger.warning(
-                f"Rejecting WebSocket connection: Failed to resolve RuntimeAgentConfig for deploymentId={resolved_deployment_id} (status={e.status_code}, code={e.error_code})"
+                f"Rejecting WebSocket connection: Failed to resolve RuntimeAgentConfig for deploymentId={resolved_deployment_id or inbound_phone} (status={e.status_code}, code={e.error_code})"
             )
             close_code = 4004 if e.status_code == 404 else (4009 if e.status_code == 409 else (4001 if e.status_code == 401 else 1011))
             await websocket.close(code=close_code, reason=f"Runtime config error: {e.error_code or 'FAILED'}")
@@ -1424,29 +2187,68 @@ async def websocket_plivo_endpoint(
         }
         logger.info(f"[TEMPORAL_CONTEXT] {json.dumps(temporal_log_data, separators=(',', ':'))}")
 
-        # Extract caller phone number from trusted Plivo metadata
+        # Extract direction and speaker phone number from trusted Plivo metadata
+        raw_direction = (
+            websocket.query_params.get("direction")
+            or websocket.query_params.get("Direction")
+            or start_payload.get("direction")
+            or start_payload.get("Direction")
+            or start_payload.get("params", {}).get("Direction")
+            or start_payload.get("customHeaders", {}).get("Direction")
+        )
         raw_from = (
-            start_payload.get("from")
+            websocket.query_params.get("from")
+            or websocket.query_params.get("From")
+            or start_payload.get("from")
             or start_payload.get("params", {}).get("From")
             or start_payload.get("customHeaders", {}).get("From")
             or start_payload.get("callerId")
-            or websocket.query_params.get("from")
             or websocket.query_params.get("callerNumber")
+        )
+        raw_to = (
+            websocket.query_params.get("to")
+            or websocket.query_params.get("To")
+            or start_payload.get("to")
+            or start_payload.get("params", {}).get("To")
+            or start_payload.get("customHeaders", {}).get("To")
         )
         direction, caller_number = detect_call_context(
             room_name=stream_id or call_id,
             from_number=raw_from,
+            to_number=raw_to,
+            direction=raw_direction,
         )
 
         # 5. Create ACTIVE CallSession in NextLite Control Plane concurrently (Phase 17B optimization)
-        call_session_holder = {"id": None}
-        call_session_task: Optional[asyncio.Task] = None
         language_manager = ConversationLanguageManager(
             primary=runtime_config.language.primary,
             supported_languages=runtime_config.language.supported_languages,
             auto_detect_enabled=runtime_config.language.auto_detect_enabled,
             language_switching_enabled=runtime_config.language.language_switching_enabled,
+            language_style=runtime_config.language.language_style,
         )
+
+        # Resolve a static greeting asset as soon as its tenant-scoped runtime
+        # identity is known.  This deliberately happens before STT, tools, and
+        # LLM construction so a cache hit can use the direct phone fast path.
+        greeting_cache_key = None
+        cached_greeting_chunks = None
+        if greeting:
+            from app.greeting_cache import (
+                compute_greeting_cache_key,
+                global_greeting_cache,
+                is_static_greeting,
+            )
+            if is_static_greeting(greeting):
+                greeting_cache_key = compute_greeting_cache_key(
+                    tenant_id=runtime_config.tenant.tenant_id,
+                    deployment_id=resolved_deployment_id,
+                    model=tts_model,
+                    voice=voice_id,
+                    language=language_manager.current_language,
+                    greeting_text=greeting,
+                )
+                cached_greeting_chunks = global_greeting_cache.get(greeting_cache_key)
 
         async def _bg_create_call_session() -> Optional[str]:
             startup_tracker.record_stage("call_session_start")
@@ -1492,6 +2294,9 @@ async def websocket_plivo_endpoint(
             "model": tts_model,
             "voice": voice_id,
             "language": language_manager.current_language,
+            # This provider/account rejects lower values with a generic config
+            # error. Keep the proven production value; cached greetings bypass
+            # this path entirely, so their startup latency is unaffected.
             "min_buffer_size": 30,
             "max_chunk_length": 150,
         }
@@ -1500,23 +2305,50 @@ async def websocket_plivo_endpoint(
         if runtime_config.voice.pitch is not None and tts_model == "bulbul:v2":
             tts_settings_kwargs["pitch"] = runtime_config.voice.pitch
 
-        tts_service = SarvamTTSService(
+        tts_service = InstrumentedSarvamTTSService(
             api_key=settings.SARVAM_API_KEY,
             sample_rate=stream_sample_rate,
             settings=SarvamTTSService.Settings(**tts_settings_kwargs),
+            tenant_id=runtime_config.tenant.tenant_id,
+            language=language_manager.current_language,
+            voice_id=voice_id,
+            model_name=tts_model,
         )
-        # Phase 21A & 22D: Early Release Phrase & Clause Aggregator (fast first chunk dispatch)
+        # Phase 21A & 22D: Early Release Phrase & Clause Aggregator (natural clause streaming without choppy micro-breaks)
         tts_service._text_aggregator = EarlyReleaseTextAggregator(
-            min_first_chunk_words=3,
-            min_first_chunk_chars=30,
+            min_first_chunk_words=2,
+            min_first_chunk_chars=10,
             min_clause_words=3,
-            min_clause_chars=15,
+            min_clause_chars=18,
+            max_first_chunk_chars=40,
         )
         startup_tracker.record_stage("tts_service_created")
+
+        tts_ready_event = asyncio.Event()
+
+        # Background TTS WebSocket Keepalive task to eliminate idle timeouts (e.g. at 30s)
+        async def _tts_websocket_keepalive_loop():
+            try:
+                while not is_terminating():
+                    await asyncio.sleep(12)
+                    if not is_terminating() and hasattr(tts_service, "_websocket") and tts_service._websocket:
+                        try:
+                            await tts_service._websocket.ping()
+                            logger.debug("[TTS Keepalive] Sent ping frame to keep Sarvam TTS WebSocket alive")
+                        except Exception as ping_err:
+                            logger.debug(f"[TTS Keepalive] Ping notice: {ping_err}")
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.debug(f"[TTS Keepalive] Error in keepalive loop: {e}")
+
+        tts_keepalive_task = asyncio.create_task(_tts_websocket_keepalive_loop())
 
         @tts_service.event_handler("on_tts_request")
         async def on_tts_request(service, context_id: str, text: str):
             now_mono = time.perf_counter()
+            from app.indic_sanitizer import sanitize_indic_tts_text
+            sanitized_text = sanitize_indic_tts_text(text, language_manager.current_language)
             # Isolate early tool filler from assistant text release timing
             is_early_filler = bool(
                 turn_tracker.early_ack_sent is not None
@@ -1526,7 +2358,7 @@ async def websocket_plivo_endpoint(
             if not is_early_filler:
                 is_post_tool = bool(turn_tracker.has_pending_tool_activity() or turn_tracker.post_tool_llm_start is not None)
                 turn_tracker.record_text_released_to_tts(now_mono, is_post_tool=is_post_tool)
-            logger.info(f"[TTS Release] Text released to TTS (context_id={context_id}, len={len(text)}): '{text[:40]}...'")
+            logger.info(f"[TTS Release] Text released to TTS (context_id={context_id}, len={len(sanitized_text)}): '{sanitized_text[:40]}...'")
 
         @tts_service.event_handler("on_connected")
         async def on_tts_connected(service):
@@ -1539,6 +2371,7 @@ async def websocket_plivo_endpoint(
             else:
                 turn_tracker.record_tts_connected(now_tts)
                 logger.info(f"[TTS Reconnect] Sarvam TTS WebSocket reconnected during active call (elapsed: {now_tts - conn_start_time:.3f}s)")
+            tts_ready_event.set()
 
 
         # Check Sarvam API key
@@ -1553,6 +2386,24 @@ async def websocket_plivo_endpoint(
             auto_hang_up=has_auth,
             plivo_sample_rate=stream_sample_rate,
         )
+        runner_ref: Dict[str, Any] = {"runner": None}
+
+        async def _on_plivo_terminal_hangup():
+            nonlocal is_call_terminating
+            is_call_terminating = True
+            logger.info(f"[Plivo Hangup] Terminal hangup detected for stream_id={stream_id} — cancelling pipeline runner")
+            r = runner_ref.get("runner")
+            if r:
+                try:
+                    await r.cancel()
+                except Exception:
+                    pass
+            try:
+                if not websocket.client_state.name == "DISCONNECTED":
+                    await websocket.close()
+            except Exception:
+                pass
+
         serializer = DiagnosticPlivoFrameSerializer(
             stream_id=stream_id,
             call_id=call_id or None,
@@ -1563,7 +2414,105 @@ async def websocket_plivo_endpoint(
             turn_tracker=turn_tracker,
             startup_tracker=startup_tracker,
             is_call_terminating_fn=is_terminating,
+            on_hangup_fn=_on_plivo_terminal_hangup,
         )
+
+        # A cache hit is already validated by a tenant/deployment/voice/language
+        # content-addressed key.  Send it directly to Plivo now, rather than
+        # waiting for STT, tools, LLM, Pipecat TTS, or pipeline startup.  The
+        # rest of the runtime continues to initialize while this task paces the
+        # cached PCM chunks at their original audio duration.
+        startup_gate_holder: Dict[str, Any] = {"processor": None}
+        direct_greeting_state = {"active": False, "completed": False, "sent_first": False}
+        direct_greeting_first_chunk = asyncio.Event()
+        direct_greeting_task: Optional[asyncio.Task] = None
+
+        cache_entry_is_safe = bool(
+            cached_greeting_chunks
+            and hasattr(cached_greeting_chunks, "is_telephony_safe")
+            and cached_greeting_chunks.is_telephony_safe(stream_sample_rate)
+        )
+        if cached_greeting_chunks and not cache_entry_is_safe:
+            logger.warning(
+                "[GreetingFastPath] Ignoring cache entry with incompatible audio format "
+                f"for stream_id={stream_id}; falling back to streaming TTS"
+            )
+
+        if cache_entry_is_safe:
+            direct_greeting_state["active"] = True
+            turn_tracker.turn_type = "greeting"
+            startup_tracker.record_stage("greeting_queue_start")
+            startup_tracker.record_stage("greeting_queued")
+            turn_tracker.record_greeting_start()
+
+            async def _play_cached_greeting_directly():
+                chunks = cached_greeting_chunks.audio_chunks
+                try:
+                    logger.info(
+                        f"[GreetingFastPath] Direct Plivo playback started for stream_id={stream_id} "
+                        f"({len(chunks)} chunks, key={greeting_cache_key[:10]}...)"
+                    )
+                    for index, chunk in enumerate(chunks):
+                        if is_terminating():
+                            return
+                        now = time.perf_counter()
+                        payload = await serializer.serialize(
+                            TTSAudioRawFrame(
+                                audio=chunk,
+                                sample_rate=stream_sample_rate,
+                                num_channels=1,
+                                context_id="greeting_fast_path",
+                            )
+                        )
+                        if payload is None:
+                            raise RuntimeError("Plivo serializer produced no cached greeting payload")
+                        if isinstance(payload, bytes):
+                            await websocket.send_bytes(payload)
+                        else:
+                            await websocket.send_text(payload)
+
+                        if index == 0:
+                            startup_tracker.record_stage("greeting_tts_started", now)
+                            turn_tracker.record_greeting_tts_started(now)
+                            startup_tracker.record_stage("greeting_first_audio", now)
+                            turn_tracker.record_greeting_first_audio(now)
+                            direct_greeting_state["sent_first"] = True
+                            transcript_collector.record_agent_message(
+                                response=greeting,
+                                active_language=runtime_config.language.primary or "en-IN",
+                            )
+                            direct_greeting_first_chunk.set()
+
+                        # PCM is 16-bit mono. Pacing prevents an entire greeting
+                        # being buffered at Plivo and preserves natural barge-in.
+                        if index + 1 < len(chunks):
+                            await asyncio.sleep(max(0.001, len(chunk) / (stream_sample_rate * 2)))
+                except Exception as playback_error:
+                    logger.error(
+                        f"[GreetingFastPath] Direct playback failed for stream_id={stream_id}: {playback_error}"
+                    )
+                finally:
+                    direct_greeting_first_chunk.set()
+                    direct_greeting_state["active"] = False
+                    direct_greeting_state["completed"] = True
+                    now = time.perf_counter()
+                    if direct_greeting_state["sent_first"]:
+                        startup_tracker.record_stage("greeting_completed", now)
+                        turn_tracker.record_greeting_completed(now)
+                        turn_tracker.turn_type = "user_turn"
+                    startup_gate = startup_gate_holder["processor"]
+                    if startup_gate:
+                        startup_gate.set_ready_for_user()
+
+            direct_greeting_task = asyncio.create_task(_play_cached_greeting_directly())
+            try:
+                await asyncio.wait_for(direct_greeting_first_chunk.wait(), timeout=1.0)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"[GreetingFastPath] First cached chunk timed out for stream_id={stream_id}; using TTS fallback"
+                )
+            if not direct_greeting_state["sent_first"]:
+                direct_greeting_state["active"] = False
 
         # 7. Instantiate FastAPI WebSocket Transport
         transport = FastAPIWebsocketTransport(
@@ -1582,6 +2531,11 @@ async def websocket_plivo_endpoint(
             is_call_terminating = True
             logger.info(f"[Plivo Transport] WebSocket client disconnected event triggered for stream_id={stream_id}")
             await finalize_call_session("COMPLETED")
+            try:
+                if 'runner' in locals() and runner is not None:
+                    await runner.cancel()
+            except Exception as cancel_err:
+                logger.debug(f"[Plivo Transport] Runner cancel notice on disconnect: {cancel_err}")
 
         # 8. Instantiate Sarvam Realtime STT Service
         startup_tracker.record_stage("stt_service_create_start")
@@ -1635,12 +2589,18 @@ async def websocket_plivo_endpoint(
                 f"{[t.name for t in resolved_tools]}"
             )
 
-        # Inject authoritative runtime temporal and calendar instructions into system prompt
-        temporal_instructions = build_temporal_and_calendar_instructions(time_zone=tz_name)
-        base_system_prompt_with_temporal = f"{compiled_system_prompt}\n\n{temporal_instructions}"
+        # Single authoritative prompt assembly: avoid injecting duplicate 1.8KB 7-day calendar table
+        # if the compiled prompt already contains authoritative temporal grounding.
+        if "=== TEMPORAL CONTEXT ===" not in compiled_system_prompt and "=== RUNTIME TEMPORAL CONTEXT ===" not in compiled_system_prompt:
+            temporal_instructions = build_temporal_and_calendar_instructions(time_zone=tz_name)
+            base_system_prompt_with_temporal = f"{compiled_system_prompt}\n\n{temporal_instructions}"
+        else:
+            base_system_prompt_with_temporal = compiled_system_prompt
+
         initial_system_prompt = build_full_instructions(
             base_system_prompt_with_temporal,
             language_manager.current_language,
+            language_style=language_manager.language_style,
         )
         initial_messages = [{"role": "system", "content": initial_system_prompt}]
         if greeting:
@@ -1653,7 +2613,7 @@ async def websocket_plivo_endpoint(
         
         turn_strategies = UserTurnStrategies(
             start=[ExternalUserTurnStartStrategy(enable_interruptions=True)],
-            stop=[ExternalUserTurnStopStrategy(timeout=0.18, wait_for_transcript=True)],
+            stop=[ExternalUserTurnStopStrategy(timeout=0.12, wait_for_transcript=True)],
         )
         user_params = LLMUserAggregatorParams(
             user_turn_strategies=turn_strategies
@@ -1667,13 +2627,20 @@ async def websocket_plivo_endpoint(
 
         @user_aggregator.event_handler("on_user_turn_started")
         async def on_user_turn_started(aggregator, strategy):
+            turn_tracker.record_speech_start()
             logger.info(f"[Trace D - UserStartedSpeakingFrame] User turn started via strategy={strategy.__class__.__name__}")
 
         @user_aggregator.event_handler("on_user_turn_stopped")
         async def on_user_turn_stopped(aggregator, strategy, message=None):
+            turn_tracker.record_speech_stop()
             content = getattr(message, "content", "") if message else ""
             content_str = f" | content='{content}'" if content else ""
             logger.info(f"[UserTurn] User turn stopped via strategy={strategy.__class__.__name__}{content_str}")
+            if content and transcript_collector:
+                transcript_collector.record_user_turn(
+                    transcript=content,
+                    detected_language=runtime_config.language.primary or "en-IN",
+                )
 
         @user_aggregator.event_handler("on_user_turn_inference_triggered")
         async def on_user_turn_inference_triggered(aggregator, strategy):
@@ -1689,12 +2656,19 @@ async def websocket_plivo_endpoint(
             has_greeting=bool(greeting),
             allow_interruptions=allow_interruptions,
         )
+        startup_gate_holder["processor"] = pre_stt_processor
+        if direct_greeting_state["sent_first"]:
+            if direct_greeting_state["completed"]:
+                pre_stt_processor.set_ready_for_user()
+            else:
+                pre_stt_processor.set_greeting_active()
 
         # Instantiate Language Context Processor (Boundary D) preserving authoritative temporal prompt
         language_processor = LanguageContextProcessor(
             language_manager=language_manager,
             conversation_context=conversation_context,
             base_system_prompt=base_system_prompt_with_temporal,
+            tts_service=tts_service,
         )
 
         # 10. Instantiate Sarvam LLM Service (Phase 21B: Worker-Lifetime Shared Connection Pool)
@@ -1702,6 +2676,7 @@ async def websocket_plivo_endpoint(
         llm_settings_kwargs = {
             "model": llm_model,
             "reasoning_effort": None,
+            "max_tokens": getattr(runtime_config.runtime, "max_tokens", 150) or 150,
         }
         if runtime_config.runtime.temperature is not None:
             llm_settings_kwargs["temperature"] = runtime_config.runtime.temperature
@@ -1714,33 +2689,50 @@ async def websocket_plivo_endpoint(
             api_key=settings.SARVAM_API_KEY,
             settings=SarvamLLMSettings(**llm_settings_kwargs),
             timing_tracker=turn_tracker,
+            transcript_collector=transcript_collector,
             http_client=sarvam_llm_pool,
             is_call_terminating_fn=is_terminating,
             runtime_config=runtime_config,
             language_manager=language_manager,
+            tts_service=tts_service,
         )
 
-        startup_tracker.record_stage("llm_service_created")
+        # Background LLM prompt prefill to preload GPU attention KV-cache in VRAM after initial greeting
+        async def _warm_llm_prompt_kv_cache():
+            try:
+                # Dynamically wait until initial greeting audio finish signal is recorded (or 12s safety limit)
+                start_wait = time.perf_counter()
+                while time.perf_counter() - start_wait < 12.0:
+                    if hasattr(turn_tracker, "greeting_completed") and turn_tracker.greeting_completed is not None:
+                        break
+                    await asyncio.sleep(0.4)
 
-        # Compute static greeting cache key (Phase 22A Greeting Fast Path)
-        greeting_cache_key = None
-        cached_greeting_chunks = None
-        if greeting:
-            from app.greeting_cache import (
-                is_static_greeting,
-                compute_greeting_cache_key,
-                global_greeting_cache,
-            )
-            if is_static_greeting(greeting):
-                greeting_cache_key = compute_greeting_cache_key(
-                    tenant_id=runtime_config.tenant.tenant_id,
-                    deployment_id=resolved_deployment_id,
-                    model=tts_model,
-                    voice=voice_id,
-                    language=language_manager.current_language,
-                    greeting_text=greeting,
-                )
-                cached_greeting_chunks = global_greeting_cache.get(greeting_cache_key)
+                if settings.SARVAM_API_KEY and llm_service:
+                    client = getattr(llm_service, "_client", None)
+                    if client:
+                        warmup_params = {
+                            "model": llm_model,
+                            "messages": initial_messages,
+                            "max_tokens": 1,
+                            "temperature": 0.0,
+                        }
+                        if resolved_tools:
+                            adapter = llm_service.get_llm_adapter()
+                            p = adapter.get_llm_invocation_params(
+                                conversation_context,
+                                system_instruction=None,
+                                convert_developer_to_user=not llm_service.supports_developer_role,
+                            )
+                            if p.get("tools"):
+                                warmup_params["tools"] = p["tools"]
+                        await client.chat.completions.create(**warmup_params)
+                        logger.info("[LLM KV Warmup] Successfully preloaded system prompt into Sarvam GPU VRAM cache after initial greeting")
+            except Exception as e:
+                logger.debug(f"[LLM KV Warmup] Background warmup notice: {e}")
+
+        asyncio.create_task(_warm_llm_prompt_kv_cache())
+
+        startup_tracker.record_stage("llm_service_created")
 
         # 11. Timing & Transcript Monitor
         timing_monitor = RealtimeStreamingTimingMonitor(
@@ -1797,12 +2789,20 @@ async def websocket_plivo_endpoint(
                 audio_in_sample_rate=8000,
                 audio_out_sample_rate=8000,
                 enable_metrics=True,
+                enable_usage_metrics=True,
             ),
-            observers=[user_bot_latency_observer],
+            observers=[
+                user_bot_latency_observer,
+                MetricsLogObserver(),
+                TranscriptionLogObserver(level="DEBUG"),
+            ],
         )
 
-        # Queue initial greeting immediately on pipeline start directly to TTS
-        if greeting:
+        # The live-TTS fallback is used only when no direct cached audio was
+        # dispatched.  A single pipeline-start trigger avoids the previous
+        # background-task / event-handler scheduling race.
+        greeting_task = None
+        if greeting and not direct_greeting_state["sent_first"]:
             turn_tracker.turn_type = "greeting"
             startup_tracker.record_stage("greeting_queue_start")
             turn_tracker.record_greeting_start()
@@ -1811,9 +2811,17 @@ async def websocket_plivo_endpoint(
                 active_language=runtime_config.language.primary or "en-IN",
             )
 
-            @worker.event_handler("on_pipeline_started")
-            async def on_pipeline_started(worker_instance, frame):
+            async def _emit_initial_greeting():
+                if not cached_greeting_chunks and not tts_ready_event.is_set():
+                    try:
+                        await asyncio.wait_for(tts_ready_event.wait(), timeout=0.05)
+                    except asyncio.TimeoutError:
+                        logger.debug(f"TTS connection asynchronously warming for stream_id={stream_id}, queueing initial greeting frame immediately")
+
+                if startup_tracker.greeting_queued is not None:
+                    return
                 startup_tracker.record_stage("greeting_queued")
+                logger.info(f"Emitting initial greeting directly after TTS ready gate (elapsed: {time.perf_counter() - conn_start_time:.3f}s)")
                 if pre_stt_processor:
                     pre_stt_processor.set_greeting_active()
                 if cached_greeting_chunks:
@@ -1842,13 +2850,20 @@ async def websocket_plivo_endpoint(
                     await timing_monitor.queue_frame(TTSStoppedFrame(context_id="greeting_fast_path"))
                 else:
                     logger.info(f"Emitting initial assistant greeting for stream_id={stream_id}: '{greeting}'")
+                    worker_instance = worker
                     await worker_instance.queue_frame(TTSSpeakFrame(text=greeting))
-        else:
+
+            @worker.event_handler("on_pipeline_started")
+            async def on_pipeline_started(worker_instance, frame):
+                await _emit_initial_greeting()
+
+        elif not direct_greeting_state["sent_first"]:
             turn_tracker.turn_type = "user_turn"
 
         startup_tracker.record_stage("pipeline_start")
         startup_tracker.record_stage("tts_connection_start")
         runner = WorkerRunner(handle_sigint=False, handle_sigterm=False)
+        runner_ref["runner"] = runner
         await runner.add_workers(worker)
 
         startup_tracker.record_stage("pipeline_started")
@@ -1861,6 +2876,32 @@ async def websocket_plivo_endpoint(
             f"llm={llm_model} | tts={tts_model} | timezone={tz_name} | greeting={'yes' if greeting else 'no'} | "
             f"setup time: {time.perf_counter() - conn_start_time:.3f}s"
         )
+
+        # Pre-warm starter phrases and full tenant dynamic greeting in background after greeting playback completes
+        if settings.SARVAM_API_KEY:
+            from app.phrase_audio_cache import global_phrase_audio_cache
+            active_lang = (runtime_config.language.primary or "mr-IN").strip()
+            add_phrases = [greeting] if greeting else None
+
+            async def _delayed_prewarm():
+                # Dynamically wait until greeting speech is completely finished (or 12s fallback)
+                start_wait = time.perf_counter()
+                while time.perf_counter() - start_wait < 12.0:
+                    if hasattr(turn_tracker, "greeting_completed") and turn_tracker.greeting_completed is not None:
+                        break
+                    await asyncio.sleep(0.4)
+
+                await global_phrase_audio_cache.prewarm_starters(
+                    tenant_id=runtime_config.tenant.tenant_id,
+                    language=active_lang,
+                    voice_id=voice_id,
+                    model=tts_model,
+                    sample_rate=stream_sample_rate,
+                    api_key=settings.SARVAM_API_KEY,
+                    additional_phrases=add_phrases,
+                )
+
+            asyncio.create_task(_delayed_prewarm())
 
         max_duration = runtime_config.runtime.max_call_duration_seconds
         duration_task = None
@@ -1876,6 +2917,120 @@ async def websocket_plivo_endpoint(
 
         if max_duration and max_duration > 0:
             duration_task = asyncio.create_task(bounded_call_task(max_duration))
+
+        # 13. Silence Watchdog & Quiet Caller Nudges
+        watchdog_task: Optional[asyncio.Task] = None
+        async def _hangup_silence_watchdog():
+            try:
+                # Wait 15 seconds for initial conversation establishment
+                await asyncio.sleep(15)
+                while not is_terminating():
+                    await asyncio.sleep(3)
+                    if hasattr(serializer, "last_inbound_audio_time"):
+                        idle_time = time.perf_counter() - serializer.last_inbound_audio_time
+                        if idle_time > 45.0:
+                            logger.info(
+                                f"[SilenceWatchdog] No inbound audio for {idle_time:.1f}s for stream_id={stream_id}. "
+                                "Caller hung up. Cleanly terminating call session."
+                            )
+                            if not is_terminating():
+                                await _on_plivo_terminal_hangup()
+                                break
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.debug(f"[SilenceWatchdog] Notice: {e}")
+
+        watchdog_task = asyncio.create_task(_hangup_silence_watchdog())
+
+        # In-Call Nudges for Quiet Callers (User silence timeout)
+        nudge_task: Optional[asyncio.Task] = None
+        nudge_cfg = getattr(runtime_config.runtime, "nudges", None)
+        nudge_enabled = bool(nudge_cfg.enabled) if nudge_cfg and hasattr(nudge_cfg, "enabled") else True
+        nudge_delay = int(nudge_cfg.delay_seconds) if nudge_cfg and hasattr(nudge_cfg, "delay_seconds") else 5
+        max_nudges = int(nudge_cfg.max_unanswered_nudges) if nudge_cfg and hasattr(nudge_cfg, "max_unanswered_nudges") else 2
+        nudge_msgs = list(nudge_cfg.messages) if nudge_cfg and hasattr(nudge_cfg, "messages") and nudge_cfg.messages else []
+
+        if nudge_enabled:
+            async def _quiet_caller_nudge_loop():
+                try:
+                    await asyncio.sleep(max(3.0, float(nudge_delay)))
+                    nudge_count = 0
+                    last_nudge_time = 0.0
+
+                    while not is_terminating():
+                        await asyncio.sleep(1.0)
+                        now_mono = time.perf_counter()
+
+                        # Inbound audio silence calculation
+                        inbound_silence = (
+                            now_mono - serializer.last_inbound_audio_time
+                            if hasattr(serializer, "last_inbound_audio_time") and serializer.last_inbound_audio_time
+                            else 0.0
+                        )
+
+                        # User speaking status
+                        user_speaking = bool(
+                            turn_tracker and turn_tracker.speech_start is not None and turn_tracker.speech_stop is None
+                        )
+                        has_active_tool = bool(turn_tracker and turn_tracker.has_pending_tool_activity())
+                        is_user_turn = bool(
+                            turn_tracker and (turn_tracker.turn_type == "user_turn" or turn_tracker.greeting_completed is not None)
+                        )
+
+                        # Reset nudge count if user spoke recently (inbound audio within 3 seconds)
+                        if inbound_silence < 3.0:
+                            nudge_count = 0
+
+                        last_activity = max(
+                            getattr(serializer, "last_inbound_audio_time", now_mono),
+                            turn_tracker.last_audio_sent_time or 0.0,
+                            last_nudge_time,
+                        )
+                        silence_duration = now_mono - last_activity
+
+                        if (
+                            is_user_turn
+                            and not user_speaking
+                            and not has_active_tool
+                            and silence_duration >= nudge_delay
+                            and nudge_count < max_nudges
+                        ):
+                            nudge_count += 1
+                            last_nudge_time = now_mono
+
+                            lang = (language_manager.current_language or "en-IN").lower()
+                            if lang.startswith("mr"):
+                                nudge_text = "तुम्ही आहात का? मला सांगा मी काही मदत करू का."
+                            elif lang.startswith("hi"):
+                                nudge_text = "क्या आप हैं? बताइए मैं आपकी क्या मदद कर सकता हूँ।"
+                            elif lang.startswith("gu"):
+                                nudge_text = "તમે છો? મને જણાવો જો હું કોઈ મદદ કરી શકું."
+                            else:
+                                nudge_text = "Are you there? Let me know if you need any help."
+
+                            if nudge_msgs and len(nudge_msgs) > 0 and nudge_msgs[0]:
+                                configured_msg = nudge_msgs[(nudge_count - 1) % len(nudge_msgs)]
+                                if configured_msg and configured_msg.strip():
+                                    from app.indic_sanitizer import sanitize_indic_tts_text
+                                    nudge_text = sanitize_indic_tts_text(configured_msg.strip(), language_manager.current_language)
+
+                            logger.info(
+                                f"[QuietCallerNudge] Dispatched gentle silence reminder #{nudge_count}/{max_nudges} "
+                                f"after {silence_duration:.1f}s silence: '{nudge_text}' (lang={language_manager.current_language})"
+                            )
+
+                            from pipecat.frames.frames import TTSSpeakFrame
+                            if 'task' in locals() and task:
+                                await task.queue_frame(TTSSpeakFrame(text=nudge_text))
+                            elif 'runner' in locals() and runner:
+                                await runner.queue_frame(TTSSpeakFrame(text=nudge_text))
+                except asyncio.CancelledError:
+                    pass
+                except Exception as e:
+                    logger.debug(f"[QuietCallerNudge] Loop notice: {e}")
+
+            nudge_task = asyncio.create_task(_quiet_caller_nudge_loop())
 
         # 14. Run Pipeline until client disconnects or stop event is received
         await runner.run()
@@ -1897,6 +3052,14 @@ async def websocket_plivo_endpoint(
         is_call_terminating = True
         if 'duration_task' in locals() and duration_task and not duration_task.done():
             duration_task.cancel()
+        if 'greeting_task' in locals() and greeting_task and not greeting_task.done():
+            greeting_task.cancel()
+        if 'direct_greeting_task' in locals() and direct_greeting_task and not direct_greeting_task.done():
+            direct_greeting_task.cancel()
+        if 'tts_keepalive_task' in locals() and tts_keepalive_task and not tts_keepalive_task.done():
+            tts_keepalive_task.cancel()
+        if 'watchdog_task' in locals() and watchdog_task and not watchdog_task.done():
+            watchdog_task.cancel()
         
         await finalize_call_session("COMPLETED")
         total_duration = time.perf_counter() - conn_start_time

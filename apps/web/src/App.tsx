@@ -21,6 +21,8 @@ import { ClientAppointments } from './pages/client/Appointments';
 import { ClientFollowUps } from './pages/client/FollowUps';
 import { ClientAnalytics } from './pages/client/Analytics';
 import { ClientPhoneAgents } from './pages/client/PhoneAgents';
+import { ClientReceptionists } from './pages/client/Receptionists';
+import { ClientPlan } from './pages/client/ClientPlan';
 import { ReceptionistDashboard } from './pages/receptionist/ReceptionistDashboard';
 import Home from './pages/Home';
 
@@ -32,6 +34,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/receptionist" element={<ReceptionistDashboard />} />
         <Route path="/receptionist/schedule" element={<ReceptionistDashboard />} />
+        <Route path="/:clinicSlug/receptionist" element={<ReceptionistDashboard />} />
+        <Route path="/:clinicSlug/receptionist/schedule" element={<ReceptionistDashboard />} />
         <Route path="/login" element={<Login />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -71,6 +75,8 @@ function App() {
           <Route path="follow-ups" element={<ClientFollowUps />} />
           <Route path="analytics" element={<ClientAnalytics />} />
           <Route path="phone-agents" element={<ClientPhoneAgents />} />
+          <Route path="receptionists" element={<ClientReceptionists />} />
+          <Route path="plan" element={<ClientPlan />} />
         </Route>
         
         {/* Catch all */}

@@ -31,6 +31,7 @@ Tests coverage:
 
 import json
 from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock
 import httpx
 import pytest
 
@@ -113,10 +114,12 @@ class MockFunctionCallParams:
         self.arguments = arguments
         self.result: Optional[Any] = None
         self.callback_called = False
+        self.callback_kwargs: Dict[str, Any] = {}
 
     async def result_callback(self, result: Any, *args, **kwargs):
         self.result = result
         self.callback_called = True
+        self.callback_kwargs = kwargs
 
 
 # ==========================================
@@ -425,7 +428,7 @@ async def test_book_appointment_success():
             arguments={
                 "customerName": "Pooja Patel",
                 "title": "General Consultation",
-                "bookingDate": "2026-09-15",
+                "bookingDate": "2026-09-20",
                 "bookingTime": "14:30",
                 "resourceName": "Dr. Rao",
             },
@@ -447,6 +450,54 @@ async def test_book_appointment_success():
         assert posted_payload["customerPhone"] == "+919876543210"
         assert posted_payload["status"] == "REQUESTED"
         assert posted_payload["resourceName"] == "Dr. Rao"
+
+
+@pytest.mark.asyncio
+async def test_book_appointment_direct_response_skips_post_tool_llm():
+    """A configured, server-authored appointment result can bypass pass two."""
+    def handler(request: httpx.Request):
+        return httpx.Response(
+            201,
+            json={"id": "apt-uuid-9999", "appointmentNumber": "A-108", "status": "REQUESTED"},
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as mock_client:
+        context = ToolRuntimeContext(
+            deployment_id="dep-123",
+            caller_phone="+919876543210",
+            api_url="http://testserver",
+            worker_secret="test-secret",
+        )
+        config = create_test_runtime_config(
+            tools_enabled=True,
+            tool_defs=[
+                RuntimeToolDefinition(
+                    toolId="book_appointment",
+                    name="book_appointment",
+                    description="Book appointment",
+                    enabled=True,
+                    directResponseEnabled=True,
+                )
+            ],
+        )
+        schema = ToolRegistry().resolve_tools(config, context=context, http_client=mock_client)[0]
+        params = MockFunctionCallParams(
+            arguments={
+                "customerName": "Pooja Patel",
+                "title": "General Consultation",
+                "bookingDate": "2026-09-20",
+                "bookingTime": "14:30",
+            },
+            function_name="book_appointment",
+        )
+        params.llm = AsyncMock()
+
+        result = await schema.handler(params)
+
+        assert result["success"] is True
+        properties = params.callback_kwargs["properties"]
+        assert properties.run_llm is True
 
 
 # ==========================================
@@ -487,7 +538,7 @@ async def test_book_appointment_api_failure():
             arguments={
                 "customerName": "Pooja Patel",
                 "title": "Consultation",
-                "bookingDate": "2026-09-15",
+                "bookingDate": "2026-09-20",
                 "bookingTime": "14:30",
             },
             function_name="book_appointment",
@@ -537,7 +588,7 @@ async def test_book_appointment_requested_semantics_not_confirmed():
                 arguments={
                     "customerName": "User",
                     "title": "Visit",
-                    "bookingDate": "2026-09-15",
+                    "bookingDate": "2026-09-20",
                     "bookingTime": "10:00 AM",
                 },
                 function_name="book_appointment",

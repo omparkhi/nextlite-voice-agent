@@ -266,7 +266,7 @@ async def test_llm_service_dispatches_multilingual_early_ack():
 
     assert len(pushed_frames) == 1
     assert isinstance(pushed_frames[0], TTSSpeakFrame)
-    assert pushed_frames[0].text == "जी, मैं अभी चेक कर लेता हूँ।"
+    assert pushed_frames[0].text == "एक मिनट, मैं अभी चेक कर लेता हूँ।"
     assert turn_tracker.early_ack_sent is not None
 
 

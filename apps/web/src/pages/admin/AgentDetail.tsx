@@ -4,7 +4,6 @@ import { api } from '../../services/api';
 import type { Agent, AgentConfiguration, AgentVersion, AgentChecklistResult } from '../../types';
 import KnowledgeManager from './KnowledgeManager';
 import TestConversation from './TestConversation';
-import WebVoiceTest from '../../components/WebVoiceTest';
 import PhoneCallTest from '../../components/PhoneCallTest';
 import { PhaseBuilder } from '../../components/agent-builder/PhaseBuilder';
 import { GuardrailsEditor } from '../../components/agent-builder/GuardrailsEditor';
@@ -13,6 +12,7 @@ import { SettingsEditor } from '../../components/agent-builder/SettingsEditor';
 import { PromptPreviewModal } from '../../components/agent-builder/PromptPreviewModal';
 import { ToolsManager } from '../../components/agent-builder/ToolsManager';
 import { VariableAutocompleteTextarea } from '../../components/agent-builder/VariableAutocompleteTextarea';
+import { PublishAndChannelModal } from '../../components/agent-builder/PublishAndChannelModal';
 
 const defaultConfiguration: AgentConfiguration = {
   identity: { agentName: 'Assistant', greeting: 'Hello! How can I help you today?', businessName: '' },
@@ -45,16 +45,37 @@ export function AgentDetail() {
   const [agent, setAgent] = useState<Agent | null>(null);
   const [configuration, setConfiguration] = useState<AgentConfiguration>(defaultConfiguration);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('instructions');
-  const [testMode, setTestMode] = useState<'chat' | 'web_voice' | 'phone'>('chat');
+  const [testMode, setTestMode] = useState<'chat' | 'phone'>('chat');
   const [versions, setVersions] = useState<AgentVersion[]>([]);
   const [checklist, setChecklist] = useState<AgentChecklistResult | null>(null);
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-  const [publishMessage, setPublishMessage] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
+
+  const handleResetData = async () => {
+    setResetting(true);
+    setResetNotice(null);
+    try {
+      if (clientId) {
+        const res = await api.resetClientData(clientId);
+        setResetNotice(`Operational data cleared! Deleted ${res.deletedCounts.appointments} appointments, ${res.deletedCounts.leads} leads, ${res.deletedCounts.callSessions} call logs.`);
+      } else {
+        const res = await api.resetOwnData();
+        setResetNotice(`Operational data cleared! Deleted ${res.deletedCounts.appointments} appointments, ${res.deletedCounts.leads} leads, ${res.deletedCounts.callSessions} call logs.`);
+      }
+      setShowResetModal(false);
+    } catch (err: any) {
+      alert(err?.message || 'Failed to reset operational data');
+    } finally {
+      setResetting(false);
+    }
+  };
 
   useEffect(() => {
     if (!clientId || !agentId) return;
@@ -121,26 +142,6 @@ export function AgentDetail() {
     }
   };
 
-  const handlePublish = async () => {
-    if (!clientId || !agentId) return;
-    setPublishing(true);
-    setPublishMessage(null);
-    try {
-      if (saveStatus === 'unsaved') {
-        await handleSaveDraft();
-      }
-      const res = await api.publishAgent(clientId, agentId);
-      setAgent(res.agent);
-      setChecklist(res.checklist);
-      setPublishMessage('✓ Agent published to LIVE production successfully!');
-      setTimeout(() => setPublishMessage(null), 4000);
-    } catch (err: any) {
-      setPublishMessage(err.message || 'Failed to publish agent');
-    } finally {
-      setPublishing(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50 text-gray-500 text-xs font-medium">
@@ -198,6 +199,29 @@ export function AgentDetail() {
 
           <button
             type="button"
+            onClick={() => {
+              if (clientId) {
+                navigator.clipboard.writeText(clientId);
+                alert(`Copied Tenant ID (Client Key): ${clientId}`);
+              }
+            }}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors flex items-center gap-1"
+            title="Copy Tenant ID for WhatsApp Bot API"
+          >
+            <span>📋 Copy Tenant ID</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowResetModal(true)}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-colors flex items-center gap-1"
+            title="Clear all test call logs, appointments, and leads"
+          >
+            <span>🗑️ Reset Data</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowPromptPreview(true)}
             className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-200 transition-colors flex items-center gap-1"
           >
@@ -223,18 +247,18 @@ export function AgentDetail() {
 
           <button
             type="button"
-            onClick={handlePublish}
-            disabled={publishing || !(checklist?.canPublish ?? false)}
-            className="px-4 py-1.5 rounded-full text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 transition-colors shadow-2xs"
+            onClick={() => setShowPublishModal(true)}
+            className="px-4 py-1.5 rounded-full text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-colors shadow-2xs flex items-center gap-1"
           >
-            {publishing ? 'Publishing...' : 'Publish Agent'}
+            <span>🚀 Publish Agent</span>
           </button>
         </div>
       </header>
 
-      {publishMessage && (
-        <div className="bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-xs px-4 py-2 text-center font-medium">
-          {publishMessage}
+      {resetNotice && (
+        <div className="bg-emerald-50 border-b border-emerald-200 text-emerald-800 text-xs px-4 py-2 text-center font-medium flex items-center justify-between">
+          <span className="mx-auto">{resetNotice}</span>
+          <button onClick={() => setResetNotice(null)} className="text-emerald-600 hover:text-emerald-900 font-bold">✕</button>
         </div>
       )}
 
@@ -547,13 +571,6 @@ export function AgentDetail() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTestMode('web_voice')}
-                    className={`pb-2.5 border-b-2 ${testMode === 'web_voice' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
-                  >
-                    Browser Web Voice Test
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setTestMode('phone')}
                     className={`pb-2.5 border-b-2 ${testMode === 'phone' ? 'border-black text-black' : 'border-transparent text-gray-400'}`}
                   >
@@ -562,7 +579,6 @@ export function AgentDetail() {
                 </div>
 
                 {testMode === 'chat' && <TestConversation clientId={clientId} agentId={agentId} />}
-                {testMode === 'web_voice' && <WebVoiceTest clientId={clientId} agentId={agentId} />}
                 {testMode === 'phone' && <PhoneCallTest clientId={clientId} agentId={agentId} />}
               </div>
             )}
@@ -593,9 +609,94 @@ export function AgentDetail() {
                 ✕
               </button>
             </div>
-            <WebVoiceTest clientId={clientId} agentId={agentId} />
+            <PhoneCallTest clientId={clientId} agentId={agentId} />
           </div>
         </div>
+      )}
+
+      {/* RESET OPERATIONAL DATA MODAL */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-amber-200">
+            <div className="flex items-center gap-3 text-amber-600">
+              <div className="p-2.5 bg-amber-100 rounded-full">
+                <span className="text-xl">⚠️</span>
+              </div>
+              <h3 className="font-semibold text-lg text-gray-900">
+                Reset Clinic Operational Data?
+              </h3>
+            </div>
+
+            <p className="text-sm text-gray-600 leading-relaxed">
+              Are you sure you want to clear test call logs, appointments, and leads for this clinic?
+            </p>
+
+            <div className="bg-amber-50 p-3.5 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-2">
+              <p className="font-semibold text-amber-900 flex items-center gap-1">
+                <span>🧹</span> What will be permanently DELETED:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-amber-800 font-medium">
+                <li>All Receptionist & AI Appointments</li>
+                <li>All CRM Leads</li>
+                <li>All Call Sessions & Logs</li>
+              </ul>
+            </div>
+
+            <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200 text-xs text-gray-700 space-y-1">
+              <p className="font-semibold text-gray-900 flex items-center gap-1">
+                <span>🛡️</span> What will be PRESERVED (Not touched):
+              </p>
+              <p className="text-gray-600">
+                Agent configuration, prompts, system instructions, voice settings, tools, knowledge base files, and receptionist login accounts.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setShowResetModal(false)}
+                disabled={resetting}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-xs font-medium hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleResetData}
+                disabled={resetting}
+                className="px-5 py-2 bg-amber-600 text-white rounded-xl text-xs font-semibold hover:bg-amber-700 disabled:opacity-50 transition-colors shadow-sm flex items-center gap-1.5"
+              >
+                {resetting ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Resetting Data...
+                  </>
+                ) : (
+                  'Yes, Reset Operational Data'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {clientId && agentId && (
+        <PublishAndChannelModal
+          clientId={clientId}
+          agentId={agentId}
+          agent={agent}
+          configuration={configuration}
+          checklist={checklist}
+          isOpen={showPublishModal}
+          onClose={() => setShowPublishModal(false)}
+          onSuccess={(updatedAgent) => {
+            setAgent(updatedAgent);
+            if (updatedAgent?.versions) setVersions(updatedAgent.versions);
+            api.getChecklist(clientId, agentId).then(setChecklist).catch(() => {});
+          }}
+        />
       )}
     </div>
   );

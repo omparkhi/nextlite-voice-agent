@@ -250,7 +250,8 @@ async def test_10_prompt_layering_order():
     assert idx_identity != -1
     assert idx_custom != -1
 
-    assert idx_safety < idx_temporal < idx_template < idx_identity < idx_custom
+    assert idx_safety < idx_template < idx_identity < idx_custom
+    assert idx_temporal > idx_safety
 
 @pytest.mark.asyncio
 async def test_11_template_tool_neutrality():

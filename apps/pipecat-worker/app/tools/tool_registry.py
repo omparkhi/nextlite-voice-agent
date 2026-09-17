@@ -20,7 +20,9 @@ from pipecat.services.llm_service import FunctionCallParams
 from app.runtime_config_client import RuntimeAgentConfig, RuntimeToolConfig, RuntimeToolDefinition
 from app.tools.appointment_tool import (
     BOOK_APPOINTMENT_TOOL_NAME,
+    RESCHEDULE_APPOINTMENT_TOOL_NAME,
     create_book_appointment_tool_factory,
+    create_reschedule_appointment_tool_factory,
 )
 from app.tools.knowledge_tool import (
     QUERY_KNOWLEDGE_BASE_TOOL_NAME,
@@ -29,6 +31,10 @@ from app.tools.knowledge_tool import (
 from app.tools.lead_tool import (
     CREATE_CALLBACK_LEAD_TOOL_NAME,
     create_callback_lead_tool_factory,
+)
+from app.tools.slot_tool import (
+    CHECK_SLOTS_TOOL_NAME,
+    create_check_slots_tool_factory,
 )
 
 if TYPE_CHECKING:
@@ -94,6 +100,8 @@ CANONICAL_PLATFORM_TOOLS = (
     "query_knowledge_base",
     "create_callback_lead",
     "book_appointment",
+    "check_available_slots",
+    "reschedule_appointment",
 )
 
 CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
@@ -124,6 +132,15 @@ CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
     "schedule appointment": "book_appointment",
     "schedule_appointment": "book_appointment",
     "appointment booking": "book_appointment",
+    # Slot checking
+    "check_available_slots": "check_available_slots",
+    "check available slots": "check_available_slots",
+    "check_slots": "check_available_slots",
+    "check slots": "check_available_slots",
+    # Reschedule
+    "reschedule_appointment": "reschedule_appointment",
+    "reschedule appointment": "reschedule_appointment",
+    "reschedule": "reschedule_appointment",
 }
 
 
@@ -206,6 +223,12 @@ class AppointmentToolFactory:
             context=context,
             description_override=desc,
             http_client=http_client,
+            direct_response_enabled=bool(tool_config and tool_config.direct_response_enabled),
+            direct_response_language=(
+                runtime_config.language.primary
+                if runtime_config and runtime_config.language
+                else "en-IN"
+            ),
         )
 
 
@@ -233,6 +256,42 @@ class KnowledgeToolFactory:
         )
 
 
+class SlotToolFactory:
+    tool_id = CHECK_SLOTS_TOOL_NAME
+
+    def create(
+        self,
+        context: ToolRuntimeContext,
+        tool_config: Optional[RuntimeToolDefinition] = None,
+        runtime_config: Optional[RuntimeAgentConfig] = None,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> FunctionSchema:
+        desc = tool_config.description if tool_config and tool_config.description else None
+        return create_check_slots_tool_factory(
+            context=context,
+            description_override=desc,
+            http_client=http_client,
+        )
+
+
+class RescheduleToolFactory:
+    tool_id = RESCHEDULE_APPOINTMENT_TOOL_NAME
+
+    def create(
+        self,
+        context: ToolRuntimeContext,
+        tool_config: Optional[RuntimeToolDefinition] = None,
+        runtime_config: Optional[RuntimeAgentConfig] = None,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> FunctionSchema:
+        desc = tool_config.description if tool_config and tool_config.description else None
+        return create_reschedule_appointment_tool_factory(
+            context=context,
+            description_override=desc,
+            http_client=http_client,
+        )
+
+
 class ToolRegistry:
     """NextLite Voice Tool Registry for Pipecat Worker.
     
@@ -245,6 +304,8 @@ class ToolRegistry:
         self.register(KnowledgeToolFactory())
         self.register(LeadToolFactory())
         self.register(AppointmentToolFactory())
+        self.register(SlotToolFactory())
+        self.register(RescheduleToolFactory())
 
     def register(self, factory: ToolFactory) -> "ToolRegistry":
         """Register a tool factory with the registry."""

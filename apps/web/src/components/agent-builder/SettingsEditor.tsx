@@ -162,34 +162,178 @@ export function SettingsEditor({ configuration, onChange }: SettingsEditorProps)
 
       {/* Language */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs p-5 space-y-4">
-        <h4 className="font-semibold text-gray-900 text-sm border-b border-gray-100 pb-2.5">Language & Switching</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
           <div>
-            <label className="block text-gray-700 mb-1.5 font-semibold">Primary Spoken Language</label>
-            <select
-              value={lang.primary || 'en-IN'}
-              onChange={(e) => handleLanguageChange('primary', e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400 focus:bg-white"
-            >
-              <option value="en-IN">English (India)</option>
-              <option value="hi-IN">Hindi (हिंदी)</option>
-              <option value="ta-IN">Tamil (தமிழ்)</option>
-              <option value="te-IN">Telugu (తెలుగు)</option>
-              <option value="bn-IN">Bengali (বাংলা)</option>
-              <option value="mr-IN">Marathi (मराठी)</option>
-            </select>
+            <h4 className="font-semibold text-gray-900 text-sm">Languages & Dynamic Switching</h4>
+            <p className="text-gray-500 text-[11px] mt-0.5">
+              Select all languages the agent is allowed to speak. Callers can switch naturally between active languages.
+            </p>
           </div>
-          <div className="flex items-center justify-between pt-4">
-            <div>
-              <span className="block text-gray-900 font-semibold text-xs">Auto-Detect Language Switching</span>
-              <span className="text-gray-500 text-[11px]">Switch language dynamically if caller switches</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-900 font-semibold text-xs">Auto-Detect Switching</span>
             <input
               type="checkbox"
               checked={lang.languageSwitchEnabled !== false}
               onChange={(e) => handleLanguageChange('languageSwitchEnabled', e.target.checked)}
               className="w-4 h-4 rounded text-black focus:ring-0 cursor-pointer"
             />
+          </div>
+        </div>
+
+        {/* Dialect Style Mode: Pure vs Conversational Mixed */}
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-3.5 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="block text-gray-900 font-semibold text-xs">
+              Language Style & Dialect Mode
+            </label>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black text-white">
+              {lang.languageStyle === 'pure' ? '🗣️ Pure Script' : '💬 Mixed Dialect'}
+            </span>
+          </div>
+          <select
+            value={lang.languageStyle || 'mixed'}
+            onChange={(e) => handleLanguageChange('languageStyle', e.target.value)}
+            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-xs focus:outline-none focus:border-gray-400 font-medium"
+          >
+            <option value="mixed">💬 Conversational Mixed (Minglish / Hinglish / English - Recommended for Real-time Calls)</option>
+            <option value="pure">🗣️ Pure Native Language (Pure Marathi / Pure Hindi - No English mix)</option>
+          </select>
+          <p className="text-gray-500 text-[11px]">
+            {lang.languageStyle === 'pure' ? (
+              <span>Enforces 100% native vocabulary and numbers (e.g. <em>वेळ, तारीख, सतरा सप्टेंबर, नक्की</em>). Prohibits English words like <em>appointment, date, age, slot available, book</em>.</span>
+            ) : (
+              <span>Uses natural code-mixed Indian dialect (e.g. Marathi/Hindi spoken naturally with common terms like <em>appointment, date, timing, book, confirm</em>).</span>
+            )}
+          </p>
+        </div>
+
+        {/* Multi-Language Selector Grid */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-gray-700 font-semibold text-xs">
+              Supported Spoken Languages ({((lang.supported && lang.supported.length > 0) ? lang.supported : [lang.primary || 'hi-IN']).length} Active)
+            </label>
+            <span className="text-[11px] text-gray-500">
+              Primary: <strong className="text-gray-900">{lang.primary || 'hi-IN'}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+            {[
+              { code: 'hi-IN', label: 'Hindi', native: 'हिंदी', badge: 'Hinglish' },
+              { code: 'mr-IN', label: 'Marathi', native: 'मराठी', badge: 'Minglish' },
+              { code: 'en-IN', label: 'English (India)', native: 'English', badge: 'Indian English' },
+              { code: 'gu-IN', label: 'Gujarati', native: 'ગુજરાતી', badge: 'Gujlish' },
+              { code: 'bn-IN', label: 'Bengali', native: 'বাংলা', badge: 'Bangla' },
+              { code: 'ta-IN', label: 'Tamil', native: 'தமிழ்', badge: 'Tanglish' },
+              { code: 'te-IN', label: 'Telugu', native: 'తెలుగు', badge: 'Tenglish' },
+              { code: 'kn-IN', label: 'Kannada', native: 'ಕನ್ನಡ', badge: 'Kanglish' },
+              { code: 'pa-IN', label: 'Punjabi', native: 'ਪੰਜਾਬੀ', badge: 'Punjabi' },
+              { code: 'ml-IN', label: 'Malayalam', native: 'മലയാളം', badge: 'Malayalam' },
+              { code: 'or-IN', label: 'Odia', native: 'ଓଡ଼ିଆ', badge: 'Odia' },
+            ].map((item) => {
+              const currentSupported = (lang.supported && lang.supported.length > 0)
+                ? lang.supported
+                : [lang.primary || 'hi-IN'];
+              const isSelected = currentSupported.includes(item.code) || lang.primary === item.code;
+              const isPrimary = (lang.primary || 'hi-IN') === item.code;
+
+              const toggleLanguage = () => {
+                let updated = [...currentSupported];
+                if (isSelected) {
+                  if (isPrimary) {
+                    // Cannot unselect primary unless another language is selected
+                    const remaining = updated.filter((c) => c !== item.code);
+                    if (remaining.length > 0) {
+                      const newPrimary = remaining[0];
+                      onChange({
+                        language: {
+                          ...lang,
+                          primary: newPrimary,
+                          supported: remaining,
+                        },
+                      });
+                    }
+                    return;
+                  }
+                  updated = updated.filter((c) => c !== item.code);
+                } else {
+                  updated.push(item.code);
+                }
+                onChange({
+                  language: {
+                    ...lang,
+                    supported: updated,
+                  },
+                });
+              };
+
+              const setAsPrimary = (e: React.MouseEvent) => {
+                e.stopPropagation();
+                let updated = [...currentSupported];
+                if (!updated.includes(item.code)) {
+                  updated.push(item.code);
+                }
+                onChange({
+                  language: {
+                    ...lang,
+                    primary: item.code,
+                    supported: updated,
+                  },
+                });
+              };
+
+              return (
+                <div
+                  key={item.code}
+                  onClick={toggleLanguage}
+                  className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                    isPrimary
+                      ? 'bg-amber-50/60 border-amber-300 ring-1 ring-amber-300'
+                      : isSelected
+                      ? 'bg-gray-50 border-gray-300'
+                      : 'bg-white border-gray-200 hover:border-gray-300 opacity-60'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={toggleLanguage}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-3.5 h-3.5 rounded text-black focus:ring-0 cursor-pointer"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-900 block text-xs leading-tight">
+                          {item.label}
+                        </span>
+                        <span className="text-[11px] text-gray-500">
+                          {item.native} · {item.code}
+                        </span>
+                      </div>
+                    </div>
+
+                    {isPrimary ? (
+                      <span className="px-2 py-0.5 bg-amber-200 text-amber-900 font-bold rounded-full text-[10px] tracking-wide uppercase">
+                        Primary
+                      </span>
+                    ) : (
+                      isSelected && (
+                        <button
+                          type="button"
+                          onClick={setAsPrimary}
+                          className="px-2 py-0.5 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 rounded text-[10px] font-medium transition-colors"
+                          title="Set this as starting primary language"
+                        >
+                          Set Primary
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

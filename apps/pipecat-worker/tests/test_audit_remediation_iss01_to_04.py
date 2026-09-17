@@ -33,6 +33,11 @@ from pipecat.processors.frame_processor import FrameDirection
 
 def test_iss01_prompt_compiler_knowledge_grounding_contract():
     """Verify prompt compiler includes authoritative knowledge grounding and slot distinction."""
+    import sys
+    from pathlib import Path
+    root_path = str(Path(__file__).resolve().parents[3])
+    if root_path not in sys.path:
+        sys.path.insert(0, root_path)
     from apps.api.app.services.prompt_compiler_service import PromptCompilerService
     
     compiler = PromptCompilerService()
@@ -147,7 +152,7 @@ def test_iss02_early_ack_phrase_selection_for_hindi_transcript():
             
     assert active_lang == "hi-IN"
     filler_phrase = DEFAULT_EARLY_TOOL_ACK_PHRASES[active_lang]
-    assert filler_phrase == "जी, मैं अभी चेक कर लेता हूँ।"
+    assert filler_phrase == "एक मिनट, मैं अभी चेक कर लेता हूँ।"
 
 
 # ============================================================================

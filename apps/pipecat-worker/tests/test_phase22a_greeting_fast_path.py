@@ -75,3 +75,17 @@ def test_greeting_cache_eviction():
     assert cache.get("k1") is None
     assert cache.get("k2") is not None
     assert cache.get("k3") is not None
+
+
+def test_direct_phone_playback_requires_matching_pcm_format():
+    """A fast-path entry must never guess how to send audio to Plivo."""
+    cache = StaticGreetingAudioCache()
+    cache.put("phone-safe", [b"\x00\x01" * 160], sample_rate=8000, num_channels=1)
+    cache.put("wrong-rate", [b"\x00\x01" * 160], sample_rate=24000, num_channels=1)
+    cache.put("wrong-channels", [b"\x00\x01" * 160], sample_rate=8000, num_channels=2)
+    cache.put("odd-pcm", [b"\x00" * 319], sample_rate=8000, num_channels=1)
+
+    assert cache.get("phone-safe").is_telephony_safe(8000) is True
+    assert cache.get("wrong-rate").is_telephony_safe(8000) is False
+    assert cache.get("wrong-channels").is_telephony_safe(8000) is False
+    assert cache.get("odd-pcm").is_telephony_safe(8000) is False

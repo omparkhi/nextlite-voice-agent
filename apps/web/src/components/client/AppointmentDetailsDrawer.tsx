@@ -131,10 +131,44 @@ export function AppointmentDetailsDrawer({
                 onChange={(e) => setStatus(e.target.value as any)}
                 className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3.5 py-2 text-xs font-medium text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
               >
-                <option value="REQUESTED">REQUESTED (Slot Pending Confirmation)</option>
-                <option value="CONFIRMED">CONFIRMED (Booking Validated)</option>
-                <option value="CANCELLED">CANCELLED</option>
+                <option value="SCHEDULED">SCHEDULED (Active Booking)</option>
+                <option value="COMPLETED">COMPLETED (Mark as Done / Patient Attended)</option>
+                <option value="CANCELLED">CANCELLED (Cancelled / Deleted)</option>
               </select>
+            </div>
+
+            {/* Customer Details */}
+            <div className="el-card p-4 bg-[#fafafa] space-y-2.5 text-xs">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#777169] block border-b border-[#f0efed] pb-1.5">
+                Customer Information
+              </span>
+
+              <div className="flex justify-between py-1">
+                <span className="text-[#777169]">Full Name</span>
+                <span className="font-semibold text-[#0c0a09]">{appointment.customerName}</span>
+              </div>
+
+              <div className="flex justify-between py-1">
+                <span className="text-[#777169]">Contact Number</span>
+                <div className="text-right">
+                  <span className="font-mono font-medium text-[#0c0a09]">{appointment.customerPhone}</span>
+                  <span className="block text-[10px] text-[#777169]">Telephony Call Metadata</span>
+                </div>
+              </div>
+
+              <div className="flex justify-between py-1">
+                <span className="text-[#777169]">Age</span>
+                <span className="font-medium text-[#0c0a09]">
+                  {appointment.age || (appointment.metadata as any)?.age || '-'}
+                </span>
+              </div>
+
+              <div className="flex justify-between py-1">
+                <span className="text-[#777169]">Place / Location</span>
+                <span className="font-medium text-[#0c0a09]">
+                  {appointment.place || (appointment.metadata as any)?.place || (appointment.metadata as any)?.location || '-'}
+                </span>
+              </div>
             </div>
 
             {/* Appointment Schedule Details */}

@@ -28,10 +28,10 @@ def test_greeting_first_audio_latch():
 
 
 def test_early_release_aggregator_buffer_alignment():
-    # Verify default min_first_chunk_chars is 30 (matching Sarvam min_buffer_size)
+    # Verify default min_first_chunk_chars is 12 and min_first_chunk_words is 2
     agg = EarlyReleaseTextAggregator()
-    assert agg._min_first_chunk_chars == 30
-    assert agg._min_first_chunk_words == 3
+    assert agg._min_first_chunk_chars == 12
+    assert agg._min_first_chunk_words == 2
 
 
 def test_turn_timing_tool_lifecycle():

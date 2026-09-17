@@ -122,6 +122,7 @@ def test_turn_timing_tracker_per_turn_first_audio_latch():
     """Verify TurnTimingTracker records first_audio_sent_to_plivo once per turn and resets for new turn."""
     tracker = TurnTimingTracker(stream_id="test_stream", session_start_monotonic=100.0)
     tracker.start_new_turn(speech_start=101.0)
+    tracker.record_first_tts_audio(101.5)
 
     for i in range(20):
         tracker.record_audio_sent_to_plivo(102.0 + (i * 0.02))
@@ -134,6 +135,7 @@ def test_turn_timing_tracker_per_turn_first_audio_latch():
     tracker.record_turn_complete(103.0)
     tracker.emit_turn_metrics_log()
     tracker.start_new_turn(speech_start=104.0)
+    tracker.record_first_tts_audio(104.5)
 
     for i in range(20):
         tracker.record_audio_sent_to_plivo(105.0 + (i * 0.02))

@@ -33,6 +33,7 @@ class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"
     CLIENT_OWNER = "CLIENT_OWNER"
     CLIENT_VIEWER = "CLIENT_VIEWER"
+    CLIENT_RECEPTIONIST = "CLIENT_RECEPTIONIST"
 
 class AgentStatus(str, enum.Enum):
     DRAFT = "DRAFT"
@@ -84,6 +85,7 @@ class AppointmentStatus(str, enum.Enum):
     SCHEDULED = "SCHEDULED"
     COMPLETED = "COMPLETED"
     NO_SHOW = "NO_SHOW"
+    RESCHEDULED = "RESCHEDULED"
 
 class FollowUpStatus(str, enum.Enum):
     PENDING = "PENDING"
@@ -121,9 +123,11 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenantId: Mapped[Optional[uuid.UUID]] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True)
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     passwordHash: Mapped[str] = mapped_column("password_hash", Text, nullable=False)
     role: Mapped[UserRole] = mapped_column(SQLEnum(UserRole, name="user_role", native_enum=False), nullable=False)
+    isActive: Mapped[bool] = mapped_column("is_active", Boolean, default=True, nullable=False)
     emailVerified: Mapped[bool] = mapped_column("email_verified", Boolean, default=False, nullable=False)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -174,9 +178,18 @@ class Subscription(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, unique=True)
+    planTier: Mapped[str] = mapped_column("plan_tier", String(50), default="STARTER", nullable=False)
     planName: Mapped[Optional[str]] = mapped_column("plan_name", String(255), nullable=True)
-    status: Mapped[SubscriptionStatus] = mapped_column(SQLEnum(SubscriptionStatus, name="subscription_status", native_enum=False), nullable=False, default=SubscriptionStatus.PENDING)
-    startedAt: Mapped[Optional[datetime]] = mapped_column("started_at", DateTime, nullable=True)
+    billingCycle: Mapped[str] = mapped_column("billing_cycle", String(20), default="monthly", nullable=False)
+    basePrice: Mapped[float] = mapped_column("base_price", Float, default=4999.0, nullable=False)
+    finalPrice: Mapped[float] = mapped_column("final_price", Float, default=4999.0, nullable=False)
+    discountAmount: Mapped[float] = mapped_column("discount_amount", Float, default=0.0, nullable=False)
+    includedMinutes: Mapped[int] = mapped_column("included_minutes", Integer, default=500, nullable=False)
+    payAsYouGoRate: Mapped[float] = mapped_column("pay_as_you_go_rate", Float, default=7.0, nullable=False)
+    features: Mapped[list] = mapped_column("features", JSONB, default=list, nullable=False)
+    adminNotes: Mapped[Optional[str]] = mapped_column("admin_notes", Text, nullable=True)
+    status: Mapped[SubscriptionStatus] = mapped_column(SQLEnum(SubscriptionStatus, name="subscription_status", native_enum=False), nullable=False, default=SubscriptionStatus.ACTIVE)
+    startedAt: Mapped[Optional[datetime]] = mapped_column("started_at", DateTime, default=datetime.utcnow, nullable=True)
     currentPeriodEnd: Mapped[Optional[datetime]] = mapped_column("current_period_end", DateTime, nullable=True)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -411,7 +424,12 @@ class Appointment(Base):
     resourceName: Mapped[Optional[str]] = mapped_column("resource_name", String(255), nullable=True)
     bookingDate: Mapped[str] = mapped_column("booking_date", String(50), nullable=False)
     bookingTime: Mapped[str] = mapped_column("booking_time", String(50), nullable=False)
-    status: Mapped[AppointmentStatus] = mapped_column(SQLEnum(AppointmentStatus, name="appointment_status", native_enum=False), nullable=False, default=AppointmentStatus.REQUESTED)
+    status: Mapped[AppointmentStatus] = mapped_column(SQLEnum(AppointmentStatus, name="appointment_status", native_enum=False), nullable=False, default=AppointmentStatus.SCHEDULED)
+    bookedBy: Mapped[str] = mapped_column("booked_by", String(50), default="AGENT", nullable=False)
+    bookedByName: Mapped[Optional[str]] = mapped_column("booked_by_name", String(255), nullable=True)
+    age: Mapped[Optional[str]] = mapped_column("age", String(50), nullable=True)
+    place: Mapped[Optional[str]] = mapped_column("place", String(255), nullable=True)
+    walkIn: Mapped[bool] = mapped_column("walk_in", Boolean, default=False, nullable=False)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metadataJson: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True, default=dict)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
@@ -432,9 +450,9 @@ class PhoneNumber(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     agentId: Mapped[Optional[uuid.UUID]] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
+    deploymentId: Mapped[Optional[uuid.UUID]] = mapped_column("deployment_id", UUID(as_uuid=True), ForeignKey("deployments.id", ondelete="SET NULL"), nullable=True)
     phoneNumber: Mapped[str] = mapped_column("phone_number", String(50), nullable=False, unique=True)
     provider: Mapped[str] = mapped_column(String(50), nullable=False)
-    providerNumberId: Mapped[Optional[str]] = mapped_column("provider_number_id", String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

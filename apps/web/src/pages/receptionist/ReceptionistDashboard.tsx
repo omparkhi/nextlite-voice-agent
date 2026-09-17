@@ -1,826 +1,707 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { api } from '../../services/api';
+import type { Appointment } from '../../types';
 
-export interface Doctor {
-  id: string;
-  name: string;
-  specialty: string;
-  opdRoom: string;
-  qualification: string;
-}
-
-export interface ScheduleSlot {
-  time: string;
-  status: 'AVAILABLE' | 'BOOKED' | 'CANCELLED';
-  appointmentId?: string;
-  patientName?: string;
-  patientPhone?: string;
-  reason?: string;
-  bookedAt?: string;
-}
-
-export interface ScheduleResponse {
-  doctor: Doctor;
-  date: string;
-  totalSlots: number;
-  bookedSlots: number;
-  availableSlots: number;
-  slots: ScheduleSlot[];
-}
-
-export const FALLBACK_DOCTORS: Doctor[] = [
-  {
-    id: 'doc-sharma',
-    name: 'Dr. Rajesh Sharma',
-    specialty: 'General Medicine & Diabetology',
-    opdRoom: 'OPD Room 102 (Ground Floor)',
-    qualification: 'MBBS, MD (Internal Medicine)',
-  },
-  {
-    id: 'doc-iyer',
-    name: 'Dr. Ananya Iyer',
-    specialty: 'Cardiology & Heart Care',
-    opdRoom: 'OPD Room 205 (2nd Floor)',
-    qualification: 'MBBS, MD, DM (Cardiology)',
-  },
-  {
-    id: 'doc-patil',
-    name: 'Dr. Sneha Patil',
-    specialty: 'Pediatrics & Child Health',
-    opdRoom: 'OPD Room 108 (Ground Floor)',
-    qualification: 'MBBS, DCH, DNB (Pediatrics)',
-  },
-  {
-    id: 'doc-malhotra',
-    name: 'Dr. Vikram Malhotra',
-    specialty: 'Orthopedics & Joint Surgery',
-    opdRoom: 'OPD Room 310 (3rd Floor)',
-    qualification: 'MBBS, MS (Orthopedics)',
-  },
+const STANDARD_TIME_SLOTS = [
+  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
+  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+  '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
+  '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM', '08:00 PM'
 ];
 
-const STANDARD_TIMES = [
-  '09:00 AM',
-  '09:30 AM',
-  '10:00 AM',
-  '10:30 AM',
-  '11:00 AM',
-  '11:30 AM',
-  '12:00 PM',
-  '12:30 PM',
-  '02:00 PM',
-  '02:30 PM',
-  '03:00 PM',
-  '03:30 PM',
-  '04:00 PM',
-  '04:30 PM',
-  '05:00 PM',
-];
+function formatSlugToName(slug?: string): string {
+  if (!slug) return 'Clinic';
+  return slug
+    .split(/[-_]+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
 
 export function ReceptionistDashboard() {
+  const { clinicSlug } = useParams<{ clinicSlug?: string }>();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   const todayStr = new Date().toISOString().split('T')[0];
-
-  const [doctors, setDoctors] = useState<Doctor[]>(FALLBACK_DOCTORS);
-  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('doc-sharma');
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-  const [scheduleData, setScheduleData] = useState<ScheduleResponse | null>(null);
+
+  // Appointments State
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [syncing, setSyncing] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
 
-  // Modal State
-  const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [modalTime, setModalTime] = useState<string>('10:00 AM');
-  const [modalPatientName, setModalPatientName] = useState<string>('');
-  const [modalPatientPhone, setModalPatientPhone] = useState<string>('');
-  const [modalReason, setModalReason] = useState<string>('General Consultation');
-  const [submitting, setSubmitting] = useState<boolean>(false);
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sourceFilter, setSourceFilter] = useState<string>('ALL');
 
-  // Live AI Voice Agent Availability Simulator State
-  const [simSlotTime, setSimSlotTime] = useState<string>('10:00 AM');
-  const [simResult, setSimResult] = useState<any>(null);
-  const [simLoading, setSimLoading] = useState<boolean>(false);
+  // Fast Horizontal Row-Entry Form State
+  const [slotTime, setSlotTime] = useState<string>('10:00 AM');
+  const [patientName, setPatientName] = useState<string>('');
+  const [age, setAge] = useState<string>('');
+  const [place, setPlace] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
+  const [reason, setReason] = useState<string>('General Consultation');
+  const [addingRow, setAddingRow] = useState<boolean>(false);
 
-  // Current live clock
-  const [currentTime, setCurrentTime] = useState<string>(new Date().toLocaleTimeString());
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // Resolve Clinic Display Name
+  const clinicDisplayName =
+    user?.tenantName ||
+    (clinicSlug ? formatSlugToName(clinicSlug) : 'NextLite Clinic');
 
-  // Fetch doctors list
-  useEffect(() => {
-    fetch('/api/appointments/doctors')
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => {
-        if (data.doctors && data.doctors.length > 0) {
-          setDoctors(data.doctors);
-        }
-      })
-      .catch(() => {
-        setDoctors(FALLBACK_DOCTORS);
-      });
-  }, []);
-
-  // Fetch schedule
-  const fetchSchedule = useCallback(async () => {
-    setLoading(true);
+  // Load appointments for selected date
+  const loadAppointments = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    else setSyncing(true);
     setErrorMsg(null);
+
     try {
-      const res = await fetch(`/api/appointments/schedule?doctorId=${selectedDoctorId}&date=${selectedDate}`);
-      if (!res.ok) throw new Error('Failed to load schedule');
-      const data: ScheduleResponse = await res.json();
-      setScheduleData(data);
+      const res = await api.getClientAppointments({
+        bookingDate: selectedDate,
+        limit: 100,
+        tenantId: user?.tenantId,
+      });
+      setAppointments(res.appointments || []);
+      setLastSyncTime(new Date());
     } catch (err: any) {
-      setErrorMsg('Could not load appointment schedule. Please retry.');
+      if (!silent) {
+        setErrorMsg(err?.message || 'Unable to connect to clinic schedule.');
+      }
     } finally {
       setLoading(false);
+      setSyncing(false);
     }
-  }, [selectedDoctorId, selectedDate]);
+  }, [selectedDate, user?.tenantId]);
 
+  // Initial & Date-change load
   useEffect(() => {
-    fetchSchedule();
-  }, [fetchSchedule]);
+    loadAppointments();
+  }, [loadAppointments]);
 
-  // Check Availability API for Voice Agent simulator
-  const checkAvailability = useCallback(
-    async (timeToTest: string) => {
-      setSimLoading(true);
-      try {
-        const res = await fetch(
-          `/api/appointments/availability?doctorId=${selectedDoctorId}&date=${selectedDate}&time=${encodeURIComponent(
-            timeToTest
-          )}`
-        );
-        const data = await res.json();
-        setSimResult(data);
-      } catch (e) {
-        setSimResult({ error: 'Failed to query availability API' });
-      } finally {
-        setSimLoading(false);
-      }
-    },
-    [selectedDoctorId, selectedDate]
-  );
-
+  // Real-time polling every 4 seconds to sync with phone bookings
   useEffect(() => {
-    if (simSlotTime) {
-      checkAvailability(simSlotTime);
-    }
-  }, [simSlotTime, selectedDoctorId, selectedDate, checkAvailability]);
+    const timer = setInterval(() => {
+      loadAppointments(true);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [loadAppointments]);
 
-  // Open modal for booking
-  const handleOpenAddModal = (presetTime?: string) => {
-    if (presetTime) {
-      setModalTime(presetTime);
-    }
-    setModalPatientName('');
-    setModalPatientPhone('+91 ');
-    setModalReason('General Consultation');
-    setErrorMsg(null);
-    setModalOpen(true);
-  };
-
-  // Submit appointment
-  const handleBookAppointment = async (e: React.FormEvent) => {
+  // Handle Quick Add Horizontal Entry
+  const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!modalPatientName.trim() || !modalPatientPhone.trim()) {
-      setErrorMsg('Please enter Patient Name and Contact Phone.');
+    if (!patientName.trim()) {
+      setErrorMsg('Please enter the patient name.');
+      nameInputRef.current?.focus();
       return;
     }
 
-    setSubmitting(true);
+    const cleanPhone = phone.trim() ? phone.trim() : '+91 98000 00000';
+
+    setAddingRow(true);
     setErrorMsg(null);
 
     try {
-      const res = await fetch('/api/appointments/book', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientName: modalPatientName.trim(),
-          patientPhone: modalPatientPhone.trim(),
-          doctorId: selectedDoctorId,
-          date: selectedDate,
-          time: modalTime,
-          reason: modalReason.trim(),
-        }),
+      const bookedByName = user?.name
+        ? `${user.name} (Desk Receptionist)`
+        : 'Front Desk Receptionist';
+
+      const res = await api.createClientAppointment({
+        customerName: patientName.trim(),
+        customerPhone: cleanPhone,
+        bookingDate: selectedDate,
+        bookingTime: slotTime,
+        title: reason.trim() || 'General Consultation',
+        age: age.trim() || undefined,
+        place: place.trim() || undefined,
+        bookedBy: 'RECEPTIONIST',
+        bookedByName,
+        walkIn: true,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to book slot');
-      }
+      const apptNum = res.appointment?.appointmentNumber || 'APT';
+      setSuccessToast(`Added ${patientName.trim()} (${slotTime}) [${apptNum}] to OPD schedule!`);
+      setTimeout(() => setSuccessToast(null), 4000);
 
-      setSuccessMsg(`Appointment booked for ${modalPatientName} at ${modalTime}! Slot is now BOOKED.`);
-      setTimeout(() => setSuccessMsg(null), 5000);
-      setModalOpen(false);
+      // Reset horizontal inputs for next rapid entry
+      setPatientName('');
+      setAge('');
+      setPlace('');
+      setPhone('');
+      setReason('General Consultation');
 
-      // Refresh schedule and simulator
-      await fetchSchedule();
-      checkAvailability(modalTime);
+      // Refresh list immediately
+      await loadAppointments(true);
+
+      // Re-focus name input for fast consecutive typing
+      nameInputRef.current?.focus();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to book appointment.');
+      setErrorMsg(err?.message || 'Failed to book appointment. Check if slot is already occupied.');
     } finally {
-      setSubmitting(false);
+      setAddingRow(false);
     }
   };
 
-  // Cancel appointment
-  const handleCancelAppointment = async (appointmentId: string, slotTime: string, patientName?: string) => {
-    if (!window.confirm(`Are you sure you want to cancel the ${slotTime} appointment for ${patientName || 'patient'}? This will make the slot AVAILABLE again.`)) {
-      return;
-    }
-
+  // Status Actions
+  const handleUpdateStatus = async (appointmentId: string, status: string) => {
     try {
-      const res = await fetch(`/api/appointments/${appointmentId}/cancel`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to cancel appointment');
-
-      setSuccessMsg(`Appointment at ${slotTime} cancelled. Time slot is now AVAILABLE.`);
-      setTimeout(() => setSuccessMsg(null), 5000);
-
-      // Refresh schedule and simulator
-      await fetchSchedule();
-      checkAvailability(slotTime);
+      await api.updateClientAppointment(appointmentId, { status });
+      await loadAppointments(true);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to cancel appointment.');
+      alert(err?.message || 'Failed to update status');
     }
   };
 
-  const activeDoctor = doctors.find((d) => d.id === selectedDoctorId) || doctors[0];
+  // Filtered Appointments
+  const filteredAppointments = appointments.filter((appt) => {
+    if (sourceFilter === 'AI' && appt.bookedBy !== 'AGENT') return false;
+    if (sourceFilter === 'DESK' && appt.bookedBy !== 'RECEPTIONIST' && appt.bookedBy !== 'MANUAL_CLIENT') return false;
+    if (sourceFilter === 'WHATSAPP' && appt.bookedBy !== 'WHATSAPP') return false;
+
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      appt.customerName?.toLowerCase().includes(q) ||
+      appt.customerPhone?.toLowerCase().includes(q) ||
+      appt.appointmentNumber?.toLowerCase().includes(q) ||
+      (appt.place && appt.place.toLowerCase().includes(q)) ||
+      (appt.title && appt.title.toLowerCase().includes(q))
+    );
+  });
+
+  // Calculate Metrics
+  const totalCount = appointments.length;
+  const aiCount = appointments.filter((a) => a.bookedBy === 'AGENT').length;
+  const deskCount = appointments.filter((a) => a.bookedBy === 'RECEPTIONIST' || a.bookedBy === 'MANUAL_CLIENT').length;
+  const whatsappCount = appointments.filter((a) => a.bookedBy === 'WHATSAPP').length;
+  const completedCount = appointments.filter((a) => a.status === 'COMPLETED').length;
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-stone-900 flex flex-col font-sans selection:bg-stone-900 selection:text-white">
-      {/* Top Hospital Reception Header in Product White Theme */}
-      <header className="bg-white/95 border-b border-stone-200/90 backdrop-blur sticky top-0 z-20 px-6 py-3.5 shadow-xs">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-xl bg-stone-900 text-white flex items-center justify-center font-bold shadow-xs group-hover:bg-emerald-700 transition-colors">
-                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                </svg>
-              </div>
-            </Link>
-
+    <div className="min-h-screen bg-[#f8fafc] text-[#0f172a] font-sans flex flex-col">
+      {/* Top Professional Header */}
+      <header className="bg-white border-b border-[#e2e8f0] px-6 py-3.5 sticky top-0 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          {/* Clinic Brand & Title */}
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-700 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+              🏥
+            </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold tracking-tight text-stone-900">City Care Super-Specialty Hospital</h1>
-                <span className="bg-emerald-50 text-emerald-800 text-[11px] px-2.5 py-0.5 rounded-full font-semibold border border-emerald-200">
-                  Receptionist Desk
+                <h1 className="text-base font-bold text-gray-900 tracking-tight">
+                  {clinicDisplayName}
+                </h1>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Reception Desk
                 </span>
               </div>
-              <p className="text-xs text-stone-500">
-                Doctor OPD Appointment Schedule & Real-Time Availability Hub
+              <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                <span>Staff:</span>
+                <strong className="text-gray-700">{user?.name || user?.email || 'Desk Receptionist'}</strong>
+                <span className="text-gray-300">•</span>
+                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Live CRM Sync
+                </span>
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 self-stretch md:self-auto justify-between md:justify-end">
-            <div className="bg-stone-100 border border-stone-200/90 rounded-lg px-3 py-1.5 text-right">
-              <div className="text-[10px] uppercase font-bold tracking-wider text-stone-500">Reception Shift</div>
-              <div className="text-xs font-semibold text-stone-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                {currentTime}
-              </div>
+          {/* Header Controls & Sign Out */}
+          <div className="flex items-center gap-3">
+            {/* Quick Live Clock / Last Sync */}
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600">
+              <span className={syncing ? 'animate-spin inline-block text-emerald-600' : 'text-gray-400'}>
+                ↻
+              </span>
+              <span>Sync: {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
             </div>
 
             <button
-              onClick={() => handleOpenAddModal()}
-              className="bg-stone-900 hover:bg-stone-800 text-white text-xs font-semibold px-4 py-2 rounded-lg shadow-sm transition-all flex items-center gap-2 cursor-pointer"
+              type="button"
+              onClick={() => loadAppointments(false)}
+              disabled={loading || syncing}
+              className="px-3 py-1.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              title="Refresh schedule now"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span>+ Add Appointment</span>
+              <span className={syncing ? 'animate-spin' : ''}>🔄</span>
+              <span>Refresh</span>
             </button>
+
+            {user ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await logout();
+                  navigate('/login');
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-gray-100 hover:bg-rose-50 hover:text-rose-600 text-gray-700 text-xs font-medium transition border border-gray-200 cursor-pointer"
+              >
+                Sign Out
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="px-3.5 py-1.5 rounded-xl bg-gray-900 text-white text-xs font-medium hover:bg-gray-800 transition"
+              >
+                Sign In
+              </Link>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {/* Alerts */}
-        {successMsg && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 px-4 py-3 rounded-xl flex items-center justify-between text-xs font-medium shadow-xs animate-fade-in">
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span>{successMsg}</span>
-            </div>
-            <button onClick={() => setSuccessMsg(null)} className="text-emerald-700 hover:text-emerald-900 text-sm">
-              ✕
-            </button>
-          </div>
-        )}
-
+      {/* Main Content Area */}
+      <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5 flex-1">
+        {/* Toast / Error alerts */}
         {errorMsg && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-900 px-4 py-3 rounded-xl flex items-center justify-between text-xs font-medium shadow-xs">
+          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center justify-between shadow-2xs animate-in fade-in duration-150">
             <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <span>⚠️</span>
               <span>{errorMsg}</span>
             </div>
-            <button onClick={() => setErrorMsg(null)} className="text-rose-700 hover:text-rose-900 text-sm">
+            <button
+              onClick={() => setErrorMsg(null)}
+              className="text-rose-400 hover:text-rose-700 text-sm font-bold cursor-pointer"
+            >
               ✕
             </button>
           </div>
         )}
 
-        {/* Doctor & Date Selection Controls */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Doctor Selection Card in Clean White */}
-          <div className="lg:col-span-2 bg-white border border-stone-200 rounded-xl p-5 shadow-xs">
-            <div className="text-[11px] uppercase tracking-wider text-stone-500 font-bold mb-3 flex items-center justify-between">
-              <span>Select Doctor / Department</span>
-              <span className="text-stone-400 font-normal">OPD Schedule Active</span>
+        {successToast && (
+          <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between shadow-2xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-2 font-medium">
+              <span>✅</span>
+              <span>{successToast}</span>
+            </div>
+            <button
+              onClick={() => setSuccessToast(null)}
+              className="text-emerald-500 hover:text-emerald-800 text-sm font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Top Summary Bar & Date Picker */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
+          {/* Quick Metrics */}
+          <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium">Date Schedule:</span>
+              <span className="text-xs font-bold text-gray-900 font-mono">
+                {selectedDate === todayStr ? 'Today' : selectedDate}
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {doctors.map((doc) => {
-                const isSelected = doc.id === selectedDoctorId;
-                return (
-                  <button
-                    key={doc.id}
-                    onClick={() => setSelectedDoctorId(doc.id)}
-                    className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-                      isSelected
-                        ? 'bg-emerald-50/50 border-emerald-500 shadow-xs ring-1 ring-emerald-500/80'
-                        : 'bg-stone-50/70 border-stone-200/90 hover:border-stone-300 hover:bg-white'
-                    }`}
-                  >
-                    <div>
-                      <div className="font-semibold text-sm text-stone-900 flex items-center justify-between">
-                        <span>{doc.name}</span>
-                        {isSelected && (
-                          <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                        )}
-                      </div>
-                      <div className="text-xs text-emerald-700 font-medium mt-0.5">{doc.specialty}</div>
-                    </div>
-                    <div className="text-[11px] text-stone-500 mt-2 flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5 text-stone-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                      <span>{doc.opdRoom}</span>
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="h-4 w-px bg-gray-200 hidden sm:block" />
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Total Booked:</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800 font-mono">
+                {totalCount}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">🎙️ AI Phone:</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 font-mono">
+                {aiCount}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">📋 Desk Walk-ins:</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                {deskCount}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">💬 WhatsApp:</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                {whatsappCount}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Completed:</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 font-mono">
+                {completedCount}
+              </span>
             </div>
           </div>
 
-          {/* Date Picker & Quick Filter Card in Clean White */}
-          <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="text-[11px] uppercase tracking-wider text-stone-500 font-bold mb-3">
-                Appointment Date
-              </div>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-stone-900 text-sm focus:outline-none focus:border-emerald-600 focus:bg-white focus:ring-1 focus:ring-emerald-600 font-medium"
-              />
+          {/* Date Selector */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedDate(todayStr)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
+                selectedDate === todayStr
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Today
+            </button>
 
-              <div className="flex gap-2 mt-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate(todayStr)}
-                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                    selectedDate === todayStr
-                      ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
-                      : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
-                  }`}
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const tomorrow = new Date();
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    setSelectedDate(tomorrow.toISOString().split('T')[0]);
-                  }}
-                  className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium border bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100 cursor-pointer"
-                >
-                  Tomorrow
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const tmr = new Date();
+                tmr.setDate(tmr.getDate() + 1);
+                setSelectedDate(tmr.toISOString().split('T')[0]);
+              }}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
+                selectedDate !== todayStr &&
+                selectedDate === new Date(Date.now() + 86400000).toISOString().split('T')[0]
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              Tomorrow
+            </button>
 
-            {scheduleData && (
-              <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs">
-                <div className="text-stone-600">
-                  Occupancy: <strong className="text-stone-900">{scheduleData.bookedSlots}</strong> / {scheduleData.totalSlots} Booked
-                </div>
-                <div className="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
-                  {scheduleData.availableSlots} Available
-                </div>
-              </div>
-            )}
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-xl bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+            />
           </div>
         </div>
 
-        {/* Schedule Grid & AI Simulator Split */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          {/* Main Appointment Schedule Column (2 cols) */}
-          <div className="xl:col-span-2 space-y-4">
-            <div className="flex items-center justify-between bg-white border border-stone-200 rounded-xl px-5 py-3.5 shadow-xs">
-              <div>
-                <h2 className="text-base font-bold text-stone-900 flex items-center gap-2">
-                  <span>Appointment Schedule</span>
-                  <span className="text-xs font-medium text-stone-500">
-                    — {activeDoctor?.name} ({selectedDate})
-                  </span>
-                </h2>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  Single source of truth for time slot occupancy and AI voice availability checks
-                </p>
-              </div>
-
-              <button
-                onClick={fetchSchedule}
-                className="text-xs text-stone-600 hover:text-stone-900 border border-stone-200 bg-stone-50 hover:bg-stone-100 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer font-medium"
-                title="Refresh Schedule"
-              >
-                <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span>Refresh</span>
-              </button>
+        {/* FAST HORIZONTAL ROW-ENTRY APPOINTMENT REGISTER FORM */}
+        <div className="bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-white rounded-2xl border border-emerald-200/90 p-4 shadow-xs">
+          <div className="flex items-center justify-between mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚡</span>
+              <h2 className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                Quick Walk-In Entry (Horizontal Row-Fill)
+              </h2>
             </div>
-
-            {loading ? (
-              <div className="bg-white border border-stone-200 rounded-xl p-12 text-center text-stone-500 text-sm shadow-xs">
-                <div className="inline-block w-7 h-7 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin mb-3"></div>
-                <p>Loading OPD appointment schedule...</p>
-              </div>
-            ) : !scheduleData || scheduleData.slots.length === 0 ? (
-              <div className="bg-white border border-stone-200 rounded-xl p-12 text-center text-stone-500 text-sm shadow-xs">
-                No slots configured for this date.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Morning Header */}
-                <div className="bg-white border border-stone-200/90 rounded-xl p-4 shadow-xs space-y-3">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-2 border-b border-stone-100 pb-2">
-                    <svg className="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                    <span>Morning Session (09:00 AM – 01:00 PM)</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {scheduleData.slots.slice(0, 8).map((slot) => (
-                      <ScheduleSlotCard
-                        key={slot.time}
-                        slot={slot}
-                        onBook={() => handleOpenAddModal(slot.time)}
-                        onCancel={(id) => handleCancelAppointment(id, slot.time, slot.patientName)}
-                        onCheckSim={() => setSimSlotTime(slot.time)}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                {/* Afternoon Header */}
-                <div className="bg-white border border-stone-200/90 rounded-xl p-4 shadow-xs space-y-3">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-2 border-b border-stone-100 pb-2">
-                    <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                    </svg>
-                    <span>Afternoon Session (02:00 PM – 05:30 PM)</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {scheduleData.slots.slice(8).map((slot) => (
-                      <ScheduleSlotCard
-                        key={slot.time}
-                        slot={slot}
-                        onBook={() => handleOpenAddModal(slot.time)}
-                        onCancel={(id) => handleCancelAppointment(id, slot.time, slot.patientName)}
-                        onCheckSim={() => setSimSlotTime(slot.time)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            <span className="text-[11px] text-emerald-700 font-medium">
+              Fill details &amp; press <kbd className="px-1.5 py-0.5 bg-white border border-emerald-200 rounded text-[10px] font-mono shadow-2xs">Enter</kbd> to add
+            </span>
           </div>
 
-          {/* AI Voice Agent Integration Preview Column (1 col) in White Theme */}
-          <div className="space-y-4">
-            <div className="bg-white border border-stone-200 rounded-xl p-5 shadow-xs flex flex-col justify-between h-full">
+          <form onSubmit={handleQuickAdd} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2.5 items-center">
+            {/* Slot Time */}
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Time Slot</label>
+              <select
+                value={slotTime}
+                onChange={(e) => setSlotTime(e.target.value)}
+                className="w-full px-2.5 py-2 text-xs font-semibold bg-white border border-emerald-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs cursor-pointer"
+              >
+                {STANDARD_TIME_SLOTS.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {slot}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Patient Name */}
+            <div className="md:col-span-3">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
+                Patient Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                ref={nameInputRef}
+                type="text"
+                required
+                placeholder="e.g. Ramesh Kulkarni"
+                value={patientName}
+                onChange={(e) => setPatientName(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-medium bg-white border border-emerald-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+              />
+            </div>
+
+            {/* Age */}
+            <div className="md:col-span-1">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Age</label>
+              <input
+                type="text"
+                placeholder="e.g. 34"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                className="w-full px-2 py-2 text-xs font-medium bg-white border border-emerald-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs text-center"
+              />
+            </div>
+
+            {/* Place (Disconnected for current deployment - preserved for future reuse) */}
+            {/* <div className="md:col-span-2">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Place / City</label>
+              <input
+                type="text"
+                placeholder="e.g. Nagpur"
+                value={place}
+                onChange={(e) => setPlace(e.target.value)}
+                className="w-full px-2.5 py-2 text-xs font-medium bg-white border border-emerald-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+              />
+            </div> */}
+
+            {/* Phone */}
+            <div className="md:col-span-3">
+              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Phone Number</label>
+              <input
+                type="tel"
+                placeholder="e.g. 9876543210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="w-full px-2.5 py-2 text-xs font-medium bg-white border border-emerald-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+              />
+            </div>
+
+            {/* Submit Button */}
+            <div className="md:col-span-3 flex flex-col justify-end">
+              <label className="block text-[10px] font-bold text-transparent uppercase mb-1">Action</label>
+              <button
+                type="submit"
+                disabled={addingRow}
+                className="w-full h-8.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 disabled:opacity-50"
+              >
+                {addingRow ? (
+                  <span>Saving...</span>
+                ) : (
+                  <>
+                    <span>+ Quick Book</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Schedule Table */}
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 bg-gray-50/50">
+            <div className="flex items-center gap-3 flex-wrap">
               <div>
-                <div className="flex items-center gap-2.5 mb-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-sm text-stone-900">AI Voice Agent Integration</h3>
-                    <span className="text-[11px] text-stone-500">Live Availability Verification</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-stone-600 leading-relaxed">
-                  When a caller asks the AI Voice Agent for an appointment, the agent queries this exact live endpoint:
-                </p>
-
-                {/* Query Endpoint Box */}
-                <div className="bg-stone-50 border border-stone-200 rounded-lg p-3 my-3 font-mono text-[11px] text-stone-800 break-all">
-                  <div className="text-stone-400 text-[10px] uppercase font-sans font-bold mb-1">Live Endpoint</div>
-                  <span className="text-emerald-700 font-bold">GET</span> /api/appointments/availability?doctorId={selectedDoctorId}&amp;date={selectedDate}&amp;time={encodeURIComponent(simSlotTime)}
-                </div>
-
-                {/* Slot Selector */}
-                <div className="mb-3">
-                  <label className="text-xs text-stone-700 font-semibold block mb-1">
-                    Select Slot to Test Live:
-                  </label>
-                  <select
-                    value={simSlotTime}
-                    onChange={(e) => setSimSlotTime(e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-indigo-600 focus:bg-white"
-                  >
-                    {STANDARD_TIMES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* API Response Preview */}
-                <div className="bg-stone-900 text-stone-100 border border-stone-800 rounded-lg p-3.5 font-mono text-xs shadow-inner">
-                  <div className="flex items-center justify-between text-stone-400 text-[10px] uppercase font-sans font-bold mb-1.5">
-                    <span>API Response</span>
-                    {simLoading && <span className="text-indigo-400 animate-pulse font-normal">Querying...</span>}
-                  </div>
-                  <pre className="text-[12px] text-emerald-400 overflow-x-auto whitespace-pre-wrap">
-                    {simResult ? JSON.stringify(simResult, null, 2) : 'Loading response...'}
-                  </pre>
-                </div>
-
-                {/* Interactive Explanation */}
-                <div className="mt-4 p-3.5 rounded-xl bg-stone-50 border border-stone-200/90 text-xs space-y-2">
-                  <div className="font-semibold text-stone-800 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                    <span>Voice Agent Behavior</span>
-                  </div>
-                  {simResult?.available ? (
-                    <p className="text-emerald-800 text-[11px] leading-relaxed">
-                      ✅ <strong>Slot is Available:</strong> The AI Voice Agent can immediately confirm or reserve{' '}
-                      <strong>{simSlotTime}</strong> for the caller.
-                    </p>
-                  ) : (
-                    <p className="text-amber-800 text-[11px] leading-relaxed">
-                      ⚠️ <strong>Slot is Booked:</strong> The AI Voice Agent detects the receptionist&apos;s booking and informs the caller:
-                      <em> &ldquo;I&apos;m sorry, {simSlotTime} is already occupied. May I offer you another slot?&rdquo;</em>
-                    </p>
-                  )}
-                </div>
+                <h3 className="font-bold text-sm text-gray-900">
+                  Scheduled Appointments ({filteredAppointments.length})
+                </h3>
+                <p className="text-xs text-gray-500">Real-time live queue across AI phone reception and front desk</p>
               </div>
 
-              <div className="mt-6 pt-3 border-t border-stone-100 text-[11px] text-stone-400 text-center font-medium">
-                Client & Doctor Presentation Module
+              <div className="inline-flex rounded-xl bg-gray-200/80 p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setSourceFilter('ALL')}
+                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] ${
+                    sourceFilter === 'ALL' ? 'bg-white text-gray-900 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  All Sources
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourceFilter('AI')}
+                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] flex items-center gap-1 ${
+                    sourceFilter === 'AI' ? 'bg-white text-purple-700 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <span>🎙️</span> AI Calls
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSourceFilter('DESK')}
+                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] flex items-center gap-1 ${
+                    sourceFilter === 'DESK' ? 'bg-white text-emerald-700 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <span>📋</span> Desk Walk-ins
+                </button>
               </div>
             </div>
+
+            <div className="relative w-full sm:w-64">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-gray-400">
+                🔍
+              </span>
+              <input
+                type="text"
+                placeholder="Search patient, phone..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:border-emerald-500 font-medium"
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="p-12 text-center text-xs text-gray-400 space-y-2">
+                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                <p>Loading clinic OPD register...</p>
+              </div>
+            ) : filteredAppointments.length === 0 ? (
+              <div className="p-10 text-center space-y-2">
+                <span className="text-3xl block">📋</span>
+                <p className="font-semibold text-xs text-gray-700">No appointments scheduled for this date</p>
+                <p className="text-[11px] text-gray-400">
+                  Use the quick-fill bar above to add a walk-in patient, or incoming AI phone bookings will appear here in real time.
+                </p>
+              </div>
+            ) : (
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+                    <th className="py-3 px-4 w-16">Token</th>
+                    <th className="py-3 px-4 w-28">Time Slot</th>
+                    <th className="py-3 px-4">Patient Name</th>
+                    <th className="py-3 px-3 w-16 text-center">Age</th>
+                    {/* <th className="py-3 px-4">Place / City</th> */}
+                    <th className="py-3 px-4">Phone Number</th>
+                    <th className="py-3 px-4">Reason / Notes</th>
+                    <th className="py-3 px-4">Origin / Booked By</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
+                  {filteredAppointments.map((appt, idx) => {
+                    const isAi = appt.bookedBy === 'AGENT';
+                    const isDesk = appt.bookedBy === 'RECEPTIONIST' || appt.bookedBy === 'MANUAL_CLIENT';
+                    const isWhatsapp = appt.bookedBy === 'WHATSAPP';
+                    const isCompleted = appt.status === 'COMPLETED';
+                    const isCancelled = appt.status === 'CANCELLED';
+
+                    return (
+                      <tr
+                        key={appt.id}
+                        className={`hover:bg-slate-50/80 transition-colors ${
+                          isCompleted ? 'bg-gray-50/40 text-gray-400' : isCancelled ? 'bg-rose-50/20 text-gray-400 line-through' : ''
+                        }`}
+                      >
+                        {/* Token # */}
+                        <td className="py-3 px-4 font-mono font-bold text-gray-600 text-[11px]">
+                          {appt.appointmentNumber || `#${idx + 1}`}
+                        </td>
+
+                        {/* Time Slot */}
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-gray-100 text-gray-900 border border-gray-200">
+                            🕒 {appt.bookingTime}
+                          </span>
+                        </td>
+
+                        {/* Patient Name */}
+                        <td className="py-3 px-4 font-bold text-gray-900">
+                          {appt.customerName}
+                        </td>
+
+                        {/* Age */}
+                        <td className="py-3 px-3 text-center text-gray-600 font-mono">
+                          {appt.age || '—'}
+                        </td>
+
+                        {/* Place (Disconnected) */}
+                        {/* <td className="py-3 px-4 text-gray-600">
+                          {appt.place || '—'}
+                        </td> */}
+
+                        {/* Phone */}
+                        <td className="py-3 px-4 font-mono text-gray-600 text-[11px]">
+                          {appt.customerPhone}
+                        </td>
+
+                        {/* Reason / Title */}
+                        <td className="py-3 px-4 text-gray-600 text-[11px] max-w-xs truncate" title={appt.title || 'Consultation'}>
+                          {appt.title || 'Consultation'}
+                        </td>
+
+                        {/* Origin */}
+                        <td className="py-3 px-4">
+                          {isWhatsapp ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-300 shadow-2xs">
+                              <span>💬</span> WhatsApp Bot
+                            </span>
+                          ) : isAi ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs">
+                              <span>🎙️</span> AI Phone Agent
+                            </span>
+                          ) : isDesk ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs" title={appt.bookedByName || 'Desk Staff'}>
+                              <span>📋</span> {appt.bookedByName || 'Desk Staff'}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              <span>👤</span> Clinic Staff
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                              isCompleted
+                                ? 'bg-blue-100 text-blue-800'
+                                : isCancelled
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {appt.status}
+                          </span>
+                        </td>
+
+                        {/* Quick Actions */}
+                        <td className="py-3 px-4 text-right space-x-1">
+                          {!isCompleted && !isCancelled && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStatus(appt.id, 'COMPLETED')}
+                                title="Mark as Completed"
+                                className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium text-[11px] border border-emerald-200 transition cursor-pointer"
+                              >
+                                ✓ Complete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStatus(appt.id, 'CANCELLED')}
+                                title="Cancel Appointment"
+                                className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium text-[11px] border border-rose-200 transition cursor-pointer"
+                              >
+                                ✕ Cancel
+                              </button>
+                            </>
+                          )}
+                          {isCancelled && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStatus(appt.id, 'SCHEDULED')}
+                              className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] transition cursor-pointer"
+                            >
+                              Restore
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </main>
 
-      {/* Add Appointment Modal in Clean White Theme */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white border border-stone-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-stone-900">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div>
-                <h3 className="text-lg font-bold text-stone-900">Book Patient Appointment</h3>
-                <p className="text-xs text-stone-500">Receptionist OPD Scheduling</p>
-              </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-stone-400 hover:text-stone-700 p-1 rounded-lg text-lg cursor-pointer transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleBookAppointment} className="space-y-4">
-              {/* Doctor */}
-              <div>
-                <label className="text-xs font-semibold text-stone-700 block mb-1">Doctor</label>
-                <input
-                  type="text"
-                  disabled
-                  value={activeDoctor.name + ' (' + activeDoctor.specialty + ')'}
-                  className="w-full bg-stone-100 border border-stone-200 rounded-lg px-3 py-2 text-xs text-stone-700 cursor-not-allowed font-medium"
-                />
-              </div>
-
-              {/* Date & Time */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-stone-700 block mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-emerald-600 focus:bg-white font-medium"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-stone-700 block mb-1">Time Slot</label>
-                  <select
-                    value={modalTime}
-                    onChange={(e) => setModalTime(e.target.value)}
-                    className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs text-stone-900 focus:outline-none focus:border-emerald-600 focus:bg-white font-medium"
-                  >
-                    {STANDARD_TIMES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Patient Name */}
-              <div>
-                <label className="text-xs font-semibold text-stone-700 block mb-1">
-                  Patient Full Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Rahul Sharma"
-                  value={modalPatientName}
-                  onChange={(e) => setModalPatientName(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-emerald-600 focus:bg-white"
-                  required
-                  autoFocus
-                />
-              </div>
-
-              {/* Patient Phone */}
-              <div>
-                <label className="text-xs font-semibold text-stone-700 block mb-1">
-                  Patient Phone Number <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  placeholder="e.g. +91 98201 12345"
-                  value={modalPatientPhone}
-                  onChange={(e) => setModalPatientPhone(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-sm text-stone-900 placeholder-stone-400 focus:outline-none focus:border-emerald-600 focus:bg-white"
-                  required
-                />
-              </div>
-
-              {/* Reason / Visit Type */}
-              <div>
-                <label className="text-xs font-semibold text-stone-700 block mb-1">Reason / Visit Type</label>
-                <input
-                  type="text"
-                  placeholder="e.g. General OPD Checkup / Fever & Cough"
-                  value={modalReason}
-                  onChange={(e) => setModalReason(e.target.value)}
-                  className="w-full bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-emerald-600 focus:bg-white"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-100">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-stone-600 hover:text-stone-900 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2 text-xs font-semibold text-white bg-stone-900 hover:bg-stone-800 disabled:opacity-50 rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
-                >
-                  {submitting ? 'Saving...' : 'Confirm & Book Slot'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Individual Slot Card Component in White Theme
-function ScheduleSlotCard({
-  slot,
-  onBook,
-  onCancel,
-  onCheckSim,
-}: {
-  slot: ScheduleSlot;
-  onBook: () => void;
-  onCancel: (id: string) => void;
-  onCheckSim: () => void;
-}) {
-  const isBooked = slot.status === 'BOOKED';
-
-  return (
-    <div
-      className={`p-3.5 rounded-xl border transition-all flex items-start justify-between gap-3 ${
-        isBooked
-          ? 'bg-indigo-50/40 border-indigo-200 shadow-xs'
-          : 'bg-stone-50/60 border-stone-200/80 hover:border-stone-300 hover:bg-white'
-      }`}
-    >
-      <div className="flex items-start gap-3 min-w-0">
-        <div
-          className={`w-18 text-center px-2 py-1.5 rounded-lg text-xs font-bold shrink-0 ${
-            isBooked
-              ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
-              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-          }`}
-        >
-          {slot.time}
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
-                isBooked
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              }`}
-            >
-              {slot.status}
-            </span>
-
-            {isBooked && (
-              <span className="text-[11px] text-stone-500 font-medium truncate">
-                {slot.patientPhone}
-              </span>
-            )}
-          </div>
-
-          {isBooked ? (
-            <div className="mt-1">
-              <div className="font-semibold text-sm text-stone-900 truncate flex items-center gap-1.5">
-                <svg className="w-3.5 h-3.5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span>{slot.patientName}</span>
-              </div>
-              <div className="text-xs text-stone-600 truncate mt-0.5">{slot.reason}</div>
-            </div>
-          ) : (
-            <div className="text-xs text-stone-500 mt-1">Available for patient booking</div>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1.5 shrink-0 self-center">
-        {isBooked ? (
-          <>
-            <button
-              onClick={() => onCancel(slot.appointmentId!)}
-              className="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
-              title="Cancel Appointment (Frees the slot)"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onCheckSim}
-              className="text-xs text-stone-500 hover:text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg border border-stone-200 transition-colors cursor-pointer"
-              title="Test API Availability"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={onBook}
-            className="text-xs font-semibold text-emerald-800 hover:text-white bg-emerald-50 hover:bg-emerald-600 border border-emerald-300 hover:border-emerald-600 px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 shadow-xs"
-          >
-            <span>+ Book</span>
-          </button>
-        )}
-      </div>
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-200 py-3 text-center text-xs text-gray-400">
+        NextLite Unified Clinic Reception Desk &bull; Connected to {clinicDisplayName} CRM &bull; Real-time AI Agent Voice Sync
+      </footer>
     </div>
   );
 }

@@ -31,44 +31,66 @@ class TrustedCallContext:
     started_at_iso: str
 
 
+def _normalize_phone_number(phone: Optional[str]) -> Optional[str]:
+    if not phone or not isinstance(phone, str):
+        return None
+    cleaned = re.sub(r"[^\d+]", "", phone.strip())
+    if not cleaned or cleaned == "+":
+        return None
+    if cleaned.startswith("+"):
+        return cleaned
+    if len(cleaned) == 10:
+        return f"+91{cleaned}"
+    elif len(cleaned) == 12 and cleaned.startswith("91"):
+        return f"+{cleaned}"
+    return f"+{cleaned}"
+
+
 def detect_call_context(
     room_name: Optional[str] = None,
     from_number: Optional[str] = None,
     participant_identity: Optional[str] = None,
     participant_attributes: Optional[Dict[str, str]] = None,
+    to_number: Optional[str] = None,
+    direction: Optional[str] = None,
 ) -> Tuple[str, Optional[str]]:
-    """Detects call direction and caller phone number based on room name and caller metadata.
+    """Detects call direction and caller/callee phone number based on room name and telephony metadata.
     
     Rules:
     1. WEB_TEST:
-       - roomName starts with 'test-' OR identity/from starts with 'tester-'
+       - roomName starts with 'test-' OR identity/from starts with 'tester-' OR direction is 'WEB_TEST'
        - callerNumber is strictly None (no fabricated phone numbers)
     2. OUTBOUND:
-       - roomName starts with 'phone-test-' OR identity starts with 'sip-' from outbound SIP flow
-       - callerNumber extracted from identity (e.g. sip-+919876543210-1234) or attributes
+       - direction is 'OUTBOUND' OR roomName starts with 'phone-test-' OR identity starts with 'sip-'
+       - The human end-user is the recipient/callee ('to_number'), SIP destination, or attributes
     3. INBOUND:
-       - Standard telephony inbound call
-       - callerNumber extracted from from_number or attributes
+       - direction is 'INBOUND' or default telephony inbound
+       - The human end-user is the caller ('from_number') or attributes
     
     Returns:
-        Tuple[str, Optional[str]]: (direction, caller_number)
+        Tuple[str, Optional[str]]: (direction, user_speaker_phone_number)
     """
     clean_room = (room_name or "").strip()
     clean_identity = (participant_identity or "").strip()
     clean_from = (from_number or "").strip()
+    clean_to = (to_number or "").strip()
+    clean_dir = (direction or "").strip().upper()
 
     # 1. WEB_TEST Detection
     if (
-        clean_room.startswith("test-")
+        clean_dir == "WEB_TEST"
+        or clean_room.startswith("test-")
         or clean_identity.startswith("tester-")
         or clean_from.startswith("tester-")
     ):
         return "WEB_TEST", None
 
     # 2. OUTBOUND Detection
-    if clean_room.startswith("phone-test-") or clean_identity.startswith("sip-"):
+    if clean_dir == "OUTBOUND" or clean_room.startswith("phone-test-") or clean_identity.startswith("sip-"):
         phone: Optional[str] = None
-        if participant_attributes and participant_attributes.get("sip.phoneNumber"):
+        if clean_to:
+            phone = clean_to
+        elif participant_attributes and participant_attributes.get("sip.phoneNumber"):
             phone = participant_attributes["sip.phoneNumber"].strip()
         elif clean_identity.startswith("sip-"):
             match = re.match(r"^sip-([0-9+]+)-", clean_identity)
@@ -78,9 +100,9 @@ def detect_call_context(
         elif clean_from:
             phone = clean_from
 
-        return "OUTBOUND", phone
+        return "OUTBOUND", _normalize_phone_number(phone)
 
-    # 3. INBOUND / Other SIP Detection
+    # 3. INBOUND / Default SIP Telephony Detection
     inbound_phone: Optional[str] = None
     if participant_attributes:
         raw = (
@@ -95,8 +117,10 @@ def detect_call_context(
 
     if not inbound_phone and clean_from:
         inbound_phone = clean_from
+    elif not inbound_phone and clean_to:
+        inbound_phone = clean_to
 
-    return "INBOUND", inbound_phone
+    return "INBOUND", _normalize_phone_number(inbound_phone)
 
 
 def mask_sensitive(text: str) -> str:
@@ -238,7 +262,7 @@ class CallTranscriptCollector:
         if duration_ms is not None:
             agent_turn["durationMs"] = round(duration_ms, 1)
 
-        if not self._current_turn:
+        if not self._current_turn or self._current_turn.get("agent"):
             self._turn_counter += 1
             self._current_turn = {
                 "turnId": self._turn_counter,
@@ -249,7 +273,9 @@ class CallTranscriptCollector:
 
         self._current_turn["agent"] = agent_turn
         self._current_turn["endTime"] = now_iso
-        return self._current_turn
+        target_turn = self._current_turn
+        self._current_turn = None
+        return target_turn
 
     def record_tool_call(
         self,

@@ -56,7 +56,7 @@ def create_callback_lead_tool_factory(
     trusted_deployment_id = context.deployment_id.strip()
 
     base_url = (context.api_url or "http://localhost:3001").rstrip("/")
-    worker_secret = context.worker_secret or "dev-livekit-worker-secret-v3"
+    worker_secret = context.worker_secret or "dev-worker-api-secret"
     api_endpoint = f"{base_url}/api/internal/leads"
 
     tool_description = (

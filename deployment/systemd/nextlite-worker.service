@@ -1,0 +1,26 @@
+[Unit]
+Description=NextLite Voice V3 - Pipecat Realtime Voice Worker
+After=network.target nextlite-api.service
+Wants=nextlite-api.service
+
+[Service]
+Type=simple
+User=nextlite
+Group=nextlite
+WorkingDirectory=/opt/nextlite/apps/pipecat-worker
+EnvironmentFile=/etc/nextlite/worker.env
+ExecStart=/opt/nextlite/apps/pipecat-worker/.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=3s
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65536
+
+# Hardening / Isolation
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

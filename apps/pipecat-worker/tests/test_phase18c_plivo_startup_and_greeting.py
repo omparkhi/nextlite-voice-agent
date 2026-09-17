@@ -242,6 +242,7 @@ async def test_requirement_n_user_barge_in_during_greeting():
     )
 
     await monitor.process_frame(TTSStartedFrame(context_id="g1"), None)
+    turn_tracker.record_greeting_completed(100.2)
     await monitor.process_frame(InterruptionFrame(), None)
 
     assert turn_tracker.turn_type == "user_turn"

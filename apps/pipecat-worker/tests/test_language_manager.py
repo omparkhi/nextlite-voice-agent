@@ -117,3 +117,38 @@ def test_disabled_switching():
     res = manager.process_user_turn("मुझे appointment चाहिए", detected_language_code="hi-IN")
     assert res.switched is False
     assert res.decision == "REJECTED"
+
+def test_marathi_primary_switches_to_hindi_explicit_and_natural():
+    manager = ConversationLanguageManager(
+        primary="mr-IN",
+        supported_languages=["mr-IN", "hi-IN", "en-IN"],
+        auto_detect_enabled=True,
+        language_switching_enabled=True,
+    )
+    assert manager.current_language == "mr-IN"
+
+    # 1. Explicit switch via colloquial Hindi request
+    res = manager.process_user_turn("kya aap hindi me baat kar sakte ho")
+    assert res.switched is True
+    assert res.current_language == "hi-IN"
+    assert res.reason == "explicit"
+    assert manager.current_language == "hi-IN"
+
+    # 2. Natural Marathi switch back
+    res2 = manager.process_user_turn("मराठीत बोला")
+    assert res2.switched is True
+    assert res2.current_language == "mr-IN"
+    assert manager.current_language == "mr-IN"
+
+    # 3. Explicit switch via colloquial English request
+    res3 = manager.process_user_turn("can you speak in english")
+    assert res3.switched is True
+    assert res3.current_language == "en-IN"
+    assert manager.current_language == "en-IN"
+
+    # 4. Natural speech switch from English to Hindi
+    res4 = manager.process_user_turn("mujhe doctor se milna hai")
+    assert res4.switched is True
+    assert res4.current_language == "hi-IN"
+    assert manager.current_language == "hi-IN"
+

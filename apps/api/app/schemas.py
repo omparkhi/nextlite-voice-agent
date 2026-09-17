@@ -35,7 +35,7 @@ class RuntimePromptConfig(CamelModel):
 
 class RuntimeVoiceConfig(CamelModel):
     provider: str = "sarvam"
-    stt_model: Optional[str] = "saaras:v3"
+    stt_model: Optional[str] = "saaras:v3-realtime"
     tts_model: Optional[str] = "bulbul:v3"
     voice_id: str = "priya"
     gender: Optional[Literal["male", "female", "neutral"]] = "female"
@@ -48,6 +48,12 @@ class RuntimeLanguageConfig(CamelModel):
     auto_detect_enabled: Optional[bool] = False
     language_switching_enabled: Optional[bool] = False
 
+class RuntimeNudgeConfig(CamelModel):
+    enabled: bool = True
+    delay_seconds: int = 5
+    messages: List[str] = Field(default_factory=lambda: ["Are you there? I can help you."])
+    max_unanswered_nudges: int = 2
+
 class RuntimeBehaviorConfig(CamelModel):
     model_provider: Optional[str] = "sarvam"
     llm_model: Optional[str] = "sarvam-2b-v0.5"
@@ -58,6 +64,13 @@ class RuntimeBehaviorConfig(CamelModel):
     noise_cancellation_model: Optional[str] = "quailVfS"
     expressive_mode_enabled: Optional[bool] = False
     max_call_duration_seconds: Optional[int] = 600
+    enable_early_tool_ack: bool = True
+    enable_conversational_early_ack: bool = False
+    tool_max_tokens: Optional[int] = 128
+    post_tool_max_tokens: Optional[int] = 80
+    tool_llm_model: Optional[str] = None
+    tool_reasoning_mode: Optional[str] = None
+    nudges: Optional[RuntimeNudgeConfig] = Field(default_factory=RuntimeNudgeConfig)
 
 class RuntimeKnowledgeConfig(CamelModel):
     enabled: bool = False
@@ -72,6 +85,7 @@ class RuntimeToolDefinition(CamelModel):
     parameters: Optional[Dict[str, Any]] = None
     enabled: bool = True
     confirmation_required: Optional[bool] = False
+    direct_response_enabled: bool = False
 
 class RuntimeToolConfig(CamelModel):
     enabled: bool = True

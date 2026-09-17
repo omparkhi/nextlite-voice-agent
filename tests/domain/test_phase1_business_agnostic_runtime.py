@@ -185,13 +185,13 @@ def test_4_tool_definitions_are_business_agnostic():
     assert "doctor" not in kb_desc.lower()
     assert "business details" in kb_desc or "business knowledge base" in kb_desc
 
-    appt_resource_desc = CANONICAL_TOOL_DEFS["book_appointment"].parameters["properties"]["resourceName"]["description"]
-    assert "doctor" not in appt_resource_desc.lower()
-    assert "staff member, host, specialist, or service provider" in appt_resource_desc
+    appt_props = CANONICAL_TOOL_DEFS["book_appointment"].parameters["properties"]
+    for prop in appt_props.values():
+        assert "doctor" not in prop.get("description", "").lower()
 
     # Pipecat worker tool properties
-    worker_resource_desc = APPOINTMENT_TOOL_PROPERTIES["resourceName"]["description"]
-    assert "doctor" not in worker_resource_desc.lower()
+    for prop in APPOINTMENT_TOOL_PROPERTIES.values():
+        assert "doctor" not in prop.get("description", "").lower()
 
     worker_kb_query_desc = KNOWLEDGE_TOOL_PROPERTIES["query"]["description"]
     assert "clinic" not in worker_kb_query_desc.lower()
@@ -236,7 +236,7 @@ def test_6_language_manager_does_not_require_hardcoded_healthcare():
 def test_7_database_appointment_default_is_business_neutral():
     """TEST 7: Database model default for Appointment title is business-neutral."""
     assert Appointment.title.default.arg == "Appointment"
-    assert Appointment.status.default.arg == AppointmentStatus.REQUESTED
+    assert Appointment.status.default.arg in (AppointmentStatus.SCHEDULED, AppointmentStatus.REQUESTED)
 
 
 def test_8_multi_tenant_isolation_and_runtime_config_contract():

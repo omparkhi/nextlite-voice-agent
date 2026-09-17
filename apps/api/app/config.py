@@ -8,20 +8,24 @@ class Settings(BaseSettings):
     NODE_ENV: Literal["development", "production", "test"] = "development"
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/nextlite"
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = "redis://127.0.0.1:6379"
 
     JWT_SECRET: str = Field(default="dev-jwt-secret-at-least-32-chars-long-12345")
     JWT_REFRESH_SECRET: str = Field(default="dev-jwt-refresh-secret-at-least-32-chars-long-12345")
-    JWT_EXPIRES_IN: str = "15m"
+    JWT_EXPIRES_IN: str = "24h"
     JWT_REFRESH_EXPIRES_IN: str = "7d"
 
-    CORS_ORIGIN: str = "http://localhost:3000"
+    CORS_ORIGINS: Optional[str] = Field(
+        default="http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173",
+        validation_alias=AliasChoices("CORS_ORIGINS", "CORS_ORIGIN")
+    )
+    CORS_ORIGIN: Optional[str] = None
     FRONTEND_URL: str = "http://localhost:3000"
 
     RESEND_API_KEY: str = "re_mock_key_for_dev_or_test"
     EMAIL_FROM: str = "onboarding@resend.dev"
 
-    LOG_LEVEL: Literal["debug", "info", "warn", "error"] = "info"
+    LOG_LEVEL: Literal["debug", "info", "warn", "error", "DEBUG", "INFO", "WARN", "ERROR"] = "info"
 
     EMBEDDING_PROVIDER: Literal["nvidia", "gemini"] = "nvidia"
     NVIDIA_API_KEY: Optional[str] = None
@@ -36,12 +40,8 @@ class Settings(BaseSettings):
 
     SARVAM_API_KEY: Optional[str] = None
 
-    # Worker secret (accepts WORKER_API_SECRET or LIVEKIT_WORKER_SECRET)
-    WORKER_API_SECRET: str = Field(
-        default="dev-livekit-worker-secret-v3",
-        validation_alias=AliasChoices("WORKER_API_SECRET", "LIVEKIT_WORKER_SECRET")
-    )
-    LIVEKIT_WORKER_SECRET: Optional[str] = None
+    # Worker secret
+    WORKER_API_SECRET: str = "dev-worker-api-secret"
 
     PIPECAT_URL: Optional[str] = None
 
@@ -50,12 +50,6 @@ class Settings(BaseSettings):
     PLIVO_AUTH_ID: Optional[str] = None
     PLIVO_AUTH_TOKEN: Optional[str] = None
     PLIVO_CALLER_ID: Optional[str] = None
-
-    EXOTEL_ACCOUNT_SID: Optional[str] = None
-    EXOTEL_API_KEY: Optional[str] = None
-    EXOTEL_API_TOKEN: Optional[str] = None
-    EXOTEL_CALLER_ID: Optional[str] = None
-    EXOTEL_BASE_URL: str = "https://api.in.exotel.com"
 
     model_config = SettingsConfigDict(
         env_file=(".env", "apps/api/.env"),

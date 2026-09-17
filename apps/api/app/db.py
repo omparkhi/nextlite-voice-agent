@@ -52,7 +52,30 @@ async def get_redis() -> redis.Redis:
     return redis_client
 
 async def init_db():
-    pass
+    from sqlalchemy import text
+    statements = [
+        "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS booked_by VARCHAR(50) DEFAULT 'AGENT';",
+        "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS booked_by_name VARCHAR(255);",
+        "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS age VARCHAR(20);",
+        "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS place VARCHAR(255);",
+        "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS walk_in BOOLEAN DEFAULT FALSE;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255);",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"
+    ]
+    try:
+        async with engine.begin() as conn:
+            for stmt in statements:
+                await conn.execute(text(stmt))
+    except Exception as e:
+        logger.warning(f"init_db migration warning: {e}")
+
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("COMMIT;"))
+            await conn.execute(text("ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'CLIENT_RECEPTIONIST';"))
+    except Exception as e:
+        logger.debug(f"init_db enum migration: {e}")
+
 
 async def close_db():
     await engine.dispose()

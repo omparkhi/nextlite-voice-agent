@@ -307,12 +307,30 @@ def test_detect_call_context_outbound():
     assert d2 == "OUTBOUND"
     assert phone2 == "+919876543210"
 
+    # Outbound call where From=Agent and To=Customer
+    d3, phone3 = detect_call_context(
+        direction="outbound",
+        from_number="+918031707681",  # Agent number
+        to_number="+919876543210",    # User/Customer speaker
+    )
+    assert d3 == "OUTBOUND"
+    assert phone3 == "+919876543210"
+
 
 def test_detect_call_context_inbound():
     """INBOUND direction for regular telephony calls."""
     d, phone = detect_call_context(room_name="stream_abc123", from_number="+919876543210")
     assert d == "INBOUND"
     assert phone == "+919876543210"
+
+    # Inbound call where From=Customer and To=Agent
+    d2, phone2 = detect_call_context(
+        direction="inbound",
+        from_number="+919876543210",  # User/Customer speaker
+        to_number="+918031707681",    # Agent number
+    )
+    assert d2 == "INBOUND"
+    assert phone2 == "+919876543210"
 
 
 def test_mask_sensitive_phone_and_tokens():

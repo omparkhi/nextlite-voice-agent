@@ -20,6 +20,9 @@ export function Login() {
 
       if (userPayload?.role === 'ADMIN') {
         navigate('/admin');
+      } else if (userPayload?.role === 'CLIENT_RECEPTIONIST') {
+        const slug = userPayload.tenantSlug || '';
+        navigate(slug ? `/${slug}/receptionist` : '/receptionist');
       } else {
         navigate('/dashboard');
       }

@@ -42,7 +42,7 @@ export function WhatsAppComposer({
       setCustomerName(name);
 
       if (initialAppointment) {
-        if (initialAppointment.status === 'CONFIRMED') {
+        if (initialAppointment.status === 'SCHEDULED' || initialAppointment.status === 'CONFIRMED') {
           setTemplate('appointment_confirmed');
           setMessage(
             `Hello ${name}, your appointment is confirmed for ${initialAppointment.bookingDate} at ${initialAppointment.bookingTime}. Your reference number is ${initialAppointment.appointmentNumber || 'A-001'}. Let us know if you need to reschedule.`

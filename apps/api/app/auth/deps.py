@@ -49,15 +49,8 @@ async def require_worker(
     elif x_worker_key:
         token = x_worker_key.strip()
 
-    valid_secrets = {
-        s for s in [
-            settings.WORKER_API_SECRET,
-            settings.LIVEKIT_WORKER_SECRET,
-            "dev-livekit-worker-secret-v3",
-            "24d69bf59eaff1dd54f66adf44a4ee4d242b04fa5ee78935a6413959ed861286"
-        ] if s
-    }
-    if not token or token not in valid_secrets:
+    expected_secret = settings.WORKER_API_SECRET or "dev-worker-api-secret"
+    if not token or token != expected_secret:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Worker authentication required"

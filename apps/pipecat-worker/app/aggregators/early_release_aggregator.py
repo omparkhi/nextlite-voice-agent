@@ -5,22 +5,23 @@
 
 """Early-release phrase and clause aggregator for low-latency TTS streaming.
 
-Reduces LLM first text -> TTS started delay (~400ms P50) toward ~150-200ms
-by identifying safe, natural clause and phrase boundaries before the full
-sentence is complete, while strictly protecting:
-- Complete sentences and phrases (no 1-word fragments or isolated fillers)
-- Numbers with commas or decimal points (e.g. 10,000, 3.14)
-- Honorifics and abbreviations (e.g. Dr., Mr., a.m., p.m.)
-- Phone numbers, appointment IDs, URLs, and alphanumeric codes
-- Multilingual scripts (English, Hindi, Marathi, Hinglish, Minglish, Devanagari danda)
-- Clean interruption and flush lifecycles
+The aggregator releases safe clause/phrase boundaries while an LLM response is
+still streaming so TTS can begin before the complete sentence is available.
+
+Design goals:
+- Low first-text -> TTS latency.
+- Safe clause boundaries.
+- Multilingual support, including Latin and Indic scripts.
+- Protection for numbers, times, URLs, IDs, and abbreviations.
+- No arbitrary mid-word or mid-phrase releases.
+- Clean interruption and flush lifecycle.
+- Compatible with Pipecat 1.8.1 BaseTextAggregator.
 """
 
 import re
 from collections.abc import AsyncIterator
-from typing import Optional, Set
+from typing import Optional
 
-from loguru import logger
 from pipecat.utils.string import (
     SENTENCE_ENDING_PUNCTUATION,
     UNAMBIGUOUS_SENTENCE_ENDING_PUNCTUATION,
@@ -32,227 +33,640 @@ from pipecat.utils.text.base_text_aggregator import (
     BaseTextAggregator,
 )
 
-# Punctuation that marks natural clause/phrase boundaries within a sentence
-CLAUSE_PUNCTUATION: frozenset[str] = frozenset({",", ";", ":", "—", "–", "\n"})
 
-# All boundary punctuation (clause + terminal)
-ALL_BOUNDARY_PUNCTUATION: frozenset[str] = CLAUSE_PUNCTUATION | SENTENCE_ENDING_PUNCTUATION
+# ---------------------------------------------------------------------------
+# Punctuation
+# ---------------------------------------------------------------------------
 
-# Common abbreviations and honorifics that end with a period and must not be split
-PROTECTED_ABBREVIATIONS: frozenset[str] = frozenset({
-    # Latin honorifics and abbreviations
-    "dr", "mr", "mrs", "ms", "prof", "sr", "jr",
-    "vs", "am", "pm", "apt", "no", "eg", "ie", "etc",
-    "st", "ave", "blvd", "rd", "dept", "inc", "ltd", "corp",
-    # Indic / Devanagari honorifics ending with a period
-    "डॉ", "श्री", "श्रीमती", "प्रा", "पं",
-})
+# Natural intra-sentence phrase/clause boundaries.
+CLAUSE_PUNCTUATION: frozenset[str] = frozenset(
+    {",", ";", ":", "—", "–", "\n"}
+)
 
-# Regex to detect punctuation inside a number (e.g., 10,000 or 3.14 or 12:30)
+# ---------------------------------------------------------------------------
+# Protected lexical patterns
+# ---------------------------------------------------------------------------
+
+PROTECTED_ABBREVIATIONS: frozenset[str] = frozenset(
+    {
+        # Latin
+        "dr",
+        "mr",
+        "mrs",
+        "ms",
+        "prof",
+        "sr",
+        "jr",
+        "vs",
+        "am",
+        "pm",
+        "apt",
+        "no",
+        "eg",
+        "ie",
+        "etc",
+        "st",
+        "ave",
+        "blvd",
+        "rd",
+        "dept",
+        "inc",
+        "ltd",
+        "corp",
+        # Indic / Devanagari
+        "डॉ",
+        "श्री",
+        "श्रीमती",
+        "प्रा",
+        "पं",
+    }
+)
+
+# Number punctuation:
+#   10,000
+#   3.14
+#   12:30
 RE_NUMBER_PUNCT = re.compile(r"\d[,\.:]\d")
 
-# Regex to detect domain names or URLs (e.g., example.com, test.in)
-RE_URL_DOMAIN = re.compile(r"(?:https?://\S+|www\.\S+|\b[a-zA-Z0-9-]+\.(?:com|in|org|net|edu|gov|io|ai|co)\b)", re.IGNORECASE)
+# URLs/domains:
+#   https://example.com
+#   www.example.com
+#   example.com
+RE_URL_DOMAIN = re.compile(
+    r"(?:https?://\S+|www\.\S+|"
+    r"\b[a-zA-Z0-9-]+\.(?:com|in|org|net|edu|gov|io|ai|co)\b)",
+    re.IGNORECASE,
+)
 
-# Regex to detect appointment IDs or hyphenated codes (e.g., APT-1234, REF-5678)
+# IDs such as:
+#   APT-1234
+#   REF-5678
 RE_CODE_OR_ID = re.compile(r"\b[A-Z]{2,}-\d+\b")
+
+# Leading conversational affirmation particles that should be deduplicated
+# if an early fast-path acknowledgment filler was already dispatched for the turn.
+RE_LEADING_AFFIRMATION = re.compile(
+    r"^\s*(?:होय|नक्कीच|हो|हाँ\s*जी|हाँ|बिल्कुल|जी|ज़रूर|Sure|Yes|Certainly|Understood|ಖಂಡಿತ|ಹೌದು|சரி|ஆம்|సరే|హా|ಹಾ|হ্যাঁ)[,\s]+",
+    re.IGNORECASE | re.UNICODE,
+)
 
 
 class EarlyReleaseTextAggregator(BaseTextAggregator):
-    """Clause-aware early release text aggregator for low-latency voice streaming.
+    """Low-latency clause-aware text aggregator.
 
-    Accumulates incoming LLM tokens and detects safe phrase/clause boundaries
-    to release the first meaningful phrase to TTS earlier (~150-200ms) than
-    waiting for a full sentence plus non-whitespace lookahead.
+    The first meaningful clause is released when it reaches a safe boundary
+    AND satisfies the minimum meaningful-phrase guard:
+
+        word threshold OR character threshold
+
+    with an absolute minimum of two words.
+
+    Example:
+
+        "हाँ बिल्कुल, मैं अभी देखता हूँ..."
+
+    can release:
+
+        "हाँ बिल्कुल,"
+
+    without waiting for the 30-character threshold.
+
+    Subsequent clauses use their own configured thresholds.
     """
 
     def __init__(
         self,
         *,
-        min_first_chunk_words: int = 3,
-        min_first_chunk_chars: int = 30,
+        min_first_chunk_words: int = 2,
+        min_first_chunk_chars: int = 12,
         min_clause_words: int = 3,
         min_clause_chars: int = 15,
+        max_first_chunk_chars: Optional[int] = None,
         aggregation_type: AggregationType = AggregationType.SENTENCE,
     ):
-        """Initialize the early release text aggregator.
+        """Initialize the early-release text aggregator.
 
         Args:
-            min_first_chunk_words: Minimum words required for the first early-released phrase (default: 3).
-            min_first_chunk_chars: Minimum characters required for the first early-released phrase (default: 30).
-            min_clause_words: Minimum words required for subsequent clause splits within a sentence (default: 3).
-            min_clause_chars: Minimum characters required for subsequent clause splits (default: 15).
-            aggregation_type: Base aggregation type (default: SENTENCE).
+            min_first_chunk_words:
+                Preferred minimum number of words for the first early chunk.
+
+            min_first_chunk_chars:
+                Preferred minimum character count for the first early chunk.
+
+            min_clause_words:
+                Preferred minimum number of words for subsequent clauses.
+
+            min_clause_chars:
+                Preferred minimum character count for subsequent clauses.
+
+            aggregation_type:
+                Base aggregation type. SENTENCE is used for normal voice
+                streaming.
         """
         super().__init__(aggregation_type=aggregation_type)
+
+        if min_first_chunk_words < 1:
+            raise ValueError("min_first_chunk_words must be >= 1")
+
+        if min_first_chunk_chars < 1:
+            raise ValueError("min_first_chunk_chars must be >= 1")
+
+        if min_clause_words < 2:
+            raise ValueError("min_clause_words must be >= 2")
+
+        if min_clause_chars < 1:
+            raise ValueError("min_clause_chars must be >= 1")
+
+        if max_first_chunk_chars is not None and max_first_chunk_chars < min_first_chunk_chars:
+            raise ValueError("max_first_chunk_chars must be >= min_first_chunk_chars")
+
         self._min_first_chunk_words = min_first_chunk_words
         self._min_first_chunk_chars = min_first_chunk_chars
         self._min_clause_words = min_clause_words
         self._min_clause_chars = min_clause_chars
+        self._max_first_chunk_chars = max_first_chunk_chars
 
         self._buffer: str = ""
         self._needs_lookahead: bool = False
         self._first_chunk_released: bool = False
+        self._deduplicate_leading_affirmation: bool = False
+        self._leading_affirmation_stripped: bool = False
+
+    def enable_leading_affirmation_deduplication(self, enable: bool = True):
+        """Enable deduplicating leading affirmative particles from LLM stream for this turn."""
+        self._deduplicate_leading_affirmation = enable
+
+    # -----------------------------------------------------------------------
+    # Public state
+    # -----------------------------------------------------------------------
 
     @property
     def text(self) -> Aggregation:
-        """Get the currently aggregated text."""
-        return Aggregation(text=self._buffer.strip(" "), type=AggregationType.SENTENCE)
+        """Return the currently buffered text."""
+        return Aggregation(
+            text=self._buffer.strip(),
+            type=AggregationType.SENTENCE,
+        )
+
+    # -----------------------------------------------------------------------
+    # Lexical protection
+    # -----------------------------------------------------------------------
 
     def _is_protected_period(self, text: str, dot_pos: int) -> bool:
-        """Check if a period at dot_pos is part of an abbreviation, number, URL, or code."""
-        # 1. Number check (e.g. 3.14)
-        if dot_pos > 0 and dot_pos < len(text) - 1:
-            if text[dot_pos - 1].isdigit() and text[dot_pos + 1].isdigit():
-                return True
+        """Return True when a period should NOT terminate a sentence."""
 
-        # 2. Abbreviation check (e.g. Dr., Mr., p.m., डॉ.)
-        preceding = text[:dot_pos].strip()
-        if preceding:
-            tokens = preceding.split()
-            if tokens:
-                last_word = tokens[-1].strip(",;: \t\r\n").lower()
-                if last_word in PROTECTED_ABBREVIATIONS:
+        if dot_pos < 0 or dot_pos >= len(text):
+            return True
+
+        # ---------------------------------------------------------------
+        # Decimal numbers (e.g. 3.14 or 3. while streaming)
+        # ---------------------------------------------------------------
+        if dot_pos > 0 and text[dot_pos - 1].isdigit():
+            if dot_pos < len(text) - 1:
+                if text[dot_pos + 1].isdigit():
                     return True
-
-        # 3. Single-letter acronyms (e.g. U.S.A.)
-        if dot_pos >= 1 and text[dot_pos - 1].isupper():
-            if dot_pos >= 3 and text[dot_pos - 2] == "." and text[dot_pos - 3].isupper():
+            else:
                 return True
 
-        # 4. URL/domain check
+        # ---------------------------------------------------------------
+        # URL / domain
+        # ---------------------------------------------------------------
         for match in RE_URL_DOMAIN.finditer(text):
             if match.start() <= dot_pos < match.end():
                 return True
 
+        # ---------------------------------------------------------------
+        # Codes / IDs
+        # ---------------------------------------------------------------
+        for match in RE_CODE_OR_ID.finditer(text):
+            if match.start() <= dot_pos < match.end():
+                return True
+
+        # ---------------------------------------------------------------
+        # Abbreviations / honorifics
+        # ---------------------------------------------------------------
+        preceding = text[:dot_pos].strip()
+
+        if preceding:
+            tokens = preceding.split()
+
+            if tokens:
+                last_word = tokens[-1].strip(
+                    ",;:!? \t\r\n"
+                ).lower()
+
+                if last_word in PROTECTED_ABBREVIATIONS:
+                    return True
+
+                # Initials such as:
+                #   U.S.
+                #   A.B.
+                #
+                # Only protect when the preceding token clearly resembles
+                # an abbreviation chain.
+                if len(last_word) == 1 and last_word.isalpha():
+                    return True
+
+        # ---------------------------------------------------------------
+        # Single-letter acronym pattern
+        # ---------------------------------------------------------------
+        if dot_pos >= 3:
+            left = text[:dot_pos]
+
+            if re.search(r"(?:\b[A-Za-z]\.){2,}$", left):
+                return True
+
         return False
 
-    def _is_protected_comma_or_colon(self, text: str, punct_pos: int) -> bool:
-        """Check if a comma or colon is inside a number or time (e.g. 10,000 or 4:00 PM)."""
+    def _is_protected_comma_or_colon(
+        self,
+        text: str,
+        punct_pos: int,
+    ) -> bool:
+        """Return True when comma/colon belongs to numeric data or URL/incomplete token."""
+
+        if punct_pos < 0 or punct_pos >= len(text):
+            return True
+
         char = text[punct_pos]
-        if char in (",", ":"):
-            # If flanked by digits, it is part of a number or time
-            if punct_pos > 0 and punct_pos < len(text) - 1:
-                if text[punct_pos - 1].isdigit() and text[punct_pos + 1].isdigit():
+
+        if char not in {",", ":"}:
+            return False
+
+        # ---------------------------------------------------------------
+        # Numeric punctuation: 10,000 or 12:30 or 10, while streaming
+        # ---------------------------------------------------------------
+        if punct_pos > 0 and text[punct_pos - 1].isdigit():
+            if punct_pos < len(text) - 1:
+                if text[punct_pos + 1].isdigit():
                     return True
+            else:
+                return True
+
+        # ---------------------------------------------------------------
+        # URL / URI check for colon (e.g. https:// or http:// or example.com:8080)
+        # ---------------------------------------------------------------
+        if char == ":":
+            if punct_pos < len(text) - 1 and text[punct_pos + 1] == "/":
+                return True
+            for match in RE_URL_DOMAIN.finditer(text):
+                if match.start() <= punct_pos < match.end():
+                    return True
+
         return False
+
+    # -----------------------------------------------------------------------
+    # Word / phrase helpers
+    # -----------------------------------------------------------------------
 
     def _count_words(self, text: str) -> int:
-        """Counts words across Latin and Indic scripts."""
-        # Split on whitespace; tokens with non-whitespace characters count as words
-        tokens = [t for t in text.strip().split() if any(c.isalnum() for c in t)]
-        return len(tokens)
+        """Count whitespace-delimited lexical words.
 
-    def _find_early_clause_boundary(self, text: str) -> Optional[int]:
-        """Finds a safe clause boundary (comma, semicolon, colon, dash, newline) for early release.
-
-        Returns index after the punctuation if a valid boundary is found, else None.
+        This intentionally remains script-agnostic so English, Hindi,
+        Marathi, Hinglish, and Minglish work through the same mechanism.
         """
-        required_words = self._min_first_chunk_words if not self._first_chunk_released else self._min_clause_words
-        required_chars = self._min_first_chunk_chars if not self._first_chunk_released else self._min_clause_chars
 
-        for i, ch in enumerate(text):
-            if ch in CLAUSE_PUNCTUATION:
-                # Check protection
-                if self._is_protected_comma_or_colon(text, i):
-                    continue
+        tokens = text.strip().split()
 
-                candidate = text[: i + 1]
-                stripped = candidate.strip()
-                word_count = self._count_words(stripped)
-                char_count = len(stripped)
+        return sum(
+            1
+            for token in tokens
+            if any(char.isalnum() for char in token)
+        )
 
-                # Must satisfy minimum meaningful phrase threshold to prevent 1-word fragments
-                if word_count >= required_words and char_count >= required_chars:
-                    return i + 1
+    def _is_meaningful_candidate(
+        self,
+        candidate: str,
+        *,
+        required_words: int,
+        required_chars: int,
+    ) -> bool:
+        """Check whether a candidate is large enough for early release.
+
+        Important:
+
+        The configured word and character thresholds are alternatives,
+        not cumulative requirements.
+
+        However, a hard two-word floor prevents releases such as:
+
+            "Sure,"
+            "हाँ,"
+            "Okay,"
+
+        from being emitted as isolated one-word fragments.
+        """
+
+        stripped = candidate.strip()
+
+        if not stripped:
+            return False
+
+        word_count = self._count_words(stripped)
+
+        # Safety floor based on configuration.
+        safety_floor = self._min_first_chunk_words if not self._first_chunk_released else min(2, self._min_clause_words)
+        if word_count < safety_floor:
+            return False
+
+        char_count = len(stripped)
+
+        # Either threshold is sufficient once the safety floor is satisfied.
+        return (
+            word_count >= required_words
+            or char_count >= required_chars
+        )
+
+    # -----------------------------------------------------------------------
+    # Boundary detection
+    # -----------------------------------------------------------------------
+
+    def _find_early_clause_boundary(
+        self,
+        text: str,
+    ) -> Optional[int]:
+        """Find the earliest safe clause boundary.
+
+        Boundary must:
+
+        1. Be actual clause punctuation.
+        2. Not be protected numeric punctuation.
+        3. Have at least two words.
+        4. Meet either configured word OR character threshold.
+
+        The earliest valid boundary is returned.
+        """
+
+        if not text:
+            return None
+
+        required_words = (
+            self._min_first_chunk_words
+            if not self._first_chunk_released
+            else self._min_clause_words
+        )
+
+        required_chars = (
+            self._min_first_chunk_chars
+            if not self._first_chunk_released
+            else self._min_clause_chars
+        )
+
+        for index, char in enumerate(text):
+            if char not in CLAUSE_PUNCTUATION:
+                continue
+
+            # Numeric punctuation such as:
+            #   10,000
+            #   12:30
+            if self._is_protected_comma_or_colon(text, index):
+                continue
+
+            candidate = text[: index + 1]
+
+            if self._is_meaningful_candidate(
+                candidate,
+                required_words=required_words,
+                required_chars=required_chars,
+            ):
+                return index + 1
 
         return None
 
-    def _find_sentence_boundary(self, text: str) -> Optional[int]:
-        """Finds a terminal sentence boundary using NLTK and unambiguous Indic punctuation."""
-        # 1. Unambiguous non-Latin punctuation (Devanagari danda ।, ॥, etc.)
-        for i, ch in enumerate(text):
-            if ch in UNAMBIGUOUS_SENTENCE_ENDING_PUNCTUATION:
-                candidate = text[: i + 1].strip()
+    def _find_sentence_boundary(
+        self,
+        text: str,
+    ) -> Optional[int]:
+        """Find a safe terminal sentence boundary."""
+
+        if not text:
+            return None
+
+        # ---------------------------------------------------------------
+        # Indic sentence punctuation
+        # ---------------------------------------------------------------
+        for index, char in enumerate(text):
+            if char in UNAMBIGUOUS_SENTENCE_ENDING_PUNCTUATION:
+                candidate = text[: index + 1].strip()
+
                 if self._count_words(candidate) >= 1:
-                    return i + 1
+                    return index + 1
 
-        # 2. Standard NLTK sentence matching
+        # ---------------------------------------------------------------
+        # Pipecat sentence matcher
+        # ---------------------------------------------------------------
         eos = match_endofsentence(text)
-        if eos > 0:
-            # Verify the boundary is not an abbreviation period (e.g. Dr.)
-            dot_pos = eos - 1
-            while dot_pos >= 0 and text[dot_pos] in " \t\r\n":
-                dot_pos -= 1
-            if dot_pos >= 0 and text[dot_pos] == ".":
-                if self._is_protected_period(text, dot_pos):
-                    return None
-            return eos
 
-        return None
+        if eos <= 0:
+            return None
 
-    async def aggregate(self, text: str) -> AsyncIterator[Aggregation]:
-        """Aggregate text character-by-character and yield completed phrase/sentence aggregations."""
+        dot_pos = eos - 1
+
+        while dot_pos >= 0 and text[dot_pos] in " \t\r\n":
+            dot_pos -= 1
+
+        if dot_pos >= 0 and text[dot_pos] == ".":
+            if self._is_protected_period(text, dot_pos):
+                return None
+
+        return eos
+
+    def _find_max_first_chunk_boundary(self, text: str) -> Optional[int]:
+        """Release the first TTS-sized phrase without waiting for punctuation."""
+        if (
+            self._max_first_chunk_chars is None
+            or self._first_chunk_released
+            or len(text) < self._max_first_chunk_chars
+        ):
+            return None
+        boundary = text.rfind(" ")
+        if boundary <= 0:
+            return None
+        candidate = text[:boundary].strip()
+        if not self._is_meaningful_candidate(
+            candidate,
+            required_words=self._min_first_chunk_words,
+            required_chars=self._min_first_chunk_chars,
+        ):
+            return None
+        return boundary
+
+    # -----------------------------------------------------------------------
+    # Aggregation
+    # -----------------------------------------------------------------------
+
+    async def aggregate(
+        self,
+        text: str,
+    ) -> AsyncIterator[Aggregation]:
+        """Consume streamed LLM text and emit safe chunks."""
+
         if self._aggregation_type == AggregationType.TOKEN:
             if text:
-                yield Aggregation(text=text, type=AggregationType.TOKEN)
+                yield Aggregation(
+                    text=text,
+                    type=AggregationType.TOKEN,
+                )
+            return
+
+        if not text:
             return
 
         for char in text:
             self._buffer += char
 
-            # If we were waiting for lookahead after sentence-ending period
+            # -----------------------------------------------------------
+            # Leading affirmative deduplication (Fast-path early ack)
+            # -----------------------------------------------------------
+            if (
+                self._deduplicate_leading_affirmation
+                and not self._leading_affirmation_stripped
+                and not self._first_chunk_released
+            ):
+                match = RE_LEADING_AFFIRMATION.match(self._buffer)
+                if match:
+                    self._buffer = self._buffer[match.end():]
+                    self._leading_affirmation_stripped = True
+
+            # -----------------------------------------------------------
+            # Period lookahead
+            # -----------------------------------------------------------
+            #
+            # We delay a period decision until the following character
+            # arrives so abbreviations such as "Dr." are not prematurely
+            # released.
+            #
             if self._needs_lookahead:
                 self._needs_lookahead = False
+
                 boundary = self._find_sentence_boundary(self._buffer)
-                if boundary:
-                    result = self._buffer[:boundary].strip(" ")
+
+                if boundary is not None:
+                    result = self._buffer[:boundary].strip()
+
                     self._buffer = self._buffer[boundary:]
-                    self._first_chunk_released = True
-                    yield Aggregation(text=result, type=AggregationType.SENTENCE)
-                    continue
 
-            # Check 1: Terminal sentence boundary
-            if self._buffer and self._buffer[-1] in SENTENCE_ENDING_PUNCTUATION:
-                # Unambiguous punctuation: Devanagari danda, exclamation, question mark -> release immediately!
-                if self._buffer[-1] in UNAMBIGUOUS_SENTENCE_ENDING_PUNCTUATION or self._buffer[-1] in ("!", "?"):
-                    result = self._buffer.strip(" ")
+                    if result:
+                        self._first_chunk_released = True
+
+                        yield Aggregation(
+                            text=result,
+                            type=AggregationType.SENTENCE,
+                        )
+
+                        continue
+
+            # -----------------------------------------------------------
+            # Explicit terminal punctuation
+            # -----------------------------------------------------------
+            if (
+                self._buffer
+                and self._buffer[-1] in SENTENCE_ENDING_PUNCTUATION
+            ):
+                current_char = self._buffer[-1]
+
+                # Unambiguous terminal punctuation:
+                #
+                #   !
+                #   ?
+                #   ।
+                #   ॥
+                #
+                # can be released immediately.
+                if (
+                    current_char in UNAMBIGUOUS_SENTENCE_ENDING_PUNCTUATION
+                    or current_char in {"!", "?"}
+                ):
+                    result = self._buffer.strip()
+
                     self._buffer = ""
-                    self._first_chunk_released = True
-                    yield Aggregation(text=result, type=AggregationType.SENTENCE)
-                    continue
-                else:
-                    # Latin period (.): mark need lookahead to disambiguate from abbreviations/numbers
-                    self._needs_lookahead = True
+
+                    if result:
+                        self._first_chunk_released = True
+
+                        yield Aggregation(
+                            text=result,
+                            type=AggregationType.SENTENCE,
+                        )
+
                     continue
 
-            # Check 2: Clause boundary for early release (especially on the first chunk)
-            clause_idx = self._find_early_clause_boundary(self._buffer)
-            if clause_idx:
-                result = self._buffer[:clause_idx].strip(" ")
-                self._buffer = self._buffer[clause_idx:]
-                self._first_chunk_released = True
-                yield Aggregation(text=result, type=AggregationType.SENTENCE)
+                # "." requires lookahead because it may be:
+                #
+                #   Dr.
+                #   3.14
+                #   example.com
+                #   U.S.
+                #
+                if current_char == ".":
+                    if not self._is_protected_period(
+                        self._buffer,
+                        len(self._buffer) - 1,
+                    ):
+                        self._needs_lookahead = True
+
+                    continue
+
+            # -----------------------------------------------------------
+            # Early clause release
+            # -----------------------------------------------------------
+            clause_index = self._find_early_clause_boundary(
+                self._buffer
+            )
+
+            if clause_index is None:
+                clause_index = self._find_max_first_chunk_boundary(self._buffer)
+
+            if clause_index is None:
+                continue
+
+            result = self._buffer[:clause_index].strip()
+
+            remaining = self._buffer[clause_index:]
+
+            if not result:
+                continue
+
+            self._buffer = remaining
+
+            self._first_chunk_released = True
+
+            yield Aggregation(
+                text=result,
+                type=AggregationType.SENTENCE,
+            )
+
+    # -----------------------------------------------------------------------
+    # Lifecycle
+    # -----------------------------------------------------------------------
 
     async def flush(self) -> Aggregation | None:
-        """Flush any remaining text in the buffer at the end of an LLM turn."""
+        """Flush remaining buffered text at the end of an LLM turn."""
+
         if self._aggregation_type == AggregationType.TOKEN:
             return None
 
-        if self._buffer.strip():
-            result = self._buffer.strip(" ")
+        remaining = self._buffer.strip()
+
+        if not remaining:
             await self.reset()
-            return Aggregation(text=result, type=AggregationType.SENTENCE)
+            return None
 
         await self.reset()
-        return None
+
+        return Aggregation(
+            text=remaining,
+            type=AggregationType.SENTENCE,
+        )
 
     async def handle_interruption(self):
-        """Handle caller interruptions (barge-in) by clearing all buffers and resetting state."""
+        """Clear all buffered text after caller barge-in."""
         await self.reset()
 
     async def reset(self):
-        """Reset internal accumulator and state tracking."""
+        """Reset all aggregation state."""
         self._buffer = ""
         self._needs_lookahead = False
         self._first_chunk_released = False
+        self._deduplicate_leading_affirmation = False
+        self._leading_affirmation_stripped = False

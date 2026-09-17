@@ -1,8 +1,23 @@
 export interface User {
   id: string;
+  name?: string;
   email: string;
-  role: 'ADMIN' | 'CLIENT_OWNER' | 'CLIENT_VIEWER';
+  role: 'ADMIN' | 'CLIENT_OWNER' | 'CLIENT_VIEWER' | 'CLIENT_RECEPTIONIST';
+  tenantId?: string;
+  tenantName?: string;
+  tenantSlug?: string;
+  isActive?: boolean;
   emailVerified: boolean;
+  createdAt: string;
+}
+
+export interface ReceptionistUser {
+  id: string;
+  tenantId: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
   createdAt: string;
 }
 
@@ -13,11 +28,47 @@ export interface Tenant {
   createdAt: string;
 }
 
+export interface SubscriptionUsage {
+  totalCalls: number;
+  usedSeconds: number;
+  usedMinutes: number;
+  includedMinutes: number;
+  remainingMinutes: number;
+  overageMinutes: number;
+  overageRatePerMinute: number;
+  overageCharge: number;
+  usagePercentage: number;
+}
+
 export interface Subscription {
   id: string;
+  tenantId?: string;
   status: string;
+  planTier?: 'STARTER' | 'GROWTH' | 'PRO' | 'CUSTOM' | string;
   planName: string | null;
+  billingCycle?: 'monthly' | 'yearly';
+  basePrice?: number;
+  finalPrice?: number;
+  discountAmount?: number;
+  includedMinutes?: number;
+  payAsYouGoRate?: number;
+  features?: string[];
+  adminNotes?: string | null;
+  startedAt?: string | null;
   currentPeriodEnd: string | null;
+  usage?: SubscriptionUsage;
+}
+
+export interface PlanTemplate {
+  tier: 'STARTER' | 'GROWTH' | 'PRO';
+  name: string;
+  description: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  yearlySavings: number;
+  includedMinutes: number;
+  payAsYouGoRate: number;
+  features: string[];
 }
 
 export interface Client {
@@ -172,6 +223,7 @@ export interface AgentConfiguration {
     languageSwitchEnabled?: boolean;
     switchSensitivity?: string;
     outputNumbersInIndic?: boolean;
+    languageStyle?: 'mixed' | 'pure' | string;
   };
   voice: {
     provider: string;
@@ -228,6 +280,8 @@ export interface AgentConfiguration {
       description: string;
       enabled: boolean;
       confirmationRequired?: boolean;
+      /** Speak a backend-authored safe result without a second LLM request. */
+      directResponseEnabled?: boolean;
     }>;
   };
   role?: { description: string };
@@ -382,7 +436,14 @@ export interface ToolCatalogItem {
 export type CallDirection = 'INBOUND' | 'OUTBOUND' | 'WEB_TEST';
 export type CallStatus = 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'MISSED';
 export type LeadStatus = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'CLOSED';
-export type AppointmentStatus = 'REQUESTED' | 'CONFIRMED' | 'CANCELLED';
+export type AppointmentStatus =
+  | 'REQUESTED'
+  | 'CONFIRMED'
+  | 'SCHEDULED'
+  | 'RESCHEDULED'
+  | 'CANCELLED'
+  | 'COMPLETED'
+  | string;
 export type FollowUpStatus = 'PENDING' | 'SENT' | 'DELIVERED' | 'FAILED';
 
 export interface StartupMetricsBreakdown {
@@ -588,11 +649,16 @@ export interface Appointment {
   appointmentNumber?: string | null; // e.g. 'A-001'
   customerName: string;
   customerPhone: string;
+  age?: string | null;
+  place?: string | null;
   title: string;
   resourceName?: string | null;
   bookingDate: string;
   bookingTime: string;
   status: AppointmentStatus;
+  bookedBy?: 'AGENT' | 'RECEPTIONIST' | 'MANUAL_CLIENT' | string | null;
+  bookedByName?: string | null;
+  walkIn?: boolean | null;
   notes?: string | null;
   metadata?: Record<string, unknown> | null;
   createdAt: string;

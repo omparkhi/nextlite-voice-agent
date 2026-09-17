@@ -1,0 +1,26 @@
+[Unit]
+Description=NextLite Voice V3 - Python FastAPI Control Plane API
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=nextlite
+Group=nextlite
+WorkingDirectory=/opt/nextlite
+EnvironmentFile=/etc/nextlite/api.env
+ExecStart=/opt/nextlite/apps/pipecat-worker/.venv/bin/python -m uvicorn apps.api.app.main:app --host 127.0.0.1 --port 3001 --workers 2
+Restart=always
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+LimitNOFILE=65536
+
+# Hardening / Isolation
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

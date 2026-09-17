@@ -20,7 +20,7 @@ Build phase-by-phase. Do not implement future phases early unless explicitly req
 Prefer:
 - simple architecture
 - modular services
-- TypeScript
+- Python (FastAPI / Pipecat) / TypeScript (React Web)
 - explicit types
 - validation
 - small changes
@@ -44,7 +44,7 @@ Avoid:
 The live voice path must be optimized for low latency.
 
 Preferred path:
-Plivo → Node.js realtime voice engine → STT → agent/LLM/tool layer → TTS → Plivo.
+Plivo → Pipecat realtime voice worker → STT → agent/LLM/tool layer → TTS → Plivo.
 
 n8n is NOT part of the realtime voice loop.
 

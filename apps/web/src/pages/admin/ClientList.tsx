@@ -88,6 +88,9 @@ export function ClientList() {
                   Subscription
                 </th>
                 <th className="px-6 py-3.5 text-left text-xs font-semibold text-[#777169] uppercase tracking-wider">
+                  Tenant ID (Client Key)
+                </th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold text-[#777169] uppercase tracking-wider">
                   Created Date
                 </th>
               </tr>
@@ -117,6 +120,22 @@ export function ClientList() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-[#777169] text-xs">
                     {client.subscriptions?.[0]?.status || 'PENDING'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate max-w-[130px]" title={client.id}>{client.id}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(client.id);
+                          alert(`Copied Tenant ID: ${client.id}`);
+                        }}
+                        className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded text-[11px] font-sans text-gray-700 transition-colors"
+                        title="Copy Tenant ID for WhatsApp & API Integrations"
+                      >
+                        📋 Copy
+                      </button>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-[#777169] text-xs">
                     {new Date(client.createdAt).toLocaleDateString()}

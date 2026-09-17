@@ -35,3 +35,15 @@ Thumbs.db
 # Temp & Artifacts
 tmp/
 scratch/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+env/
+venv/
+.cache/
+.pytest_cache/

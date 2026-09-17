@@ -11,8 +11,11 @@ greetings, eliminating the 855ms Sarvam TTS WebSocket connection overhead and
 """
 
 import hashlib
+import os
+import pickle
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, List, Optional
 from loguru import logger
 
@@ -45,6 +48,21 @@ class CachedGreetingAudio:
             return self.audio_chunks == other
         return False
 
+    def is_telephony_safe(self, required_sample_rate: int) -> bool:
+        """Whether this entry can be sent directly to the phone transport.
+
+        Cached greetings are captured from the Pipecat TTS output.  A direct
+        Plivo fast path must never guess its format: doing so can produce
+        slow, pitched, or corrupted audio.  Only mono 16-bit PCM at the active
+        Plivo sample rate is eligible.
+        """
+        return bool(
+            self.audio_chunks
+            and self.sample_rate == required_sample_rate
+            and self.num_channels == 1
+            and all(chunk and len(chunk) % 2 == 0 for chunk in self.audio_chunks)
+        )
+
 
 def is_static_greeting(text: Optional[str]) -> bool:
     """Returns True if the greeting text contains no dynamic template variables."""
@@ -75,15 +93,38 @@ def compute_greeting_cache_key(
 
 
 class StaticGreetingAudioCache:
-    """Thread-safe, tenant-isolated in-memory cache for static greeting audio chunks."""
+    """Thread-safe, tenant-isolated in-memory and disk cache for static greeting audio chunks."""
 
-    def __init__(self, max_entries: int = 100):
+    def __init__(self, max_entries: int = 100, disk_cache_dir: Optional[str] = None):
         self._cache: Dict[str, CachedGreetingAudio] = {}
         self._max_entries = max_entries
+        if disk_cache_dir:
+            self._disk_cache_dir = Path(disk_cache_dir)
+        else:
+            self._disk_cache_dir = Path(os.getcwd()) / ".cache" / "greeting_audio"
+        try:
+            self._disk_cache_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"[GreetingCache] Could not create disk cache directory {self._disk_cache_dir}: {e}")
 
     def get(self, cache_key: str) -> Optional[CachedGreetingAudio]:
-        """Retrieves cached audio object for the given cache key."""
-        return self._cache.get(cache_key)
+        """Retrieves cached audio object for the given cache key (memory first, disk fallback)."""
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        # Check disk cache
+        try:
+            file_path = self._disk_cache_dir / f"{cache_key}.bin"
+            if file_path.exists():
+                with open(file_path, "rb") as f:
+                    entry = pickle.load(f)
+                if isinstance(entry, CachedGreetingAudio):
+                    self._cache[cache_key] = entry
+                    logger.info(f"[GreetingCache] Loaded cached greeting from disk ({len(entry.audio_chunks)} chunks, key={cache_key[:12]}...)")
+                    return entry
+        except Exception as e:
+            logger.warning(f"[GreetingCache] Failed loading disk cache for {cache_key[:12]}: {e}")
+        return None
 
     def put(
         self,
@@ -99,19 +140,39 @@ class StaticGreetingAudioCache:
             # Evict oldest entry (simple FIFO)
             oldest_key = next(iter(self._cache))
             del self._cache[oldest_key]
-        self._cache[cache_key] = CachedGreetingAudio(
+            if self._disk_cache_dir:
+                try:
+                    (self._disk_cache_dir / f"{oldest_key}.bin").unlink(missing_ok=True)
+                except Exception:
+                    pass
+        entry = CachedGreetingAudio(
             audio_chunks=[bytes(chunk) for chunk in audio_chunks],
             sample_rate=sample_rate,
             num_channels=num_channels,
         )
+        self._cache[cache_key] = entry
         logger.info(
             f"[GreetingCache] Stored {len(audio_chunks)} audio chunks in cache "
             f"(sample_rate={sample_rate}, channels={num_channels}, key={cache_key[:12]}...)"
         )
+        # Persist to disk
+        try:
+            if self._disk_cache_dir:
+                file_path = self._disk_cache_dir / f"{cache_key}.bin"
+                with open(file_path, "wb") as f:
+                    pickle.dump(entry, f)
+        except Exception as e:
+            logger.warning(f"[GreetingCache] Failed persisting disk cache for {cache_key[:12]}: {e}")
 
     def clear(self) -> None:
-        """Clears all cached greeting audio."""
+        """Clears all cached greeting audio from memory and disk."""
         self._cache.clear()
+        try:
+            if self._disk_cache_dir.exists():
+                for p in self._disk_cache_dir.glob("*.bin"):
+                    p.unlink(missing_ok=True)
+        except Exception as e:
+            logger.warning(f"[GreetingCache] Error clearing disk cache: {e}")
 
 
 # Global singleton instance for the worker process lifetime

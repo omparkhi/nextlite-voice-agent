@@ -6,7 +6,7 @@ from ..models import Deployment, Agent, AgentVersion, AgentTemplate, PhoneNumber
 from ..schemas import (
     RuntimeAgentConfig, RuntimeTenantConfig, RuntimeAgentMetadata,
     RuntimeDeploymentMetadata, RuntimePromptConfig, RuntimeVoiceConfig,
-    RuntimeLanguageConfig, RuntimeBehaviorConfig, RuntimeKnowledgeConfig,
+    RuntimeLanguageConfig, RuntimeBehaviorConfig, RuntimeNudgeConfig, RuntimeKnowledgeConfig,
     RuntimeToolConfig, RuntimeToolDefinition, RuntimeVariableConfig
 )
 from .prompt_compiler_service import prompt_compiler
@@ -38,9 +38,24 @@ class RuntimeAgentConfigService:
             res = await self.session.execute(stmt)
             deployment = res.scalar_one_or_none()
         elif phone_number:
-            p_stmt = select(PhoneNumber).where(PhoneNumber.phoneNumber == phone_number.strip())
+            import re
+            from sqlalchemy import or_
+            raw_p = phone_number.strip()
+            digits = re.sub(r"[^\d]", "", raw_p)
+            candidates = [raw_p, f"+{digits}", digits]
+            if len(digits) >= 10:
+                candidates.append(digits[-10:])
+                candidates.append(f"+91{digits[-10:]}")
+                candidates.append(f"91{digits[-10:]}")
+            
+            p_stmt = select(PhoneNumber).where(
+                or_(
+                    PhoneNumber.phoneNumber.in_(candidates),
+                    PhoneNumber.phoneNumber.like(f"%{digits[-10:]}") if len(digits) >= 10 else False
+                )
+            )
             p_res = await self.session.execute(p_stmt)
-            phone_record = p_res.scalar_one_or_none()
+            phone_record = p_res.scalars().first()
             if phone_record and phone_record.agentId:
                 d_stmt = select(Deployment).where(
                     Deployment.agentId == phone_record.agentId,
@@ -90,13 +105,31 @@ class RuntimeAgentConfigService:
                     cfg["identity"] = {}
                 cfg["identity"].update(copy.deepcopy(latest_cfg["identity"]))
 
-        voice_cfg = cfg.get("voice", {})
-        lang_cfg = cfg.get("language", {})
-        runtime_cfg = cfg.get("runtime", {}) or cfg.get("runtimeSettings", {})
+        voice_cfg = cfg.get("voice", {}) if isinstance(cfg.get("voice"), dict) else {}
+        lang_cfg = cfg.get("language", {}) if isinstance(cfg.get("language"), dict) else {}
+        runtime_cfg = (cfg.get("runtime") or cfg.get("runtimeSettings") or {}) if (isinstance(cfg.get("runtime"), dict) or isinstance(cfg.get("runtimeSettings"), dict)) else {}
         tools_cfg = cfg.get("tools")
-        vars_cfg = cfg.get("variables", {})
-        knowledge_cfg = cfg.get("knowledge", {})
-        identity_cfg = cfg.get("identity", {})
+        vars_cfg = cfg.get("variables", {}) if isinstance(cfg.get("variables"), dict) else {}
+        knowledge_cfg = cfg.get("knowledge", {}) if isinstance(cfg.get("knowledge"), dict) else {}
+        identity_cfg = cfg.get("identity", {}) if isinstance(cfg.get("identity"), dict) else {}
+
+        raw_nudges = cfg.get("nudges") if isinstance(cfg.get("nudges"), dict) else (runtime_cfg.get("nudges") if isinstance(runtime_cfg.get("nudges"), dict) else {})
+        nudge_enabled = bool(raw_nudges.get("enabled", True)) if isinstance(raw_nudges, dict) else True
+        try:
+            nudge_delay = int(raw_nudges.get("delaySeconds", raw_nudges.get("delay_seconds", 5))) if isinstance(raw_nudges, dict) else 5
+        except Exception:
+            nudge_delay = 5
+        raw_msgs = raw_nudges.get("messages") if isinstance(raw_nudges, dict) else None
+        if isinstance(raw_msgs, list):
+            nudge_msgs = [str(m) for m in raw_msgs if m]
+        elif isinstance(raw_msgs, str) and raw_msgs.strip():
+            nudge_msgs = [raw_msgs.strip()]
+        else:
+            nudge_msgs = ["Are you there? I can help you."]
+        try:
+            nudge_max = int(raw_nudges.get("maxUnansweredNudges", raw_nudges.get("max_unanswered_nudges", 2))) if isinstance(raw_nudges, dict) else 2
+        except Exception:
+            nudge_max = 2
 
         timezone = (
             cfg.get("timezone")
@@ -132,11 +165,29 @@ class RuntimeAgentConfigService:
         runtime_ctx_map = vars_cfg.get("runtimeContext", {}) if isinstance(vars_cfg, dict) else {}
 
         from ..domain.variable_resolver import resolve_prompt_variables
+        from ..domain.greeting_localizer import localize_greeting
         resolved_greeting = resolve_prompt_variables(
             raw_greeting,
             variables=input_vars_list,
             runtime_context=runtime_ctx_map,
             config=cfg
+        )
+
+        voice_id = str(voice_cfg.get("voiceId", "shubh")).lower()
+        is_male = voice_id in ["shubh", "aditya", "amit", "ratan", "kabir", "male"] or voice_cfg.get("gender") == "male"
+        biz_info = cfg.get("businessInformation") or {}
+        b_name = biz_info.get("businessName") or identity_cfg.get("businessName")
+        a_name = identity_cfg.get("agentName")
+
+        language_style = lang_cfg.get("languageStyle", lang_cfg.get("language_style", "mixed"))
+
+        resolved_greeting = localize_greeting(
+            resolved_greeting,
+            primary_lang=primary_lang,
+            business_name=b_name,
+            agent_name=a_name,
+            is_male=is_male,
+            language_style=language_style,
         )
 
         # Build tools list dynamically from canonical tool registry and agent bindings
@@ -162,7 +213,7 @@ class RuntimeAgentConfigService:
             ),
             voice=RuntimeVoiceConfig(
                 provider=voice_cfg.get("provider", "sarvam"),
-                stt_model=voice_cfg.get("sttModel", "saaras:v3"),
+                stt_model=voice_cfg.get("sttModel", "saaras:v3-realtime"),
                 tts_model=voice_cfg.get("ttsModel", "bulbul:v3"),
                 voice_id=voice_cfg.get("voiceId", "shubh"),
                 gender=voice_cfg.get("gender", "male"),
@@ -173,18 +224,30 @@ class RuntimeAgentConfigService:
                 primary=primary_lang,
                 supported_languages=supported_langs,
                 auto_detect_enabled=lang_cfg.get("autoDetect", lang_cfg.get("autoDetectEnabled", False)),
-                language_switching_enabled=lang_cfg.get("languageSwitchEnabled", lang_cfg.get("languageSwitchingEnabled", True))
+                language_switching_enabled=lang_cfg.get("languageSwitchEnabled", lang_cfg.get("languageSwitchingEnabled", True)),
+                language_style=lang_cfg.get("languageStyle", lang_cfg.get("language_style", "mixed"))
             ),
             runtime=RuntimeBehaviorConfig(
                 model_provider=runtime_cfg.get("modelProvider", "sarvam"),
                 llm_model=runtime_cfg.get("llmModel", "sarvam-105b-conversations"),
                 temperature=float(runtime_cfg.get("modelTemperature", runtime_cfg.get("temperature", 0.3))),
+                tool_llm_model=runtime_cfg.get("toolLlmModel"),
+                tool_max_tokens=int(runtime_cfg.get("toolMaxTokens", 128)),
+                post_tool_max_tokens=int(runtime_cfg.get("postToolMaxTokens", 80)),
+                tool_reasoning_mode=runtime_cfg.get("toolReasoningMode"),
+                enable_early_tool_ack=runtime_cfg.get("enableEarlyToolAck", True),
+                enable_conversational_early_ack=False,
                 interruption_mode=runtime_cfg.get("interruptionMode", "adaptive"),
                 preemptive_generation_enabled=runtime_cfg.get("preemptiveGenerationEnabled", False),
                 response_eagerness=runtime_cfg.get("eagernessToRespond", runtime_cfg.get("responseEagerness", "medium")),
-                noise_cancellation_model=runtime_cfg.get("noiseCancellationModel", "quailVfS"),
                 expressive_mode_enabled=runtime_cfg.get("expressiveModeEnabled", False),
-                max_call_duration_seconds=int(runtime_cfg.get("maxCallLengthSeconds", runtime_cfg.get("maxCallDurationSeconds", 600)))
+                max_call_duration_seconds=int(runtime_cfg.get("maxCallLengthSeconds", runtime_cfg.get("maxCallDurationSeconds", 600))),
+                nudges=RuntimeNudgeConfig(
+                    enabled=nudge_enabled,
+                    delay_seconds=nudge_delay,
+                    messages=nudge_msgs,
+                    max_unanswered_nudges=nudge_max
+                )
             ),
             knowledge=RuntimeKnowledgeConfig(
                 enabled=knowledge_cfg.get("enabled", True),

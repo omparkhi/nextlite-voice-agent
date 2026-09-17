@@ -81,6 +81,23 @@ export function ToolsManager({ configuration, onChange }: ToolsManagerProps) {
     });
   };
 
+  const handleDirectResponseToggle = (toolId: string, directResponseEnabled: boolean) => {
+    const updatedBindings = currentBindings.map((binding) => {
+      if (binding.toolId === toolId || binding.name === toolId) {
+        return { ...binding, directResponseEnabled };
+      }
+      return binding;
+    });
+
+    onChange({
+      tools: {
+        ...toolsConfig,
+        enabled: isMasterEnabled,
+        bindings: updatedBindings,
+      },
+    });
+  };
+
   // Remove/Unbind a tool from the agent
   const handleRemoveBinding = (toolId: string) => {
     const updatedBindings = currentBindings.filter(
@@ -252,6 +269,7 @@ export function ToolsManager({ configuration, onChange }: ToolsManagerProps) {
               const description = binding.description || catalogItem?.description || 'Custom agent tool';
               const categoryColor = CATEGORY_COLORS[category] || 'bg-gray-100 text-gray-700 border-gray-200';
               const isToolEnabled = binding.enabled;
+              const supportsDirectResponse = binding.toolId === 'book_appointment';
 
               return (
                 <div
@@ -309,6 +327,22 @@ export function ToolsManager({ configuration, onChange }: ToolsManagerProps) {
                       </button>
                     </div>
                   </div>
+
+                  {supportsDirectResponse && (
+                    <label className="flex items-start gap-2.5 pt-2 border-t border-gray-100 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={binding.directResponseEnabled === true}
+                        disabled={!isToolEnabled || !isMasterEnabled}
+                        onChange={(e) => handleDirectResponseToggle(binding.toolId, e.target.checked)}
+                        className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+                      />
+                      <span className="text-[11px] leading-relaxed text-gray-600">
+                        Fast server-confirmed response — skips the second LLM call. Enable only after the exact
+                        appointment-request wording has been approved for this client and language.
+                      </span>
+                    </label>
+                  )}
 
                   {/* Accepted Parameters */}
                   {catalogItem?.parameters && catalogItem.parameters.length > 0 && (

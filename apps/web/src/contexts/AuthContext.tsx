@@ -20,9 +20,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await api.refresh();
       setAccessToken(response.accessToken);
       
-      // Decode token to get user info
-      const payload = JSON.parse(atob(response.accessToken.split('.')[1]));
-      setUser(payload);
+      // Decode token to get core auth fields
+      const jwtPayload = JSON.parse(atob(response.accessToken.split('.')[1]));
+      // Merge with rich user object from API (includes tenantSlug, tenantName)
+      const mergedUser = { ...jwtPayload, ...(response.user || {}) };
+      setUser(mergedUser);
     } catch {
       setAccessToken(null);
       setUser(null);
@@ -47,9 +49,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await api.login(email, password);
     setAccessToken(response.accessToken);
     
-    const payload = JSON.parse(atob(response.accessToken.split('.')[1]));
-    setUser(payload);
-    return payload;
+    const jwtPayload = JSON.parse(atob(response.accessToken.split('.')[1]));
+    // Merge JWT fields with the richer user object from the API response
+    // The API response includes tenantSlug, tenantName which JWT does not
+    const mergedUser = { ...jwtPayload, ...(response.user || {}) };
+    setUser(mergedUser);
+    return mergedUser;
   };
   
   const logout = async () => {

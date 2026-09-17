@@ -1,21 +1,20 @@
 """NextLite Pipecat Book Appointment Tool.
 
-Ports generic appointment booking behavior from LiveKit worker to Pipecat native tool calling.
 Connects strictly to NextLite Control Plane internal API (POST /api/internal/appointments).
 
-Booking Semantics & Anti-Hallucination:
-- Always creates records with status = 'REQUESTED'.
-- Preserves REQUESTED != CONFIRMED semantics.
-- Operating hours do NOT indicate slot availability.
-- Never claims confirmed booking, reserved calendar slot, or local UUID/appointment number generation.
-- Structured success or failure is returned to the LLM to prevent hallucinations.
+Booking Semantics:
+- Registers active upcoming appointments directly in the clinic system.
+- Structured success or failure is returned to the LLM to provide natural conversational confirmation.
 """
 
 from typing import TYPE_CHECKING, Any, Dict, Optional
+import re
 import httpx
 from loguru import logger
 
 from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.frames.frames import FunctionCallResultProperties, TTSSpeakFrame
+from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import FunctionCallParams
 from app.temporal_context import is_past_date, resolve_relative_or_absolute_date
 from app.turn_timing import log_phone_trace
@@ -28,32 +27,28 @@ BOOK_APPOINTMENT_TOOL_NAME = "book_appointment"
 APPOINTMENT_TOOL_PROPERTIES: Dict[str, Any] = {
     "customerName": {
         "type": "string",
-        "description": "Customer name",
-    },
-    "title": {
-        "type": "string",
-        "description": "Reason for visit",
+        "description": "Full name of the person",
     },
     "bookingDate": {
         "type": "string",
-        "description": "Date (YYYY-MM-DD or relative)",
+        "description": "Date of appointment (YYYY-MM-DD or relative like tomorrow)",
     },
     "bookingTime": {
         "type": "string",
-        "description": "Time (e.g. 10:00 AM)",
+        "description": "Time of appointment (e.g. 10:00 AM, 3:00 PM)",
     },
-    "resourceName": {
+    "title": {
         "type": "string",
-        "description": "Requested staff member, host, specialist, or service provider",
+        "description": "Reason for visit or service type",
     },
-    "customerPhone": {
+    "age": {
         "type": "string",
-        "description": "Contact phone",
+        "description": "Age of the person (e.g. '22')",
     },
-    "notes": {
-        "type": "string",
-        "description": "Notes",
-    },
+    # "place": {
+    #     "type": "string",
+    #     "description": "Place, city, or location (e.g. 'Nagpur')",
+    # },
 }
 
 APPOINTMENT_TOOL_REQUIRED = ["customerName", "title", "bookingDate", "bookingTime"]
@@ -63,6 +58,8 @@ def create_book_appointment_tool_factory(
     context: "ToolRuntimeContext",
     description_override: Optional[str] = None,
     http_client: Optional[httpx.AsyncClient] = None,
+    direct_response_enabled: bool = False,
+    direct_response_language: str = "en-IN",
 ) -> FunctionSchema:
     """Creates a native Pipecat FunctionSchema for book_appointment bound to trusted context."""
     if not context.deployment_id or not context.deployment_id.strip():
@@ -71,14 +68,41 @@ def create_book_appointment_tool_factory(
     trusted_deployment_id = context.deployment_id.strip()
 
     base_url = (context.api_url or "http://localhost:3001").rstrip("/")
-    worker_secret = context.worker_secret or "dev-livekit-worker-secret-v3"
+    worker_secret = context.worker_secret or "dev-worker-api-secret"
     api_endpoint = f"{base_url}/api/internal/appointments"
 
     tool_description = (
         description_override.strip()
         if description_override and description_override.strip()
-        else "Submit an appointment request. Records an unconfirmed request for team verification."
+        else "Book an appointment for a patient. Registers an active upcoming appointment in the clinic system."
     )
+
+    def direct_success_message(result: Dict[str, Any]) -> Optional[str]:
+        """Build a clean, warm conversational confirmation in the caller's active language."""
+        if not result.get("success"):
+            return None
+        language = (direct_response_language or "en-IN").lower()
+        if language.startswith("mr"):
+            return "तुमची अपॉइंटमेंट बुक झाली आहे. काही अडचण असल्यास नक्की सांगा!"
+        if language.startswith("hi"):
+            return "आपकी अपॉइंटमेंट बुक हो गई है। कोई और सहायता चाहिए तो बताइए!"
+        if language.startswith("gu"):
+            return "તમારી appointment book થઈ ગઈ છે. આભાર!"
+        if language.startswith("ta"):
+            return "உங்கள் appointment பதிவு செய்யப்பட்டது. நன்றி!"
+        if language.startswith("te"):
+            return "మీ appointment book చేయబడింది. ధన్యవాదాలు!"
+        if language.startswith("kn"):
+            return "ನಿಮ್ಮ appointment ಬುಕ್ ಆಗಿದೆ. ಧನ್ಯವಾದಗಳು!"
+        if language.startswith("bn"):
+            return "আপনার appointment book হয়ে গেছে। ধন্যবাদ!"
+        return "Your appointment has been booked. Let me know if you need any other help!"
+
+    async def deliver_result(params: FunctionCallParams, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Return an authoritative result to the LLM to generate a single natural confirmation."""
+        if params.result_callback:
+            await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=True))
+        return result
 
     async def handle_book_appointment(params: FunctionCallParams) -> Dict[str, Any]:
         await context.ensure_call_session_id()
@@ -92,9 +116,7 @@ def create_book_appointment_tool_factory(
                 "error": "INVALID_ARGUMENTS",
                 "message": "Invalid appointment request details: arguments must be a JSON object.",
             }
-            if params.result_callback:
-                await params.result_callback(failure_result)
-            return failure_result
+            return await deliver_result(params, failure_result)
 
         # 1. Validate required fields
         raw_name = raw_args.get("customerName")
@@ -118,9 +140,7 @@ def create_book_appointment_tool_factory(
                 "error": "INVALID_ARGUMENTS",
                 "message": f"Missing required appointment details: {', '.join(missing_fields)}.",
             }
-            if params.result_callback:
-                await params.result_callback(failure_result)
-            return failure_result
+            return await deliver_result(params, failure_result)
 
         customer_name = str(raw_name).strip()
         title = str(raw_title).strip()
@@ -141,39 +161,40 @@ def create_book_appointment_tool_factory(
                     "Please ask the caller for a future appointment date."
                 ),
             }
-            if params.result_callback:
-                await params.result_callback(failure_result)
-            return failure_result
+            return await deliver_result(params, failure_result)
 
         # Normalize relative/natural date to standard YYYY-MM-DD
         normalized_date = resolve_relative_or_absolute_date(raw_booking_date, time_zone=tz_name)
         booking_date = normalized_date if normalized_date else raw_booking_date
 
-        # 2. Resolve caller phone: supplied customerPhone > trusted callerPhone fallback
-        raw_phone = raw_args.get("customerPhone")
+        # 2. Resolve caller phone: ALWAYS prioritize trusted telephony callerPhone metadata
+        raw_phone = raw_args.get("customerPhone") or raw_args.get("phone")
         turn_id = context.timing_tracker.active_turn_id if context.timing_tracker else "unknown"
         log_phone_trace("tool_argument_received", turn_id, raw_phone)
 
-        effective_phone: Optional[str] = None
-        if raw_phone and isinstance(raw_phone, str) and raw_phone.strip():
-            effective_phone = raw_phone.strip()
-        elif trusted_caller_phone:
-            effective_phone = trusted_caller_phone
+        # Phone number comes from trusted telephony call metadata, never conversationally requested
+        candidate_phone = None
+        if trusted_caller_phone and isinstance(trusted_caller_phone, str) and trusted_caller_phone.strip():
+            candidate_phone = trusted_caller_phone.strip()
+        elif raw_phone and isinstance(raw_phone, str) and raw_phone.strip():
+            candidate_phone = raw_phone.strip()
+
+        if candidate_phone and candidate_phone != "+910000000000":
+            clean_digits = re.sub(r"[^\d+]", "", candidate_phone)
+            if clean_digits.startswith("+"):
+                effective_phone = clean_digits
+            elif len(clean_digits) == 10:
+                effective_phone = f"+91{clean_digits}"
+            elif len(clean_digits) == 12 and clean_digits.startswith("91"):
+                effective_phone = f"+{clean_digits}"
+            elif len(clean_digits) == 11 and clean_digits.startswith("0"):
+                effective_phone = f"+91{clean_digits[1:]}"
+            else:
+                effective_phone = clean_digits
+        else:
+            effective_phone = candidate_phone or "+910000000000"
 
         log_phone_trace("control_plane_payload", turn_id, effective_phone)
-
-        if not effective_phone:
-            failure_result = {
-                "success": False,
-                "error": "INVALID_ARGUMENTS",
-                "message": (
-                    "Customer phone number is required to record an appointment request. "
-                    "Please ask the caller for their contact phone number."
-                ),
-            }
-            if params.result_callback:
-                await params.result_callback(failure_result)
-            return failure_result
 
         # 3. Assemble API payload strictly with trusted identity fields & status = REQUESTED
         payload: Dict[str, Any] = {
@@ -184,9 +205,23 @@ def create_book_appointment_tool_factory(
             "bookingDate": booking_date,
             "bookingTime": booking_time,
             "status": "REQUESTED",
+            "bookedBy": "AGENT",
+            "bookedByName": "AI Voice Assistant",
         }
+        if context.tenant_id:
+            payload["tenantId"] = context.tenant_id
+        if context.agent_id:
+            payload["agentId"] = context.agent_id
         if trusted_call_session_id:
             payload["callSessionId"] = trusted_call_session_id
+
+        raw_age = raw_args.get("age")
+        if raw_age and str(raw_age).strip():
+            payload["age"] = str(raw_age).strip()
+
+        raw_place = raw_args.get("place") or raw_args.get("location")
+        if raw_place and str(raw_place).strip():
+            payload["place"] = str(raw_place).strip()
 
         raw_resource = raw_args.get("resourceName")
         if raw_resource and isinstance(raw_resource, str) and raw_resource.strip():
@@ -276,11 +311,10 @@ def create_book_appointment_tool_factory(
                 "message": "Unable to record the appointment request due to a temporary network issue. Please try again later.",
             }
 
-        # 5. Deliver result to Pipecat LLM callback
-        if params.result_callback:
-            await params.result_callback(result)
-
-        return result
+        # 5. Deliver result to Pipecat. A configured safe direct response
+        # avoids a second LLM request; otherwise this preserves the standard
+        # tool-result -> LLM response flow.
+        return await deliver_result(params, result)
 
     return FunctionSchema(
         name=BOOK_APPOINTMENT_TOOL_NAME,
@@ -289,3 +323,102 @@ def create_book_appointment_tool_factory(
         required=APPOINTMENT_TOOL_REQUIRED,
         handler=handle_book_appointment,
     )
+
+
+RESCHEDULE_APPOINTMENT_TOOL_NAME = "reschedule_appointment"
+
+RESCHEDULE_TOOL_PROPERTIES: Dict[str, Any] = {
+    "newBookingDate": {
+        "type": "string",
+        "description": "New date for the appointment (e.g. 'tomorrow', '2026-09-17', 'Friday')",
+    },
+    "newBookingTime": {
+        "type": "string",
+        "description": "New time for the appointment (e.g. '03:00 PM', '11:00 AM')",
+    },
+    "reason": {
+        "type": "string",
+        "description": "Optional reason for rescheduling",
+    },
+}
+
+RESCHEDULE_TOOL_REQUIRED = ["newBookingDate", "newBookingTime"]
+
+
+def create_reschedule_appointment_tool_factory(
+    context: "ToolRuntimeContext",
+    description_override: Optional[str] = None,
+    http_client: Optional[httpx.AsyncClient] = None,
+) -> FunctionSchema:
+    """Creates a native Pipecat FunctionSchema for reschedule_appointment bound to trusted context."""
+    if not context.deployment_id or not context.deployment_id.strip():
+        raise ValueError("[RescheduleTool] deployment_id is required in ToolRuntimeContext")
+
+    trusted_deployment_id = context.deployment_id.strip()
+    base_url = (context.api_url or "http://localhost:3001").rstrip("/")
+    worker_secret = context.worker_secret or "dev-worker-api-secret"
+    api_endpoint = f"{base_url}/api/internal/appointments/reschedule"
+
+    tool_description = (
+        description_override.strip()
+        if description_override and description_override.strip()
+        else "Reschedule an existing clinic appointment to a new date and time when requested by the caller."
+    )
+
+    async def execute_reschedule(params: FunctionCallParams):
+        raw_args = params.arguments or {}
+        raw_date = str(raw_args.get("newBookingDate") or "").strip()
+        raw_time = str(raw_args.get("newBookingTime") or "").strip()
+        reason = str(raw_args.get("reason") or "").strip() or None
+
+        tz_name = getattr(context, "timezone", None)
+        normalized_date = resolve_relative_or_absolute_date(raw_date, time_zone=tz_name)
+
+        payload = {
+            "deploymentId": trusted_deployment_id,
+            "newBookingDate": normalized_date,
+            "newBookingTime": raw_time,
+            "phone": context.caller_phone,
+            "reason": reason,
+        }
+        headers = {
+            "Authorization": f"Bearer {worker_secret}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            if http_client:
+                resp = await http_client.post(api_endpoint, json=payload, headers=headers)
+            else:
+                async with httpx.AsyncClient(timeout=4.0) as client:
+                    resp = await client.post(api_endpoint, json=payload, headers=headers)
+
+            if resp.status_code == 200:
+                result = {
+                    "success": True,
+                    "newDate": normalized_date,
+                    "newTime": raw_time,
+                    "message": f"Appointment successfully rescheduled to {normalized_date} at {raw_time}.",
+                }
+            else:
+                result = {
+                    "success": False,
+                    "message": "Unable to reschedule the appointment. Please check if you have an active booking or try again.",
+                }
+        except Exception as e:
+            logger.error(f"[RescheduleTool] Failed to reschedule: {e}")
+            result = {
+                "success": False,
+                "message": "Temporary network issue while rescheduling. Please try again.",
+            }
+
+        await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=True))
+
+    return FunctionSchema(
+        name=RESCHEDULE_APPOINTMENT_TOOL_NAME,
+        description=tool_description,
+        properties=RESCHEDULE_TOOL_PROPERTIES,
+        required=RESCHEDULE_TOOL_REQUIRED,
+        handler=execute_reschedule,
+    )
+

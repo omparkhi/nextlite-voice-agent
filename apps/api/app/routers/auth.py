@@ -63,10 +63,12 @@ async def register(req: RegisterRequest, response: Response, session: AsyncSessi
         "accessToken": token_pair["accessToken"],
         "user": {
             "id": str(user.id),
+            "name": getattr(user, "name", None) or user.email.split("@")[0],
             "email": user.email,
             "role": user.role.value,
-            "tenantId": str(tenant.id),
-            "tenantName": tenant.name
+            "tenantId": str(tenant.id) if tenant else None,
+            "tenantName": tenant.name if tenant else "",
+            "tenantSlug": getattr(tenant, "slug", "") if tenant else ""
         }
     }
 
@@ -82,10 +84,19 @@ async def login(req: LoginRequest, response: Response, session: AsyncSession = D
             detail="Invalid email or password"
         )
 
+    if hasattr(user, "isActive") and not user.isActive:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated. Please contact your clinic administrator."
+        )
+
     tenant_name = ""
+    tenant_slug = ""
     if user.tenantId:
         tenant = await tenant_repo.get_by_id(user.tenantId)
-        tenant_name = tenant.name if tenant else ""
+        if tenant:
+            tenant_name = tenant.name
+            tenant_slug = getattr(tenant, "slug", "")
 
     token_pair = generate_token_pair(str(user.id), str(user.tenantId) if user.tenantId else None, user.role.value)
     await user_repo.create_refresh_token(
@@ -106,10 +117,12 @@ async def login(req: LoginRequest, response: Response, session: AsyncSession = D
         "accessToken": token_pair["accessToken"],
         "user": {
             "id": str(user.id),
+            "name": getattr(user, "name", None) or user.email.split("@")[0],
             "email": user.email,
             "role": user.role.value,
             "tenantId": str(user.tenantId) if user.tenantId else None,
-            "tenantName": tenant_name
+            "tenantName": tenant_name,
+            "tenantSlug": tenant_slug
         }
     }
 
@@ -165,8 +178,25 @@ async def refresh_token(
         max_age=7 * 86400
     )
 
+    tenant_name = ""
+    tenant_slug = ""
+    if user.tenantId:
+        tenant = await tenant_repo.get_by_id(user.tenantId)
+        if tenant:
+            tenant_name = tenant.name
+            tenant_slug = getattr(tenant, "slug", "")
+
     return {
-        "accessToken": new_token_pair["accessToken"]
+        "accessToken": new_token_pair["accessToken"],
+        "user": {
+            "id": str(user.id),
+            "name": getattr(user, "name", None) or user.email.split("@")[0],
+            "email": user.email,
+            "role": user.role.value,
+            "tenantId": str(user.tenantId) if user.tenantId else None,
+            "tenantName": tenant_name,
+            "tenantSlug": tenant_slug
+        }
     }
 
 @router.post("/logout")
@@ -197,6 +227,7 @@ async def get_me(
     return {
         "user": {
             "id": str(user.id),
+            "name": getattr(user, "name", None) or user.email.split("@")[0],
             "email": user.email,
             "role": user.role.value if hasattr(user.role, "value") else str(user.role),
             "tenantId": str(user.tenantId) if user.tenantId else None

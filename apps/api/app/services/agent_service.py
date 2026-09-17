@@ -150,14 +150,29 @@ class AgentService:
 
         # Load template config snapshot
         tmpl_config = {}
-        if tmpl_data and tmpl_data.get("defaultConfiguration"):
-            import copy
-            tmpl_config = copy.deepcopy(tmpl_data["defaultConfiguration"])
-            if "identity" in tmpl_config and isinstance(tmpl_config["identity"], dict):
-                tmpl_config["identity"]["agentName"] = name
-                tmpl_config["identity"]["name"] = name
-            if tmpl_data.get("basePrompt") and "basePrompt" not in tmpl_config:
-                tmpl_config["basePrompt"] = tmpl_data["basePrompt"]
+        if tmpl_data:
+            raw_cfg = tmpl_data.get("defaultConfiguration") or tmpl_data.get("default_configuration") or tmpl_data.get("defaultConfig")
+            if isinstance(raw_cfg, str):
+                import json
+                try:
+                    tmpl_config = json.loads(raw_cfg)
+                except Exception:
+                    tmpl_config = {}
+            elif isinstance(raw_cfg, dict):
+                import copy
+                tmpl_config = copy.deepcopy(raw_cfg)
+            else:
+                tmpl_config = {}
+
+            if isinstance(tmpl_config, dict) and tmpl_config:
+                if "identity" in tmpl_config and isinstance(tmpl_config["identity"], dict):
+                    tmpl_config["identity"]["agentName"] = name
+                    tmpl_config["identity"]["name"] = name
+                elif "identity" not in tmpl_config:
+                    tmpl_config["identity"] = {"agentName": name, "name": name}
+
+                if tmpl_data.get("basePrompt") and "basePrompt" not in tmpl_config:
+                    tmpl_config["basePrompt"] = tmpl_data["basePrompt"]
 
         default_config = tmpl_config or {
             "identity": {"agentName": name, "greeting": "Hello! How can I assist you today?"},

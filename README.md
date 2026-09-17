@@ -25,20 +25,18 @@ Target variable voice cost:
 
 ## Stack
 
-- Frontend: React + Vite + TypeScript
-- Backend: Node.js + Express + TypeScript (modular monolith)
+- Frontend: React + Vite + TypeScript (`apps/web/`)
+- Backend Control Plane: Python FastAPI (`apps/api/app/`)
+- Realtime Voice Worker: Python Pipecat (`apps/pipecat-worker/`)
 - Database: PostgreSQL + pgvector
 - Cache/Session: Redis
-- Jobs: BullMQ
 - Telephony: Plivo
 - STT: Sarvam Saaras v3
 - TTS: Sarvam Bulbul v3
-- LLM: Gemini / Sarvam (provider abstraction)
+- LLM: Sarvam / Gemini (provider abstraction)
 - Payments: Cashfree
 - Email: Resend
 - Auth: Custom JWT + refresh tokens
-- Automation: n8n (async only, NOT in realtime voice path)
-- Agent Orchestration: LangChain.js (where useful)
 
 ## Source-of-truth documents
 

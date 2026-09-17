@@ -273,10 +273,10 @@ def test_one_sarvam_tts_service_instance_per_call():
     """Verify that exactly one SarvamTTSService is instantiated per call session."""
     main_source = inspect.getsource(main_module)
 
-    # Count occurrences of SarvamTTSService constructor call in main.py
-    constructor_count = main_source.count("SarvamTTSService(")
+    # Count occurrences of tts_service instantiation in main.py
+    constructor_count = main_source.count("tts_service = InstrumentedSarvamTTSService(") + main_source.count("tts_service = SarvamTTSService(")
     assert constructor_count == 1, (
-        f"Expected exactly 1 SarvamTTSService instantiation in main.py, found {constructor_count}"
+        f"Expected exactly 1 tts_service instantiation in main.py, found {constructor_count}"
     )
 
 

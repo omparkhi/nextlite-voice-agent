@@ -7,6 +7,14 @@ import { EmptyState } from '../../components/client/EmptyState';
 import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
 import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
 
+const STANDARD_TIME_SLOTS = [
+  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
+  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
+  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
+  '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
+  '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM'
+];
+
 export function ClientAppointments() {
   const { isViewer } = useOutletContext<{ isViewer: boolean }>();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -16,6 +24,7 @@ export function ClientAppointments() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [bookedByFilter, setBookedByFilter] = useState<string>('ALL');
 
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -23,8 +32,29 @@ export function ClientAppointments() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [whatsAppTargetAppt, setWhatsAppTargetAppt] = useState<Appointment | null>(null);
 
-  const loadAppointments = useCallback(async () => {
-    setLoading(true);
+  // Quick Book Modal
+  const [bookModalOpen, setBookModalOpen] = useState(false);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [newAge, setNewAge] = useState('');
+  const [newPlace, setNewPlace] = useState('');
+  const [newBookingDate, setNewBookingDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [newBookingTime, setNewBookingTime] = useState('10:00 AM');
+  const [newTitle, setNewTitle] = useState('General Consultation');
+  const [newResourceName, setNewResourceName] = useState('Dr. Rajesh Sharma');
+  const [newNotes, setNewNotes] = useState('');
+  const [newIsWalkIn, setNewIsWalkIn] = useState(true);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [bookingSuccess, setBookingSuccess] = useState<string | null>(null);
+
+  // Live Slot Availability Check inside Modal
+  const [slotChecking, setSlotChecking] = useState(false);
+  const [slotAvailable, setSlotAvailable] = useState<boolean | null>(null);
+  const [existingBookingInfo, setExistingBookingInfo] = useState<any>(null);
+
+  const loadAppointments = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.getClientAppointments({
         limit,
@@ -36,22 +66,58 @@ export function ClientAppointments() {
     } catch (err) {
       console.error('Failed to load appointments:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [page, statusFilter]);
 
   useEffect(() => {
     loadAppointments();
 
-    const handleRefresh = () => loadAppointments();
+    const handleRefresh = () => loadAppointments(false);
+    const handleRefreshSilent = () => loadAppointments(true);
     window.addEventListener('crm-refresh', handleRefresh);
-    window.addEventListener('crm-refresh-silent', handleRefresh);
+    window.addEventListener('crm-refresh-silent', handleRefreshSilent);
+
+    // Live sync polling every 10s
+    const pollInterval = setInterval(() => {
+      loadAppointments(true);
+    }, 10000);
 
     return () => {
       window.removeEventListener('crm-refresh', handleRefresh);
-      window.removeEventListener('crm-refresh-silent', handleRefresh);
+      window.removeEventListener('crm-refresh-silent', handleRefreshSilent);
+      clearInterval(pollInterval);
     };
   }, [loadAppointments]);
+
+  // Check slot availability when date/time/phone changes in modal
+  useEffect(() => {
+    if (!bookModalOpen || !newBookingDate || !newBookingTime) return;
+
+    let cancelled = false;
+    const check = async () => {
+      setSlotChecking(true);
+      try {
+        const res = await api.checkClientAppointmentSlots(newBookingDate, newCustomerPhone, newBookingTime);
+        if (!cancelled) {
+          setSlotAvailable(res.slotAvailable);
+          setExistingBookingInfo(res.hasExistingBooking ? res.existingBooking : null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setSlotAvailable(null);
+        }
+      } finally {
+        if (!cancelled) setSlotChecking(false);
+      }
+    };
+
+    const timer = setTimeout(check, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [bookModalOpen, newBookingDate, newBookingTime, newCustomerPhone]);
 
   const handleRowClick = async (appt: Appointment) => {
     setSelectedAppointment(appt);
@@ -74,21 +140,96 @@ export function ClientAppointments() {
     setSelectedAppointment(updated);
   };
 
+  const handleMarkAsDone = async (appt: Appointment, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await api.updateClientAppointment(appt.id, { status: 'COMPLETED' });
+      setAppointments((prev) => prev.map((a) => (a.id === appt.id ? { ...a, status: 'COMPLETED' } : a)));
+      if (selectedAppointment?.id === appt.id) {
+        setSelectedAppointment((prev) => (prev ? { ...prev, status: 'COMPLETED' } : null));
+      }
+    } catch (err) {
+      console.error('Failed to mark appointment as done:', err);
+    }
+  };
+
+  const handleCreateWalkInBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomerName || !newCustomerPhone || !newBookingDate || !newBookingTime) {
+      setBookingError('Please fill in patient name, phone number, date, and time.');
+      return;
+    }
+
+    setBookingSubmitting(true);
+    setBookingError(null);
+    setBookingSuccess(null);
+
+    try {
+      const res = await api.bookClientAppointment({
+        customerName: newCustomerName.trim(),
+        customerPhone: newCustomerPhone.trim(),
+        bookingDate: newBookingDate,
+        bookingTime: newBookingTime,
+        title: newTitle.trim() || 'General Consultation',
+        resourceName: newResourceName.trim(),
+        bookedBy: 'RECEPTIONIST',
+        bookedByName: 'Desk Receptionist (Walk-in)',
+        age: newAge.trim() || undefined,
+        place: newPlace.trim() || undefined,
+        walkIn: newIsWalkIn,
+        notes: newNotes.trim() || undefined,
+      });
+
+      if (res.success) {
+        setBookingSuccess(`Appointment ${res.appointment?.appointmentNumber || ''} created successfully!`);
+        setTimeout(() => {
+          setBookModalOpen(false);
+          setNewCustomerName('');
+          setNewCustomerPhone('');
+          setNewAge('');
+          setNewPlace('');
+          setNewNotes('');
+          setBookingSuccess(null);
+          loadAppointments();
+        }, 1200);
+      }
+    } catch (err: any) {
+      setBookingError(err?.message || 'Failed to create booking. The time slot may already be reserved.');
+    } finally {
+      setBookingSubmitting(false);
+    }
+  };
+
   const filteredAppointments = appointments.filter((a) => {
+    if (bookedByFilter !== 'ALL') {
+      const bBy = (a.bookedBy || 'AGENT').toUpperCase();
+      if (bookedByFilter === 'AGENT' && bBy !== 'AGENT') return false;
+      if (bookedByFilter === 'RECEPTIONIST' && bBy !== 'RECEPTIONIST' && !a.walkIn) return false;
+      if (bookedByFilter === 'WHATSAPP' && bBy !== 'WHATSAPP') return false;
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const numMatch = a.appointmentNumber?.toLowerCase().includes(q);
       const nameMatch = a.customerName.toLowerCase().includes(q);
       const phoneMatch = a.customerPhone.toLowerCase().includes(q);
-      const titleMatch = a.title.toLowerCase().includes(q);
-      return numMatch || nameMatch || phoneMatch || titleMatch;
+      const titleMatch = a.title?.toLowerCase().includes(q);
+      const bookedByMatch = a.bookedByName?.toLowerCase().includes(q) || a.bookedBy?.toLowerCase().includes(q);
+      const ageVal = a.age || ((a.metadata as any)?.age != null ? String((a.metadata as any).age) : '');
+      const placeVal = a.place || ((a.metadata as any)?.place != null ? String((a.metadata as any).place) : '') || ((a.metadata as any)?.location != null ? String((a.metadata as any).location) : '');
+      const ageMatch = ageVal.toLowerCase().includes(q);
+      const placeMatch = placeVal.toLowerCase().includes(q);
+      return numMatch || nameMatch || phoneMatch || titleMatch || ageMatch || placeMatch || bookedByMatch;
     }
     return true;
   });
 
   const getStatusBadge = (status: Appointment['status']) => {
     switch (status) {
+      case 'SCHEDULED':
       case 'CONFIRMED':
+        return 'bg-[#e0f2fe] text-[#0369a1] border-[#bae6fd]';
+      case 'COMPLETED':
         return 'bg-[#dcfce7] text-[#15803d] border-[#bbf7d0]';
       case 'CANCELLED':
         return 'bg-[#fee2e2] text-[#b91c1c] border-[#fecaca]';
@@ -96,6 +237,43 @@ export function ClientAppointments() {
       default:
         return 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]';
     }
+  };
+
+  const getBookedByBadge = (appt: Appointment) => {
+    const bBy = (appt.bookedBy || 'AGENT').toUpperCase();
+    if (bBy === 'WHATSAPP') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#dcfce7] text-[#15803d] border border-[#86efac]">
+          <span className="text-[11px]">💬</span>
+          WhatsApp Bot
+        </span>
+      );
+    }
+    if (bBy === 'AGENT') {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#eef2ff] text-[#4f46e5] border border-[#c7d2fe]">
+          <svg className="w-3 h-3 text-[#4f46e5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+          </svg>
+          AI Voice Assistant
+        </span>
+      );
+    }
+    if (bBy === 'RECEPTIONIST' || appt.walkIn) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#ecfdf5] text-[#059669] border border-[#a7f3d0]">
+          <svg className="w-3 h-3 text-[#059669]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          Walk-in Receptionist
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#f4f4f5] text-[#52525b] border border-[#e4e4e7]">
+        Client Portal
+      </span>
+    );
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -109,13 +287,26 @@ export function ClientAppointments() {
             Appointments & Bookings CRM
           </h1>
           <p className="text-xs text-[#777169] mt-0.5">
-            Bookings scheduled and recorded by your AI phone assistant with atomic reference numbering.
+            Unified conflict-free schedule synchronized across AI phone calls and clinic desk walk-ins.
           </p>
         </div>
 
-        <span className="el-badge text-[11px] self-start sm:self-auto">
-          {total} Total Bookings
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="el-badge text-[11px] self-start sm:self-auto">
+            {total} Total Bookings
+          </span>
+          {!isViewer && (
+            <button
+              onClick={() => setBookModalOpen(true)}
+              className="el-btn-primary flex items-center gap-1.5 px-3.5 py-1.5 text-xs bg-[#0c0a09] text-white rounded-xl hover:bg-[#292524] transition-colors shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Quick Walk-in Booking</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -126,110 +317,155 @@ export function ClientAppointments() {
           </svg>
           <input
             type="text"
-            placeholder="Search by reference number (e.g. A-001), customer, or title..."
+            placeholder="Search by reference number (e.g. APT-1001), patient, age, place, or source..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl pl-10 pr-4 py-2 text-xs text-[#0c0a09] placeholder-[#a8a29e] focus:outline-none focus:border-[#0c0a09]"
           />
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setPage(0);
-          }}
-          className="bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs font-medium text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
-        >
-          <option value="ALL">All Statuses</option>
-          <option value="REQUESTED">Requested (Pending)</option>
-          <option value="CONFIRMED">Confirmed</option>
-          <option value="CANCELLED">Cancelled</option>
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={bookedByFilter}
+            onChange={(e) => {
+              setBookedByFilter(e.target.value);
+              setPage(0);
+            }}
+            className="bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs font-medium text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+          >
+            <option value="ALL">All Sources</option>
+            <option value="AGENT">AI Voice Agent</option>
+            <option value="RECEPTIONIST">Desk Walk-in</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(0);
+            }}
+            className="bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs font-medium text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+          >
+            <option value="ALL">All Statuses</option>
+            <option value="SCHEDULED">Scheduled (Active)</option>
+            <option value="COMPLETED">Completed (Done)</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
       </div>
 
       {/* Appointments Table */}
       {loading ? (
-        <TableSkeleton rows={8} cols={7} />
+        <TableSkeleton rows={8} cols={9} />
       ) : filteredAppointments.length === 0 ? (
         <EmptyState
           title="No appointments booked yet"
-          description={searchQuery ? 'No appointments matched your filter criteria.' : 'Appointments booked by your AI assistant will appear here automatically with human-friendly reference IDs (A-001, A-002...).'}
+          description={searchQuery ? 'No appointments matched your filter criteria.' : 'Appointments booked by your AI phone assistant and clinic reception desk will appear here automatically.'}
         />
       ) : (
-        <div className="el-card bg-white overflow-hidden border border-[#e7e5e4] shadow-sm">
+        <div className="el-card bg-white overflow-hidden border border-[#e7e5e4] shadow-sm rounded-2xl">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#f0efed] text-left">
               <thead className="bg-[#fafafa] text-[#777169] text-[10px] font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-3.5">Ref #</th>
-                  <th className="px-6 py-3.5">Customer Name</th>
-                  <th className="px-6 py-3.5">Schedule Date & Time</th>
-                  <th className="px-6 py-3.5">Appointment Service</th>
-                  <th className="px-6 py-3.5">Staff / Resource</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5 text-right">Action</th>
+                  <th className="px-5 py-3.5">Ref #</th>
+                  <th className="px-5 py-3.5">Patient / Contact</th>
+                  <th className="px-3 py-3.5">Age</th>
+                  {/* <th className="px-4 py-3.5">Place / City</th> */}
+                  <th className="px-5 py-3.5">Schedule</th>
+                  <th className="px-4 py-3.5">Booked By</th>
+                  <th className="px-4 py-3.5">Service / Doctor</th>
+                  <th className="px-4 py-3.5">Status</th>
+                  <th className="px-4 py-3.5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f0efed] text-xs">
-                {filteredAppointments.map((appt) => (
-                  <tr
-                    key={appt.id}
-                    onClick={() => handleRowClick(appt)}
-                    className="hover:bg-[#fafafa] cursor-pointer transition-colors group"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-mono text-xs font-bold text-[#0c0a09] px-2 py-0.5 bg-[#f0efed] rounded">
-                        {appt.appointmentNumber || 'A-???'}
-                      </span>
-                    </td>
+                {filteredAppointments.map((appt) => {
+                  const displayAge = appt.age || (appt.metadata as any)?.age || '-';
+                  // const displayPlace = appt.place || (appt.metadata as any)?.place || (appt.metadata as any)?.location || '-';
 
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-semibold text-[#0c0a09] block">{appt.customerName}</span>
-                      <span className="font-mono text-[11px] text-[#777169]">{appt.customerPhone}</span>
-                    </td>
+                  return (
+                    <tr
+                      key={appt.id}
+                      onClick={() => handleRowClick(appt)}
+                      className="hover:bg-[#fafafa] cursor-pointer transition-colors group"
+                    >
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <span className="font-mono text-xs font-bold text-[#0c0a09] px-2.5 py-1 bg-[#f0efed] rounded-lg">
+                          {appt.appointmentNumber || 'APT-???'}
+                        </span>
+                      </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap font-medium text-[#0c0a09]">
-                      <span>{appt.bookingDate}</span>
-                      <span className="text-[#777169] text-[11px] block">{appt.bookingTime}</span>
-                    </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <span className="font-semibold text-[#0c0a09] block">{appt.customerName}</span>
+                        <span className="font-mono text-[11px] text-[#777169]">{appt.customerPhone}</span>
+                      </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-[#4e4e4e]">
-                      {appt.title}
-                    </td>
+                      <td className="px-3 py-4 whitespace-nowrap font-medium text-[#0c0a09]">
+                        <span className="px-2 py-0.5 bg-[#fafafa] border border-[#e7e5e4] rounded text-[11px]">
+                          {displayAge}
+                        </span>
+                      </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-[#777169]">
-                      {appt.resourceName || '-'}
-                    </td>
+                      {/* <td className="px-4 py-4 whitespace-nowrap font-medium text-[#4e4e4e]">
+                        {displayPlace}
+                      </td> */}
 
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${getStatusBadge(appt.status)}`}>
-                        {appt.status}
-                      </span>
-                    </td>
+                      <td className="px-5 py-4 whitespace-nowrap font-medium text-[#0c0a09]">
+                        <span>{appt.bookingDate}</span>
+                        <span className="text-[#777169] text-[11px] block">{appt.bookingTime}</span>
+                      </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleRowClick(appt)}
-                          className="el-btn-outline h-7 px-2.5 text-[11px] bg-white group-hover:border-[#0c0a09]"
-                        >
-                          Manage
-                        </button>
-                        <button
-                          onClick={() => handleOpenWhatsApp(appt)}
-                          className="el-btn-outline h-7 px-2.5 text-[11px] bg-white text-[#15803d] hover:bg-[#f0fdf4] flex items-center gap-1"
-                          title="Send WhatsApp Confirmation"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                          </svg>
-                          <span>Confirm</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {getBookedByBadge(appt)}
+                      </td>
+
+                      <td className="px-4 py-4 whitespace-nowrap text-[#4e4e4e]">
+                        <span className="font-medium text-[#0c0a09] block">{appt.title}</span>
+                        <span className="text-[#777169] text-[11px]">{appt.resourceName || 'Clinic Staff'}</span>
+                      </td>
+
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${getStatusBadge(appt.status)}`}>
+                          {appt.status}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2">
+                          {appt.status !== 'COMPLETED' && appt.status !== 'CANCELLED' && (
+                            <button
+                              onClick={(e) => handleMarkAsDone(appt, e)}
+                              className="el-btn-outline h-7 px-2.5 text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 flex items-center gap-1 font-medium"
+                              title="Mark Patient Attended / Done"
+                            >
+                              <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span>Done</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRowClick(appt)}
+                            className="el-btn-outline h-7 px-2.5 text-[11px] bg-white group-hover:border-[#0c0a09]"
+                          >
+                            Manage
+                          </button>
+                          <button
+                            onClick={() => handleOpenWhatsApp(appt)}
+                            className="el-btn-outline h-7 px-2.5 text-[11px] bg-white text-[#15803d] hover:bg-[#f0fdf4] flex items-center gap-1"
+                            title="Send WhatsApp Confirmation"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            <span>Confirm</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -261,6 +497,210 @@ export function ClientAppointments() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Quick Book Walk-In Modal */}
+      {bookModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#e7e5e4] animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-4 border-b border-[#f0efed]">
+              <div>
+                <h3 className="font-display-serif text-xl font-medium text-[#0c0a09]">
+                  New Walk-in / Desk Booking
+                </h3>
+                <p className="text-xs text-[#777169] mt-0.5">
+                  Directly books into the unified schedule. AI agent will immediately avoid this slot.
+                </p>
+              </div>
+              <button
+                onClick={() => setBookModalOpen(false)}
+                className="text-[#a8a29e] hover:text-[#0c0a09] transition-colors p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWalkInBooking} className="mt-4 space-y-4">
+              {bookingError && (
+                <div className="p-3 bg-[#fef2f2] border border-[#fecaca] rounded-xl text-xs text-[#b91c1c]">
+                  {bookingError}
+                </div>
+              )}
+              {bookingSuccess && (
+                <div className="p-3 bg-[#f0fdf4] border border-[#bbf7d0] rounded-xl text-xs text-[#15803d]">
+                  {bookingSuccess}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
+                    Patient Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Ramesh Kulkarni"
+                    value={newCustomerName}
+                    onChange={(e) => setNewCustomerName(e.target.value)}
+                    className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
+                    Mobile Phone Number *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. +91 98765 43210"
+                    value={newCustomerPhone}
+                    onChange={(e) => setNewCustomerPhone(e.target.value)}
+                    className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
+                  Age
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 38"
+                  value={newAge}
+                  onChange={(e) => setNewAge(e.target.value)}
+                  className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+                />
+              </div>
+
+              {/* <div>
+                <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
+                  Place / Location
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Pune / Kothrud"
+                  value={newPlace}
+                  onChange={(e) => setNewPlace(e.target.value)}
+                  className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+                />
+              </div> */}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
+                    Booking Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newBookingDate}
+                    onChange={(e) => setNewBookingDate(e.target.value)}
+                    className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
+                    Time Slot *
+                  </label>
+                  <select
+                    value={newBookingTime}
+                    onChange={(e) => setNewBookingTime(e.target.value)}
+                    className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+                  >
+                    {STANDARD_TIME_SLOTS.map((slot) => (
+                      <option key={slot} value={slot}>{slot}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Real-time slot status indicator */}
+              <div className="p-2.5 rounded-xl bg-[#fafafa] border border-[#e7e5e4] flex items-center justify-between text-xs">
+                <span className="text-[#777169]">Slot Status:</span>
+                {slotChecking ? (
+                  <span className="text-[#777169] animate-pulse">Checking availability...</span>
+                ) : slotAvailable === false ? (
+                  <span className="text-[#b91c1c] font-semibold flex items-center gap-1">
+                    ⚠️ Slot Occupied (Conflict!)
+                  </span>
+                ) : slotAvailable === true ? (
+                  <span className="text-[#15803d] font-semibold flex items-center gap-1">
+                    ✓ Slot Open & Available
+                  </span>
+                ) : (
+                  <span className="text-[#777169]">—</span>
+                )}
+              </div>
+
+              {existingBookingInfo && (
+                <div className="p-2.5 rounded-xl bg-[#fffbeb] border border-[#fef3c7] text-[11px] text-[#92400e]">
+                  Patient already has booking <strong>{existingBookingInfo.appointmentNumber}</strong> on {existingBookingInfo.bookingDate} at {existingBookingInfo.bookingTime}.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
+                    Service / Reason
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Fever Consultation"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
+                    Doctor / Resource
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Dr. Rajesh Sharma"
+                    value={newResourceName}
+                    onChange={(e) => setNewResourceName(e.target.value)}
+                    className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-1">
+                <label className="flex items-center gap-2 text-xs text-[#44403c] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newIsWalkIn}
+                    onChange={(e) => setNewIsWalkIn(e.target.checked)}
+                    className="rounded text-[#0c0a09] focus:ring-0"
+                  />
+                  <span className="text-[11px] font-medium">Mark as Clinic Desk Walk-in Patient</span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#f0efed]">
+                <button
+                  type="button"
+                  onClick={() => setBookModalOpen(false)}
+                  className="el-btn-outline px-4 py-2 text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={bookingSubmitting || slotAvailable === false}
+                  className="el-btn-primary px-5 py-2 text-xs bg-[#0c0a09] text-white rounded-xl hover:bg-[#292524] disabled:opacity-50"
+                >
+                  {bookingSubmitting ? 'Confirming...' : 'Save & Confirm Walk-in'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

@@ -1,0 +1,76 @@
+# ==============================================================================
+# NextLite Voice V3 — Caddy Reverse Proxy & TLS Configuration
+# File Path on Server: /etc/caddy/Caddyfile
+# Replace 'voice.example.com' with your actual registered domain name
+# ==============================================================================
+
+voice.example.com {
+    # 1. Automatic HTTPS with HTTP -> HTTPS redirection handled automatically by Caddy
+
+    # 2. Control Plane HTTP API Routes
+    handle /api/* {
+        reverse_proxy http://127.0.0.1:3001 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # 3. Pipecat Voice Worker WebSocket Routes (Plivo bidirectional audio stream)
+    handle /ws/* {
+        reverse_proxy http://127.0.0.1:8000 {
+            # Long timeout for extended phone conversations
+            transport http {
+                read_timeout 3600s
+                write_timeout 3600s
+            }
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # 4. Plivo XML Webhook Generation Route
+    handle /plivo/* {
+        reverse_proxy http://127.0.0.1:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # 5. Worker Direct Health Check Route
+    handle /health {
+        reverse_proxy http://127.0.0.1:8000 {
+            header_up Host {host}
+        }
+    }
+
+    # 6. Static React Dashboard Single Page Application (SPA)
+    handle {
+        root * /opt/nextlite/apps/web/dist
+        encode zstd gzip
+        file_server
+        try_files {path} /index.html
+    }
+
+    # Security Headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+
+    # Structured Access Logging
+    log {
+        output file /var/log/caddy/nextlite_access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+        format json
+    }
+}

@@ -13,11 +13,20 @@ class Settings(BaseSettings):
 
     # NextLite Control Plane API configuration
     NEXTLITE_API_URL: str = "http://localhost:3001"
-    WORKER_API_SECRET: str = "dev-livekit-worker-secret-v3"
+    WORKER_API_SECRET: str = "dev-worker-api-secret"
     RUNTIME_CONFIG_TIMEOUT_SECONDS: float = 8.0
+    REDIS_URL: str = "redis://127.0.0.1:6379"
 
     # Sarvam AI API Credentials
     SARVAM_API_KEY: str = ""
+
+    # OpenRouter & Fast Conversational LLM Settings
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_HTTP_REFERER: str = "http://localhost:8000"
+    OPENROUTER_TITLE: str = "NextLite Voice Agent"
+    CONVERSATIONAL_LLM_MODEL: str = "google/gemma-4-26b-a4b-it"
+    CONVERSATIONAL_LLM_PROVIDER: str = "sarvam"  # "openrouter" or "sarvam"
 
     # Audio diagnostic logging flag (default: False to prevent log spam)
     PIPECAT_AUDIO_DEBUG: bool = False
@@ -26,6 +35,7 @@ class Settings(BaseSettings):
     STT_MODEL: str = "saaras:v3-realtime"
     TTS_MODEL: str = "bulbul:v3"
     LLM_MODEL: str = "sarvam-105b-conversations"
+    TOOL_LLM_MODEL: str = "sarvam-105b-conversations"
     PHASE2_TEST_VOICE_ID: str = "shubh"  # Scoped to telephony test loopback
     TEST_PROMPT: str = (
         "You are a helpful voice assistant. "

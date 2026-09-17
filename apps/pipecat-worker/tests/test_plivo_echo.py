@@ -33,7 +33,7 @@ def test_plivo_test_xml_endpoint(client):
     assert response.headers["content-type"] == "application/xml"
     content = response.text
     assert "<Response>" in content
-    assert '<Stream bidirectional="true" keepCallAlive="true">' in content
+    assert '<Stream bidirectional="true" keepCallAlive="true"' in content
     assert "/ws/plivo" in content
     assert "</Response>" in content
 

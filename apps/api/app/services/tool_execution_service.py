@@ -81,7 +81,27 @@ class ToolExecutionService:
         service_type = arguments.get("title") or arguments.get("serviceType") or arguments.get("service") or "General Appointment"
         apt_date = arguments.get("appointmentDate") or arguments.get("bookingDate") or arguments.get("date") or "Tomorrow"
         apt_time = arguments.get("appointmentTime") or arguments.get("bookingTime") or arguments.get("time") or "10:00 AM"
-        phone = arguments.get("customerPhone") or caller_phone or "+910000000000"
+        # Always prioritize trusted telephony caller_phone over any LLM-supplied value
+        phone = caller_phone or arguments.get("customerPhone") or "+910000000000"
+
+        # Extract person details: age, place/location
+        age = arguments.get("age")
+        place = arguments.get("place") or arguments.get("location")
+        raw_notes = arguments.get("notes")
+
+        # Build metadata & combined notes
+        meta = dict(arguments.get("metadata") or {})
+        detail_notes = []
+        if age is not None and str(age).strip():
+            meta["age"] = str(age).strip()
+            detail_notes.append(f"Age: {str(age).strip()}")
+        if place and str(place).strip():
+            meta["place"] = str(place).strip()
+            meta["location"] = str(place).strip()
+            detail_notes.append(f"Place: {str(place).strip()}")
+        if raw_notes and str(raw_notes).strip():
+            detail_notes.append(str(raw_notes).strip())
+        combined_notes = "; ".join(detail_notes) if detail_notes else None
 
         # Auto-resolve agent_id if omitted
         effective_agent_id = agent_id
@@ -133,7 +153,8 @@ class ToolExecutionService:
             bookingDate=apt_date,
             bookingTime=apt_time,
             status=AppointmentStatus.REQUESTED,
-            notes=arguments.get("notes")
+            notes=combined_notes,
+            metadataJson=meta
         )
         await apt_repo.create(apt)
         await self.session.commit()

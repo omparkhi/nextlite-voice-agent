@@ -114,7 +114,7 @@ class CallSessionClient:
         ).rstrip("/")
         self._worker_secret = (
             worker_secret
-            or getattr(settings, "WORKER_API_SECRET", "dev-livekit-worker-secret-v3")
+            or getattr(settings, "WORKER_API_SECRET", "dev-worker-api-secret")
         )
         self._timeout_seconds = timeout_seconds or 4.0
         self._http_client = http_client

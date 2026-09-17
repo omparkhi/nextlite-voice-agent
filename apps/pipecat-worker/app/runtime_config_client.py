@@ -8,6 +8,7 @@ This client enforces the strict architectural boundary between the Control Plane
 and the Pipecat Voice Worker (which is purely an audio and turn execution engine).
 """
 
+import time
 from typing import Any, Dict, List, Literal, Optional
 from urllib.parse import quote
 
@@ -64,6 +65,14 @@ class RuntimeLanguageConfig(BaseContractModel):
     supported_languages: List[str] = Field(default_factory=lambda: ["en-IN"], alias="supportedLanguages")
     auto_detect_enabled: Optional[bool] = Field(default=None, alias="autoDetectEnabled")
     language_switching_enabled: Optional[bool] = Field(default=None, alias="languageSwitchingEnabled")
+    language_style: Optional[str] = Field(default="mixed", alias="languageStyle")
+
+
+class RuntimeNudgeConfig(BaseContractModel):
+    enabled: bool = Field(default=True)
+    delay_seconds: int = Field(default=5, alias="delaySeconds")
+    messages: List[str] = Field(default_factory=lambda: ["Are you there? I can help you."])
+    max_unanswered_nudges: int = Field(default=2, alias="maxUnansweredNudges")
 
 
 class RuntimeBehaviorConfig(BaseContractModel):
@@ -74,6 +83,10 @@ class RuntimeBehaviorConfig(BaseContractModel):
     post_tool_max_tokens: Optional[int] = Field(default=80, alias="postToolMaxTokens")
     tool_reasoning_mode: Optional[str] = Field(default=None, alias="toolReasoningMode")
     enable_early_tool_ack: bool = Field(default=True, alias="enableEarlyToolAck")
+    # Reserved for a future intent-gated acknowledgement policy. The worker
+    # deliberately does not inject fillers for ordinary turns.
+    enable_conversational_early_ack: bool = Field(default=False, alias="enableConversationalEarlyAck")
+    enable_appointment_intent_ack: bool = Field(default=False, alias="enableAppointmentIntentAck")
     temperature: Optional[float] = None
     interruption_mode: Optional[str] = Field(default=None, alias="interruptionMode")
     preemptive_generation_enabled: Optional[bool] = Field(default=None, alias="preemptiveGenerationEnabled")
@@ -81,6 +94,7 @@ class RuntimeBehaviorConfig(BaseContractModel):
     noise_cancellation_model: Optional[str] = Field(default=None, alias="noiseCancellationModel")
     expressive_mode_enabled: Optional[bool] = Field(default=None, alias="expressiveModeEnabled")
     max_call_duration_seconds: Optional[int] = Field(default=None, alias="maxCallDurationSeconds")
+    nudges: Optional[RuntimeNudgeConfig] = Field(default_factory=RuntimeNudgeConfig)
 
 
 
@@ -101,6 +115,9 @@ class RuntimeToolDefinition(BaseContractModel):
     parameters: Optional[Dict[str, Any]] = None
     enabled: bool = Field(default=True)
     confirmation_required: Optional[bool] = Field(default=None, alias="confirmationRequired")
+    # Only enable for a tool whose server-produced message is itself safe to
+    # speak. This avoids a second LLM request after an authoritative action.
+    direct_response_enabled: bool = Field(default=False, alias="directResponseEnabled")
 
 
 class RuntimeToolConfig(BaseContractModel):
@@ -228,6 +245,9 @@ def extract_deployment_id(
     return None
 
 
+from app.runtime_config_cache import runtime_config_cache, RuntimeConfigCache
+
+
 # ==============================================================================
 # 4. RuntimeConfigClient Implementation
 # ==============================================================================
@@ -241,6 +261,8 @@ class RuntimeConfigClient:
         worker_secret: Optional[str] = None,
         timeout_seconds: Optional[float] = None,
         http_client: Optional[httpx.AsyncClient] = None,
+        cache_ttl_seconds: float = 43200.0,
+        cache: Optional[RuntimeConfigCache] = None,
     ):
         self._api_url = (
             api_url
@@ -248,19 +270,30 @@ class RuntimeConfigClient:
         ).rstrip("/")
         self._worker_secret = (
             worker_secret
-            or getattr(settings, "WORKER_API_SECRET", "dev-livekit-worker-secret-v3")
+            or getattr(settings, "WORKER_API_SECRET", "dev-worker-api-secret")
         )
         self._timeout_seconds = (
             timeout_seconds
             or getattr(settings, "RUNTIME_CONFIG_TIMEOUT_SECONDS", 8.0)
         )
         self._http_client = http_client
+        self._cache = cache or runtime_config_cache
+        self._cache_ttl_seconds = cache_ttl_seconds
 
-    async def get_runtime_agent_config(self, deployment_id: str) -> RuntimeAgentConfig:
+    def clear_cache(self, deployment_id: Optional[str] = None):
+        """Clears in-memory runtime configuration cache."""
+        self._cache.invalidate(deployment_id)
+
+    async def get_runtime_agent_config(
+        self,
+        deployment_id: str,
+        use_cache: bool = True,
+    ) -> RuntimeAgentConfig:
         """Fetches and validates the authoritative RuntimeAgentConfig for a deployment.
         
         Args:
             deployment_id: The unique deployment ID string (UUID).
+            use_cache: If True, uses in-memory cached config within TTL.
             
         Returns:
             RuntimeAgentConfig parsed and validated Pydantic model.
@@ -276,6 +309,52 @@ class RuntimeConfigClient:
             )
 
         clean_deployment_id = deployment_id.strip()
+
+        # 1. In-Memory Cache Lookup for ultra-fast startup (<0.1ms)
+        if use_cache:
+            cached_cfg = self._cache.get(clean_deployment_id)
+            if cached_cfg is not None:
+                logger.debug(f"[RuntimeConfigCache] Local memory hit for deploymentId={clean_deployment_id}")
+                return cached_cfg
+
+        # 2. Redis Distributed Snapshot Cache Lookup (~1-2ms)
+        import json
+        import asyncio
+        from app.redis_client import get_worker_redis
+        redis_conn = get_worker_redis()
+        redis_snapshot_key = f"runtime:snapshot:active:{clean_deployment_id}"
+        redis_lock_key = f"runtime:lock:{clean_deployment_id}"
+
+        if use_cache and redis_conn:
+            try:
+                raw_snapshot = await redis_conn.get(redis_snapshot_key)
+                if raw_snapshot:
+                    snapshot_dict = json.loads(raw_snapshot)
+                    config = RuntimeAgentConfig.model_validate(snapshot_dict)
+                    self._cache.set(clean_deployment_id, config)
+                    logger.info(f"[RuntimeConfigCache] Redis snapshot hit for deploymentId={clean_deployment_id}")
+                    return config
+            except Exception as re_err:
+                logger.warning(f"[RuntimeConfigCache] Redis snapshot read notice: {re_err}")
+
+        # 3. Cache Miss: Stampede protection lease lock
+        lock_acquired = False
+        if redis_conn:
+            try:
+                lock_acquired = bool(await redis_conn.set(redis_lock_key, "locked", nx=True, ex=3))
+                if not lock_acquired:
+                    # Wait briefly for concurrent request holder to write snapshot
+                    await asyncio.sleep(0.3)
+                    raw_snapshot = await redis_conn.get(redis_snapshot_key)
+                    if raw_snapshot:
+                        snapshot_dict = json.loads(raw_snapshot)
+                        config = RuntimeAgentConfig.model_validate(snapshot_dict)
+                        self._cache.set(clean_deployment_id, config)
+                        logger.info(f"[RuntimeConfigCache] Post-lock Redis snapshot hit for deploymentId={clean_deployment_id}")
+                        return config
+            except Exception as lock_err:
+                logger.warning(f"[RuntimeConfigCache] Lock notice: {lock_err}")
+
         encoded_deployment_id = quote(clean_deployment_id, safe="")
         url = f"{self._api_url}/api/internal/runtime-config/{encoded_deployment_id}"
 
@@ -400,12 +479,149 @@ class RuntimeConfigClient:
                 cause=ve,
             ) from ve
 
+        # Store in local memory cache
+        self._cache.set(clean_deployment_id, config)
+
+        # Store in Redis distributed snapshot cache
+        if redis_conn:
+            try:
+                snapshot_json = json.dumps(raw_json)
+                await redis_conn.set(redis_snapshot_key, snapshot_json, ex=86400)
+                if lock_acquired:
+                    await redis_conn.delete(redis_lock_key)
+                logger.info(f"[RuntimeConfigCache] Persisted snapshot to Redis for deploymentId={clean_deployment_id}")
+            except Exception as re_store_err:
+                logger.warning(f"[RuntimeConfigCache] Redis snapshot store notice: {re_store_err}")
+
         logger.info(
             f"Successfully resolved RuntimeAgentConfig | tenantId={config.tenant.tenant_id} | "
             f"agentId={config.agent.agent_id} | deploymentId={config.deployment.deployment_id} | "
             f"versionNumber={config.deployment.version_number}"
         )
         return config
+
+    async def get_runtime_agent_config_by_phone(
+        self,
+        phone_number: str,
+        use_cache: bool = True,
+    ) -> RuntimeAgentConfig:
+        """Fetches and validates RuntimeAgentConfig for an inbound DID phone number."""
+        if not phone_number or not isinstance(phone_number, str) or not phone_number.strip():
+            raise RuntimeConfigClientError(
+                "Phone number is required and must be a non-empty string",
+                status_code=400,
+                error_code="INVALID_INPUT",
+            )
+
+        clean_phone = phone_number.strip()
+        encoded_phone = quote(clean_phone, safe="")
+        url = f"{self._api_url}/api/internal/runtime-agent-config?phoneNumber={encoded_phone}"
+
+        headers = {
+            "Authorization": f"Bearer {self._worker_secret}",
+            "x-worker-secret": self._worker_secret,
+            "Accept": "application/json",
+        }
+
+        logger.info(f"Requesting RuntimeAgentConfig for inbound phone={clean_phone}")
+
+        try:
+            if self._http_client:
+                response = await self._http_client.get(
+                    url,
+                    headers=headers,
+                    timeout=self._timeout_seconds,
+                )
+            else:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(
+                        url,
+                        headers=headers,
+                        timeout=self._timeout_seconds,
+                    )
+        except httpx.TimeoutException as te:
+            logger.warning(f"Request to NextLite runtime config API timed out for phone={clean_phone}")
+            raise RuntimeConfigClientError(
+                "Request to NextLite runtime config API timed out",
+                status_code=504,
+                error_code="SERVICE_UNAVAILABLE",
+                cause=te,
+            ) from te
+        except (httpx.ConnectError, httpx.RequestError) as re:
+            logger.error(f"Failed to connect to NextLite runtime config API: {re}")
+            raise RuntimeConfigClientError(
+                "Failed to connect to NextLite runtime config API",
+                status_code=503,
+                error_code="SERVICE_UNAVAILABLE",
+                cause=re,
+            ) from re
+
+        if response.status_code != 200:
+            error_body = None
+            try:
+                error_body = response.json()
+            except Exception:
+                pass
+            api_code = error_body.get("code") if isinstance(error_body, dict) else None
+            api_message = error_body.get("detail") or error_body.get("error") if isinstance(error_body, dict) else None
+            raise RuntimeConfigClientError(
+                api_message or f"NextLite API error (status {response.status_code})",
+                status_code=response.status_code,
+                error_code=api_code or "RUNTIME_CONFIG_PHONE_NOT_FOUND",
+            )
+
+        try:
+            raw_json = response.json()
+            config = RuntimeAgentConfig.model_validate(raw_json)
+        except Exception as pe:
+            logger.error(f"Failed to parse runtime config for phone {clean_phone}: {pe}")
+            raise RuntimeConfigClientError(
+                "Invalid response structure from NextLite API",
+                status_code=500,
+                error_code="SCHEMA_VALIDATION_FAILED",
+                cause=pe,
+            ) from pe
+
+        if config.deployment.deployment_id:
+            self._cache.set(config.deployment.deployment_id, config)
+
+        logger.info(
+            f"Successfully resolved RuntimeAgentConfig by phone {clean_phone} -> deploymentId={config.deployment.deployment_id}"
+        )
+        return config
+
+    async def prewarm_active_configs(self) -> int:
+        """Fetches active deployment IDs from API and pre-warms local memory & Redis snapshot caches."""
+        url = f"{self._api_url}/api/internal/deployments/active"
+        headers = {
+            "Authorization": f"Bearer {self._worker_secret}",
+            "x-worker-secret": self._worker_secret,
+            "Accept": "application/json",
+        }
+        prewarmed_count = 0
+        try:
+            client = self._http_client
+            if client is None:
+                async with httpx.AsyncClient(timeout=5.0) as temp_client:
+                    res = await temp_client.get(url, headers=headers)
+            else:
+                res = await client.get(url, headers=headers, timeout=5.0)
+
+            if res.status_code == 200:
+                data = res.json()
+                deployments = data.get("deployments", [])
+                for dep_id in deployments:
+                    try:
+                        await self.get_runtime_agent_config(dep_id, use_cache=True)
+                        prewarmed_count += 1
+                    except Exception as err:
+                        logger.warning(f"[RuntimeConfigCache] Failed to pre-warm deploymentId={dep_id}: {err}")
+                logger.info(f"[RuntimeConfigCache] Startup pre-warming complete | prewarmed={prewarmed_count} active deployment(s)")
+            else:
+                logger.warning(f"[RuntimeConfigCache] Active deployments query returned status {res.status_code}")
+        except Exception as e:
+            logger.info(f"[RuntimeConfigCache] Notice: Pre-warming active deployments skipped or offline ({e})")
+        return prewarmed_count
 
     async def retrieve_knowledge(
         self,

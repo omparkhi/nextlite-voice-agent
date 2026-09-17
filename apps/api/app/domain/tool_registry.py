@@ -18,6 +18,8 @@ CANONICAL_PLATFORM_TOOLS = (
     "query_knowledge_base",
     "create_callback_lead",
     "book_appointment",
+    "check_available_slots",
+    "reschedule_appointment",
 )
 
 CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
@@ -50,6 +52,19 @@ CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
     "appointment booking": "book_appointment",
     "booking": "book_appointment",
     "reservation": "book_appointment",
+    # Slot Availability Checking
+    "check_available_slots": "check_available_slots",
+    "check available slots": "check_available_slots",
+    "check_slots": "check_available_slots",
+    "check slots": "check_available_slots",
+    "slot availability": "check_available_slots",
+    "check slot availability": "check_available_slots",
+    "check availability": "check_available_slots",
+    # Reschedule Appointment
+    "reschedule_appointment": "reschedule_appointment",
+    "reschedule appointment": "reschedule_appointment",
+    "reschedule": "reschedule_appointment",
+    "reschedule booking": "reschedule_appointment",
 }
 
 PROTECTED_CONTEXT_KEYS = {
@@ -79,7 +94,12 @@ class ToolDefinition:
     is_platform_default: bool = True
     confirmation_supported: bool = False
 
-    def to_runtime_tool_definition(self, enabled: bool = True, confirmation_required: bool = False) -> RuntimeToolDefinition:
+    def to_runtime_tool_definition(
+        self,
+        enabled: bool = True,
+        confirmation_required: bool = False,
+        direct_response_enabled: bool = False,
+    ) -> RuntimeToolDefinition:
         return RuntimeToolDefinition(
             tool_id=self.id,
             name=self.name,
@@ -87,6 +107,7 @@ class ToolDefinition:
             parameters=self.parameters,
             enabled=enabled,
             confirmation_required=confirmation_required,
+            direct_response_enabled=direct_response_enabled,
         )
 
     def to_catalog_dict(self) -> Dict[str, Any]:
@@ -148,20 +169,19 @@ CANONICAL_TOOL_REGISTRY: Dict[str, ToolDefinition] = {
         id="book_appointment",
         name="book_appointment",
         display_name="Appointment Booking",
-        description="Submit a booking or appointment request with customer details, date, time, and service type. Never claim success unless the tool returns a successful result.",
+        description="Submit a booking or appointment request with customer details (Full Name, Age), date, time, and service type. Never claim success unless the tool returns a successful result.",
         category="Scheduling",
         parameters={
             "type": "object",
             "properties": {
-                "customerName": {"type": "string", "description": "Customer name"},
-                "title": {"type": "string", "description": "Reason for visit, service type, or booking purpose"},
+                "customerName": {"type": "string", "description": "Customer full name"},
                 "bookingDate": {"type": "string", "description": "Date of appointment (YYYY-MM-DD or relative like tomorrow)"},
-                "bookingTime": {"type": "string", "description": "Time of appointment (e.g. 10:00 AM, 12:00 PM)"},
-                "resourceName": {"type": "string", "description": "Requested staff member, host, specialist, or service provider"},
-                "customerPhone": {"type": "string", "description": "Contact phone number"},
-                "notes": {"type": "string", "description": "Additional notes"}
+                "bookingTime": {"type": "string", "description": "Time of appointment (e.g. 10:00 AM, 3:00 PM)"},
+                "title": {"type": "string", "description": "Reason for visit or service type"},
+                "age": {"type": "string", "description": "Age of the person (e.g. '22')"}
+                # "place": {"type": "string", "description": "Place, city, or location (e.g. 'Nagpur')"}
             },
-            "required": ["customerName", "title", "bookingDate", "bookingTime"]
+            "required": ["customerName", "bookingDate", "bookingTime"]
         },
         output_schema={
             "type": "object",
@@ -207,6 +227,82 @@ CANONICAL_TOOL_REGISTRY: Dict[str, ToolDefinition] = {
         },
         is_platform_default=True,
         confirmation_supported=False
+    ),
+    "check_available_slots": ToolDefinition(
+        id="check_available_slots",
+        name="check_available_slots",
+        display_name="Check Slot Availability",
+        description="Check available appointment slots for a given date and time. Also checks if the caller already has an existing booked appointment.",
+        category="Scheduling",
+        parameters={
+            "type": "object",
+            "properties": {
+                "bookingDate": {
+                    "type": "string",
+                    "description": "Date to check (YYYY-MM-DD or relative like 'today', 'tomorrow', 'next Monday')"
+                },
+                "bookingTime": {
+                    "type": "string",
+                    "description": "Optional preferred time or session e.g. '10:00 AM', 'morning', 'afternoon'"
+                }
+            },
+            "required": ["bookingDate"]
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "slotAvailable": {"type": "boolean"},
+                "availableSlots": {"type": "array"},
+                "hasExistingBooking": {"type": "boolean"},
+                "existingBooking": {"type": "object"},
+                "message": {"type": "string"}
+            },
+            "required": ["slotAvailable"]
+        },
+        is_platform_default=True,
+        confirmation_supported=False
+    ),
+    "reschedule_appointment": ToolDefinition(
+        id="reschedule_appointment",
+        name="reschedule_appointment",
+        display_name="Reschedule Appointment",
+        description="Reschedule an existing patient appointment to a new date and time.",
+        category="Scheduling",
+        parameters={
+            "type": "object",
+            "properties": {
+                "appointmentId": {
+                    "type": "string",
+                    "description": "Appointment ID or number if known (optional if caller phone is recognized)"
+                },
+                "newDate": {
+                    "type": "string",
+                    "description": "New date for appointment (YYYY-MM-DD or relative like 'tomorrow')"
+                },
+                "newTime": {
+                    "type": "string",
+                    "description": "New time for appointment (e.g. '11:00 AM')"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Reason for rescheduling"
+                }
+            },
+            "required": ["newDate", "newTime"]
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "success": {"type": "boolean"},
+                "appointmentNumber": {"type": "string"},
+                "newDate": {"type": "string"},
+                "newTime": {"type": "string"},
+                "message": {"type": "string"}
+            },
+            "required": ["success"]
+        },
+        is_platform_default=True,
+        confirmation_supported=True
     ),
 }
 
@@ -293,6 +389,10 @@ def validate_tool_arguments(tool_id: str, arguments: Dict[str, Any]) -> Tuple[bo
                 alias_match = True
             elif req == "bookingTime" and ("appointmentTime" in arguments or "time" in arguments):
                 alias_match = True
+            elif req == "newDate" and ("date" in arguments or "rescheduleDate" in arguments or "new_date" in arguments):
+                alias_match = True
+            elif req == "newTime" and ("time" in arguments or "rescheduleTime" in arguments or "new_time" in arguments):
+                alias_match = True
 
             if not alias_match:
                 return False, f"Missing required parameter '{req}' for tool '{tool_id}'"
@@ -368,10 +468,19 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
                 if canonical:
                     if canonical.id not in seen_ids:
                         confirmation_req = t.get("confirmationRequired", False)
+                        # Appointment REQUESTED results are backend-authored
+                        # and use an approved localized template in the worker.
+                        # Default this safe action to the direct path; an admin
+                        # can explicitly opt out with false.
+                        direct_response_enabled = t.get(
+                            "directResponseEnabled",
+                            canonical.id == "book_appointment",
+                        )
                         resolved_tools.append(
                             canonical.to_runtime_tool_definition(
                                 enabled=True,
-                                confirmation_required=confirmation_req
+                                confirmation_required=confirmation_req,
+                                direct_response_enabled=direct_response_enabled,
                             )
                         )
                         seen_ids.add(canonical.id)
@@ -385,7 +494,8 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
                                 description=t.get("description", "Custom business tool"),
                                 parameters=t.get("parameters"),
                                 enabled=True,
-                                confirmation_required=t.get("confirmationRequired", False)
+                                confirmation_required=t.get("confirmationRequired", False),
+                                direct_response_enabled=t.get("directResponseEnabled", False),
                             )
                         )
                         seen_ids.add(norm_id)
@@ -393,6 +503,11 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
 
     # Legacy default fallback when bindings field is absent
     for tool_def in CANONICAL_TOOL_REGISTRY.values():
-        resolved_tools.append(tool_def.to_runtime_tool_definition(enabled=True))
+        resolved_tools.append(
+            tool_def.to_runtime_tool_definition(
+                enabled=True,
+                direct_response_enabled=tool_def.id == "book_appointment",
+            )
+        )
 
     return resolved_tools

@@ -172,12 +172,15 @@ class TurnTimingTracker:
         self.llm_request_created: Optional[float] = None
         self.llm_request_start: Optional[float] = None  # HTTP request started
         self.llm_first_provider_response: Optional[float] = None  # First HTTP response headers/connection
-        self.first_llm_output: Optional[float] = None  # First text token delta
+        self.llm_first_stream_bytes: Optional[float] = None  # First streaming bytes from provider
+        self.first_llm_output: Optional[float] = None  # First text token delta / content
+        self.llm_first_pipecat_text_frame: Optional[float] = None  # First Pipecat LLMTextFrame
         self.llm_first_releasable_text: Optional[float] = None  # First complete clause/sentence
         self.text_released_to_tts: Optional[float] = None  # Text released/dispatched to TTS
         self.post_tool_text_released_to_tts: Optional[float] = None  # Post-tool text released to TTS
         self.last_user_transcript: Optional[str] = None  # Recent user transcript for heuristic fallbacks
         self.tool_call_delta: Optional[float] = None  # First tool call delta
+        self.tool_call_detected: Optional[float] = None  # Tool call detected
         self.last_tool_delta: Optional[float] = None  # Last tool call delta
         self.tool_delta_count: int = 0
         self.tool_call_complete: Optional[float] = None  # Tool arguments JSON complete
@@ -190,6 +193,24 @@ class TurnTimingTracker:
         self.post_tool_llm_first_provider_response: Optional[float] = None
         self.first_post_tool_llm_output: Optional[float] = None
         self.post_tool_llm_response_complete: Optional[float] = None
+        self.post_tool_tts_text_sent: Optional[float] = None
+        self.post_tool_tts_first_audio: Optional[float] = None
+        self.post_tool_plivo_send: Optional[float] = None
+        
+        # P0 Forensic TTS Lifecycle & Streaming timestamps
+        self.tts_connect_start: Optional[float] = None
+        self.tts_ws_connected: Optional[float] = None
+        self.tts_ws_ready: Optional[float] = None
+        self.tts_text_sent: Optional[float] = None
+        self.tts_first_server_message: Optional[float] = None
+        self.tts_first_audio_frame: Optional[float] = None
+        self.tts_connection_closed: Optional[float] = None
+        self.tts_reconnect_start: Optional[float] = None
+        self.tts_reconnect_complete: Optional[float] = None
+        self.tts_connection_id: Optional[str] = None
+        self.tts_connection_state_at_turn_start: Optional[str] = "UNKNOWN"
+        self._event_sequence: int = 0
+
         self.tts_start: Optional[float] = None
         self.tts_connected: Optional[float] = None
         self.first_tts_audio: Optional[float] = None
@@ -206,7 +227,23 @@ class TurnTimingTracker:
         self.interruption_reason: Optional[str] = None
         self.active_turn_events: List[Dict[str, Any]] = []
         self.active_phone_trace: Optional[Dict[str, Any]] = None
+        self.call_id: Optional[str] = None
+        self.greeting_tracer: GreetingTraceTracker = GreetingTraceTracker(
+            call_id=self.stream_id,
+            session_start_monotonic=self.session_start_time,
+        )
 
+    def record_greeting_trace_event(self, event_name: str, ts: Optional[float] = None, **extra) -> Optional[Dict[str, Any]]:
+        """Records a greeting trace milestone in the GREETING_TRACE phase."""
+        if self.call_id and self.call_id != "unknown":
+            self.greeting_tracer.call_id = self.call_id
+        elif self.stream_id and self.stream_id != "pending":
+            self.greeting_tracer.call_id = self.stream_id
+        return self.greeting_tracer.record_event(event_name, ts, **extra)
+
+    def calculate_greeting_intervals(self) -> Dict[str, Optional[int]]:
+        """Calculates all 14 specified greeting stage intervals in milliseconds."""
+        return self.greeting_tracer.calculate_intervals()
 
     @property
     def is_assistant_speaking(self) -> bool:
@@ -286,8 +323,11 @@ class TurnTimingTracker:
 
 
     def record_audio_sent_to_plivo(self, ts: Optional[float] = None):
-        """Records timestamp when first audio chunk is serialized and dispatched to Plivo."""
+        """Records timestamp when first audio chunk of current assistant response is serialized and dispatched to Plivo."""
         if self.first_audio_sent_to_plivo is not None:
+            return
+        if self.first_tts_audio is None and self.early_ack_first_audio is None:
+            # Outbound audio belongs to previous turn buffer flush, ignore for current turn
             return
         now = ts if ts is not None else time.perf_counter()
         self.first_audio_sent_to_plivo = now
@@ -533,11 +573,12 @@ class TurnTimingTracker:
         self.record_event("turn_completed", now)
 
     def has_pending_tool_activity(self) -> bool:
-        """Returns True if the active turn involves tool calling that has not completed its post-tool TTS."""
+        """Returns True if the active turn involves tool calling or post-tool TTS playback that has not completed."""
         return bool(
             self.tool_call_delta is not None
             or len(self.tool_executions) > 0
             or self.post_tool_llm_start is not None
+            or (getattr(self, "first_post_tool_llm_output", None) is not None and self.tts_stop is None)
         )
 
     def record_turn_complete_once(self, ts: Optional[float] = None) -> bool:
@@ -549,13 +590,95 @@ class TurnTimingTracker:
         self.record_turn_complete(ts)
         return True
 
+    def record_llm_first_stream_bytes(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        if self.llm_first_stream_bytes is None:
+            self.llm_first_stream_bytes = now
+            self.record_event("LLM_FIRST_STREAM_BYTES", now)
+
+    def record_llm_first_pipecat_text_frame(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        if self.llm_first_pipecat_text_frame is None:
+            self.llm_first_pipecat_text_frame = now
+            self.record_event("LLM_FIRST_PIPECAT_TEXT_FRAME", now)
+
+    def record_tts_connect_start(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        self.tts_connect_start = now
+        self.record_event("TTS_CONNECT_START", now)
+
+    def record_tts_ws_connected(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        self.tts_ws_connected = now
+        self.record_event("TTS_WS_CONNECTED", now)
+
+    def record_tts_ws_ready(self, ts: Optional[float] = None, connection_id: Optional[str] = None):
+        now = ts if ts is not None else time.perf_counter()
+        self.tts_ws_ready = now
+        if connection_id:
+            self.tts_connection_id = connection_id
+        self.record_event("TTS_WS_READY", now, connection_id=self.tts_connection_id)
+
+    def record_tts_text_sent(self, ts: Optional[float] = None, text_len: int = 0, is_post_tool: bool = False):
+        now = ts if ts is not None else time.perf_counter()
+        if is_post_tool:
+            if self.post_tool_tts_text_sent is None:
+                self.post_tool_tts_text_sent = now
+                self.record_event("POST_TOOL_TTS_TEXT_SENT", now, text_len=text_len)
+        else:
+            if self.tts_text_sent is None:
+                self.tts_text_sent = now
+                self.record_event("TTS_TEXT_SEND", now, text_len=text_len)
+
+    def record_tts_first_server_message(self, ts: Optional[float] = None, msg_type: str = "unknown"):
+        now = ts if ts is not None else time.perf_counter()
+        if self.tts_first_server_message is None:
+            self.tts_first_server_message = now
+            self.record_event("TTS_FIRST_SERVER_MESSAGE", now, msg_type=msg_type)
+
+    def record_tts_first_audio_frame(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        if self.tts_first_audio_frame is None:
+            self.tts_first_audio_frame = now
+            self.record_event("TTS_FIRST_AUDIO_FRAME", now)
+
+    def record_tts_connection_closed(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        self.tts_connection_closed = now
+        self.record_event("TTS_CONNECTION_CLOSED", now, connection_id=self.tts_connection_id)
+
+    def record_tts_reconnect_start(self, ts: Optional[float] = None):
+        now = ts if ts is not None else time.perf_counter()
+        self.tts_reconnect_start = now
+        self.record_event("TTS_RECONNECT_START", now)
+
+    def record_tts_reconnect_complete(self, ts: Optional[float] = None, connection_id: Optional[str] = None):
+        now = ts if ts is not None else time.perf_counter()
+        self.tts_reconnect_complete = now
+        if connection_id:
+            self.tts_connection_id = connection_id
+        self.record_event("TTS_RECONNECT_COMPLETE", now, connection_id=self.tts_connection_id)
+
+    def record_tts_state_at_turn_start(self, state: str, connection_id: Optional[str] = None):
+        self.tts_connection_state_at_turn_start = state
+        if connection_id:
+            self.tts_connection_id = connection_id
+        self.record_event(
+            "TTS_STATE_AT_TURN_START",
+            state=state,
+            connection_id=self.tts_connection_id,
+        )
+
     def record_event(self, event: str, ts: Optional[float] = None, **fields: Any):
         """Records a monotonic and wall-clock trace event for stable turn correlation."""
         event_time = ts if ts is not None else time.perf_counter()
+        self._event_sequence += 1
         elapsed_ms = round((event_time - self.session_start_time) * 1000)
         now_iso = datetime.now(timezone.utc).isoformat()
         payload = {
-            "turnId": self.active_turn_id,
+            "call_id": self.stream_id,
+            "turn_id": self.active_turn_id,
+            "sequence": self._event_sequence,
             "event": event,
             "timestamp": now_iso,
             "monotonicTimestamp": round(event_time, 6),
@@ -661,22 +784,32 @@ class TurnTimingTracker:
             post_tool_llm_to_first_output_ms = diff_ms(
                 self.first_post_tool_llm_output, post_llm_ref, "postToolLlmToFirstOutputMs"
             )
-            tool_result_to_first_audio_ms = diff_ms(
-                self.first_tts_audio, last_tool_end, "toolResultToFirstAudioMs"
-            )
-            if self.tts_start is not None and self.first_post_tool_llm_output is not None:
+            post_tool_audio_ref = getattr(self, "post_tool_tts_first_audio", None) or self.first_tts_audio
+            if post_tool_audio_ref is not None and last_tool_end is not None and post_tool_audio_ref >= last_tool_end:
+                tool_result_to_first_audio_ms = diff_ms(
+                    post_tool_audio_ref, last_tool_end, "toolResultToFirstAudioMs"
+                )
+            else:
+                tool_result_to_first_audio_ms = None
+
+            if self.tts_start is not None and self.first_post_tool_llm_output is not None and self.tts_start >= self.first_post_tool_llm_output:
                 post_tool_llm_to_tts_ms = diff_ms(
                     self.tts_start, self.first_post_tool_llm_output, "postToolLlmToTTSMs"
                 )
-            if self.first_tts_audio is not None and self.tts_start is not None:
+            if post_tool_audio_ref is not None and self.tts_start is not None and post_tool_audio_ref >= self.tts_start:
                 post_tool_tts_to_first_audio_ms = diff_ms(
-                    self.first_tts_audio, self.tts_start, "postToolTTSToFirstAudioMs"
+                    post_tool_audio_ref, self.tts_start, "postToolTTSToFirstAudioMs"
                 )
+            else:
+                post_tool_tts_to_first_audio_ms = None
 
         post_tool_llm_ms = post_tool_llm_to_first_output_ms
 
         # 10. tts_start_to_first_audio_ms = first_tts_audio - tts_start
-        tts_start_to_first_audio_ms = diff_ms(self.first_tts_audio, self.tts_start, "ttsStartToFirstAudioMs")
+        if self.first_tts_audio is not None and self.tts_start is not None and self.first_tts_audio >= self.tts_start:
+            tts_start_to_first_audio_ms = diff_ms(self.first_tts_audio, self.tts_start, "ttsStartToFirstAudioMs")
+        else:
+            tts_start_to_first_audio_ms = None
 
         # 11. tts_connection_ms = tts_connected - speech_start (guaranteed non-negative if connected in this turn)
         if self.tts_connected is not None and self.speech_start is not None and self.tts_connected >= self.speech_start:
@@ -710,15 +843,51 @@ class TurnTimingTracker:
         else:
             llm_first_text_to_release_ms = None
 
-        llm_first_output_to_tts_start_ms = diff_ms(self.tts_start, first_output_ref, "llmFirstOutputToTtsStartMs")
+        if is_tool_turn:
+            post_tts_start = getattr(self, "post_tool_tts_start", None) or self.tts_start
+            if post_tts_start is not None and first_output_ref is not None and post_tts_start >= first_output_ref:
+                llm_first_output_to_tts_start_ms = diff_ms(post_tts_start, first_output_ref, "llmFirstOutputToTtsStartMs")
+            else:
+                llm_first_output_to_tts_start_ms = None
+
+            audio_for_output = getattr(self, "post_tool_tts_first_audio", None)
+            if audio_for_output is not None and first_output_ref is not None and audio_for_output >= first_output_ref:
+                first_llm_output_to_first_audio_ms = diff_ms(audio_for_output, first_output_ref, "firstLLMOutputToFirstAudioMs")
+            else:
+                first_llm_output_to_first_audio_ms = None
+        else:
+            llm_first_output_to_tts_start_ms = diff_ms(self.tts_start, first_output_ref, "llmFirstOutputToTtsStartMs")
+            first_llm_output_to_first_audio_ms = diff_ms(self.first_tts_audio, first_output_ref, "firstLLMOutputToFirstAudioMs")
+
         llm_first_text_to_tts_start_ms = llm_first_output_to_tts_start_ms
         llm_to_tts_start_ms = llm_first_output_to_tts_start_ms
-
-        # 15. first_llm_output_to_first_audio_ms = first_tts_audio - first_llm_output
-        first_llm_output_to_first_audio_ms = diff_ms(self.first_tts_audio, first_output_ref, "firstLLMOutputToFirstAudioMs")
         llm_first_text_to_first_audio_ms = first_llm_output_to_first_audio_ms
 
-        # 16. total_turn_duration_ms / totalTurnMs = turn_complete - speech_start
+        # 16. P0 Forensic Latency Waterfall Calculations
+        tts_ready_to_text_send_ms = diff_ms(self.tts_text_sent, self.tts_ws_ready, "ttsReadyToTextSendMs")
+        text_release_to_tts_send_ms = diff_ms(self.tts_text_sent, self.text_released_to_tts, "textReleaseToTTSSendMs")
+        text_send_to_first_server_msg_ms = diff_ms(self.tts_first_server_message, self.tts_text_sent, "textSendToFirstServerMessageMs")
+        first_server_msg_to_first_audio_ms = diff_ms(self.first_tts_audio, self.tts_first_server_message, "firstServerMessageToFirstAudioMs")
+        first_audio_to_plivo_ms = diff_ms(self.first_audio_sent_to_plivo, self.first_tts_audio, "firstAudioToPlivoMs")
+        text_release_to_first_audio_ms = diff_ms(self.first_tts_audio, self.text_released_to_tts, "textReleaseToFirstAudioMs")
+        tts_send_to_first_audio_ms = diff_ms(self.first_tts_audio, self.tts_text_sent, "ttsSendToFirstAudioMs")
+
+        llm_request_to_headers_ms = diff_ms(self.llm_first_provider_response, self.llm_request_start, "llmRequestToHeadersMs")
+        llm_headers_to_first_bytes_ms = diff_ms(self.llm_first_stream_bytes, self.llm_first_provider_response, "llmHeadersToFirstBytesMs")
+        llm_first_bytes_to_content_ms = diff_ms(self.first_llm_output, self.llm_first_stream_bytes, "llmFirstBytesToContentMs")
+        llm_content_to_pipecat_frame_ms = diff_ms(self.llm_first_pipecat_text_frame, self.first_llm_output, "llmContentToPipecatFrameMs")
+        speech_stop_to_llm_first_content_ms = diff_ms(self.first_llm_output, self.speech_stop, "speechStopToLlmFirstContentMs")
+        llm_first_content_to_text_release_ms = diff_ms(self.text_released_to_tts, self.first_llm_output, "llmFirstContentToTextReleaseMs")
+        speech_stop_to_plivo_first_audio_ms = diff_ms(self.first_audio_sent_to_plivo or self.first_tts_audio, self.speech_stop, "speechStopToPlivoFirstAudioMs")
+
+        # Tool Turn Specific Waterfalls
+        tool_call_detected_to_complete_ms = diff_ms(self.tool_call_complete, self.tool_call_detected or self.tool_call_delta, "toolCallDetectedToCompleteMs")
+        post_tool_llm_first_content_ms = diff_ms(self.first_post_tool_llm_output, self.post_tool_llm_start, "postToolLlmFirstContentMs")
+        post_tool_tts_text_sent_ms = diff_ms(self.post_tool_tts_text_sent, self.first_post_tool_llm_output, "postToolTtsTextSentMs")
+        post_tool_tts_first_audio_ms = diff_ms(self.first_tts_audio, self.post_tool_tts_text_sent, "postToolTtsFirstAudioMs")
+        post_tool_plivo_send_ms = diff_ms(self.first_audio_sent_to_plivo, self.first_tts_audio, "postToolPlivoSendMs")
+
+        # 17. total_turn_duration_ms / totalTurnMs = turn_complete - speech_start
         end_ref = self.turn_complete or self.tts_stop or self.first_tts_audio
         total_turn_duration_ms = diff_ms(end_ref, self.speech_start, "totalTurnDurationMs")
         total_turn_ms = total_turn_duration_ms
@@ -740,6 +909,13 @@ class TurnTimingTracker:
             "aggregationToLLMRequestMs": aggregation_to_llm_request_ms,
             "llmContextToRequestMs": llm_context_to_request_ms,
             "llmHttpRequestMs": llm_http_request_ms,
+            "llmRequestToHeadersMs": llm_request_to_headers_ms,
+            "llmHeadersToFirstBytesMs": llm_headers_to_first_bytes_ms,
+            "llmFirstBytesToContentMs": llm_first_bytes_to_content_ms,
+            "llmContentToPipecatFrameMs": llm_content_to_pipecat_frame_ms,
+            "speechStopToLlmFirstContentMs": speech_stop_to_llm_first_content_ms,
+            "llmFirstContentToTextReleaseMs": llm_first_content_to_text_release_ms,
+            "speechStopToPlivoFirstAudioMs": speech_stop_to_plivo_first_audio_ms,
             "llmProviderToFirstOutputMs": llm_provider_to_first_output_ms,
             "providerToFirstOutputMs": llm_provider_to_first_output_ms,
             "llmToFirstOutputMs": llm_to_first_output_ms,
@@ -752,12 +928,22 @@ class TurnTimingTracker:
             "earlyAckSentToFirstAudioMs": early_ack_sent_to_first_audio_ms,
             "userStopToEarlyAckFirstAudioMs": user_stop_to_early_ack_first_audio_ms,
             "toolCallCompleteToExecutionStartMs": tool_call_complete_to_execution_start_ms,
+            "toolCallDetectedToCompleteMs": tool_call_detected_to_complete_ms,
             "llmFirstTextToReleaseMs": llm_first_text_to_release_ms,
             "llmFirstTextToTtsStartMs": llm_first_text_to_tts_start_ms,
             "llmFirstOutputToTtsStartMs": llm_first_output_to_tts_start_ms,
             "llmToTTSStartMs": llm_to_tts_start_ms,
             "firstLLMOutputToFirstAudioMs": first_llm_output_to_first_audio_ms,
             "llmFirstTextToFirstAudioMs": llm_first_text_to_first_audio_ms,
+            "textReleaseToTTSSendMs": text_release_to_tts_send_ms,
+            "ttsReadyToTextSendMs": tts_ready_to_text_send_ms,
+            "textSendToFirstServerMessageMs": text_send_to_first_server_msg_ms,
+            "firstServerMessageToFirstAudioMs": first_server_msg_to_first_audio_ms,
+            "firstAudioToPlivoMs": first_audio_to_plivo_ms,
+            "textReleaseToFirstAudioMs": text_release_to_first_audio_ms,
+            "ttsSendToFirstAudioMs": tts_send_to_first_audio_ms,
+            "ttsConnectionStateAtTurnStart": self.tts_connection_state_at_turn_start,
+            "ttsConnectionId": self.tts_connection_id,
             "toolDurationMs": tool_duration_ms,
             "toolExecutionMs": tool_duration_ms,
             "tools": tools_list if tools_list else None,
@@ -766,6 +952,10 @@ class TurnTimingTracker:
             "toolResultToPostToolLLMMs": tool_result_to_post_tool_llm_start_ms,
             "postToolLlmToFirstOutputMs": post_tool_llm_to_first_output_ms,
             "postToolLlmMs": post_tool_llm_ms,
+            "postToolLlmFirstContentMs": post_tool_llm_first_content_ms,
+            "postToolTtsTextSentMs": post_tool_tts_text_sent_ms,
+            "postToolTtsFirstAudioMs": post_tool_tts_first_audio_ms,
+            "postToolPlivoSendMs": post_tool_plivo_send_ms,
             "postToolLLMToTTSMs": post_tool_llm_to_tts_ms,
             "postToolOutputToTTSMs": post_tool_llm_to_tts_ms,
             "postToolTTSToFirstAudioMs": post_tool_tts_to_first_audio_ms,
@@ -783,7 +973,6 @@ class TurnTimingTracker:
         }
 
     def emit_turn_metrics_log(self) -> Dict[str, Any]:
-
         """Emits a single compact structured log line for the completed turn and records it."""
         if self.speech_start is None and self.tts_start is None and self.first_llm_output is None:
             return {}
@@ -845,38 +1034,55 @@ class TurnTimingTracker:
         successful_turns = sum(1 for t in self.completed_turns if not t.get("interrupted", False))
         interrupted_turns = sum(1 for t in self.completed_turns if t.get("interrupted", False))
         tool_turns = sum(1 for t in self.completed_turns if t.get("toolDurationMs") is not None)
+        normal_turns = [t for t in self.completed_turns if t.get("toolDurationMs") is None and not t.get("interrupted", False)]
 
         def calc_percentiles(vals: List[int]):
             if not vals:
-                return None, None, None
+                return None, None, None, None
             sorted_v = sorted(vals)
             n = len(sorted_v)
             max_v = sorted_v[-1]
             if n < 3:
-                return None, None, max_v
+                return None, None, None, max_v
             mid = n // 2
             p50_v = sorted_v[mid] if n % 2 != 0 else round((sorted_v[mid - 1] + sorted_v[mid]) / 2)
             p90_idx = min(n - 1, math.ceil(0.90 * n) - 1)
             p90_v = sorted_v[p90_idx]
-            return p50_v, p90_v, max_v
+            p95_idx = min(n - 1, math.ceil(0.95 * n) - 1)
+            p95_v = sorted_v[p95_idx]
+            return p50_v, p90_v, p95_v, max_v
 
         valid_latencies = [
             t["responseLatencyMs"] for t in self.completed_turns
             if t.get("responseLatencyMs") is not None and isinstance(t["responseLatencyMs"], (int, float))
         ]
-        p50, p90, max_latency = calc_percentiles(valid_latencies)
+        p50, p90, p95, max_latency = calc_percentiles(valid_latencies)
 
-        tool_latencies = [
-            t["responseLatencyMs"] for t in self.completed_turns
-            if t.get("toolDurationMs") is not None and t.get("responseLatencyMs") is not None and isinstance(t["responseLatencyMs"], (int, float))
-        ]
-        tool_p50, tool_p90, tool_max = calc_percentiles(tool_latencies)
+        # Stage percentiles for normal turns
+        def get_stat(key: str):
+            vals = [t[key] for t in normal_turns if t.get(key) is not None and isinstance(t[key], (int, float))]
+            return calc_percentiles(vals)
 
-        non_tool_latencies = [
-            t["responseLatencyMs"] for t in self.completed_turns
-            if t.get("toolDurationMs") is None and t.get("responseLatencyMs") is not None and isinstance(t["responseLatencyMs"], (int, float))
+        speech_stop_to_llm_first_content = get_stat("speechStopToLlmFirstContentMs")
+        llm_first_content_to_text_release = get_stat("llmFirstContentToTextReleaseMs")
+        text_release_to_tts_send = get_stat("textReleaseToTTSSendMs")
+        tts_send_to_first_server_msg = get_stat("textSendToFirstServerMessageMs")
+        first_server_msg_to_first_audio = get_stat("firstServerMessageToFirstAudioMs")
+        first_audio_to_plivo = get_stat("firstAudioToPlivoMs")
+        speech_stop_to_plivo_first_audio = get_stat("speechStopToPlivoFirstAudioMs")
+
+        # TTS Connection Metrics
+        tts_ready_count = sum(1 for t in self.completed_turns if t.get("ttsConnectionStateAtTurnStart") == "READY")
+        tts_reconnect_count = sum(1 for t in self.completed_turns if t.get("ttsConnectionStateAtTurnStart") not in ("READY", "UNKNOWN"))
+        tts_ready_percentage = round((tts_ready_count / total_turns) * 100, 1) if total_turns > 0 else 100.0
+        tts_reconnect_percentage = round((tts_reconnect_count / total_turns) * 100, 1) if total_turns > 0 else 0.0
+
+        tts_send_to_audio_vals = [
+            t["ttsSendToFirstAudioMs"] for t in normal_turns
+            if t.get("ttsSendToFirstAudioMs") is not None and isinstance(t["ttsSendToFirstAudioMs"], (int, float))
         ]
-        non_tool_p50, non_tool_p90, non_tool_max = calc_percentiles(non_tool_latencies)
+        tts_send_p50, tts_send_p90, tts_send_p95, tts_send_max = calc_percentiles(tts_send_to_audio_vals)
+        tts_send_avg = round(sum(tts_send_to_audio_vals) / len(tts_send_to_audio_vals), 1) if tts_send_to_audio_vals else None
 
         total_call_duration_ms = round((time.perf_counter() - self.session_start_time) * 1000)
 
@@ -886,23 +1092,37 @@ class TurnTimingTracker:
             "successfulTurns": successful_turns,
             "interruptedTurns": interrupted_turns,
             "toolTurns": tool_turns,
+            "normalTurns": len(normal_turns),
             "responseLatencyP50Ms": p50,
             "responseLatencyP90Ms": p90,
+            "responseLatencyP95Ms": p95,
             "responseLatencyMaxMs": max_latency,
-            "toolLatencyP50Ms": tool_p50,
-            "toolLatencyP90Ms": tool_p90,
-            "toolLatencyMaxMs": tool_max,
-            "nonToolLatencyP50Ms": non_tool_p50,
-            "nonToolLatencyP90Ms": non_tool_p90,
-            "nonToolLatencyMaxMs": non_tool_max,
             "totalCallDurationMs": total_call_duration_ms,
+            "waterfall": {
+                "speechStopToLlmFirstContent": {"p50": speech_stop_to_llm_first_content[0], "p90": speech_stop_to_llm_first_content[1], "p95": speech_stop_to_llm_first_content[2], "max": speech_stop_to_llm_first_content[3]},
+                "llmFirstContentToTextRelease": {"p50": llm_first_content_to_text_release[0], "p90": llm_first_content_to_text_release[1], "p95": llm_first_content_to_text_release[2], "max": llm_first_content_to_text_release[3]},
+                "textReleaseToTTSSend": {"p50": text_release_to_tts_send[0], "p90": text_release_to_tts_send[1], "p95": text_release_to_tts_send[2], "max": text_release_to_tts_send[3]},
+                "ttsSendToFirstServerMessage": {"p50": tts_send_to_first_server_msg[0], "p90": tts_send_to_first_server_msg[1], "p95": tts_send_to_first_server_msg[2], "max": tts_send_to_first_server_msg[3]},
+                "firstServerMessageToFirstAudio": {"p50": first_server_msg_to_first_audio[0], "p90": first_server_msg_to_first_audio[1], "p95": first_server_msg_to_first_audio[2], "max": first_server_msg_to_first_audio[3]},
+                "firstAudioToPlivo": {"p50": first_audio_to_plivo[0], "p90": first_audio_to_plivo[1], "p95": first_audio_to_plivo[2], "max": first_audio_to_plivo[3]},
+                "speechStopToPlivoFirstAudio": {"p50": speech_stop_to_plivo_first_audio[0], "p90": speech_stop_to_plivo_first_audio[1], "p95": speech_stop_to_plivo_first_audio[2], "max": speech_stop_to_plivo_first_audio[3]},
+            },
+            "ttsConnection": {
+                "readyPercentage": tts_ready_percentage,
+                "reconnectPercentage": tts_reconnect_percentage,
+                "sendToFirstAudioAvgMs": tts_send_avg,
+                "sendToFirstAudioP50Ms": tts_send_p50,
+                "sendToFirstAudioP90Ms": tts_send_p90,
+                "sendToFirstAudioP95Ms": tts_send_p95,
+                "sendToFirstAudioMaxMs": tts_send_max,
+            },
         }
 
         compact_summary = {
             k: v for k, v in summary.items()
             if v is not None or k in ("sessionId", "totalTurns", "totalCallDurationMs")
         }
-        logger.info(f"[CALL_BASELINE] {json.dumps(compact_summary, separators=(',', ':'))}")
+        logger.info(f"[P0_FORENSIC_CALL_SUMMARY] {json.dumps(compact_summary, separators=(',', ':'))}")
         return summary
 
 
@@ -911,6 +1131,8 @@ class StartupTimingTracker:
 
     def __init__(self, stream_id: Optional[str] = None, start_time_monotonic: Optional[float] = None):
         self.stream_id = stream_id or "stream_unknown"
+        self.call_id: Optional[str] = None
+        self.greeting_tracer: Optional[GreetingTraceTracker] = None
         self._emitted = False
         self.start_time_monotonic: float = start_time_monotonic if start_time_monotonic is not None else time.perf_counter()
         self.events: List[Dict[str, Any]] = []
@@ -1039,6 +1261,16 @@ class StartupTimingTracker:
         }
         self.events.append(event_payload)
         logger.info(f"[CALL_STARTUP_EVENT] {stage_name}: {elapsed_ms}ms from start")
+
+    def record_greeting_trace_event(self, event_name: str, ts: Optional[float] = None, **extra) -> Optional[Dict[str, Any]]:
+        """Records a greeting trace milestone in the GREETING_TRACE phase."""
+        if self.greeting_tracer:
+            if self.call_id and self.call_id != "unknown":
+                self.greeting_tracer.call_id = self.call_id
+            elif self.stream_id and self.stream_id != "pending":
+                self.greeting_tracer.call_id = self.stream_id
+            return self.greeting_tracer.record_event(event_name, ts, **extra)
+        return None
 
     def calculate_breakdown(self) -> Dict[str, Any]:
         """Calculates all isolated startup latency stages in milliseconds directly from monotonic timestamps."""
@@ -1238,6 +1470,107 @@ class StartupTimingTracker:
         return metrics
 
 
+
+class GreetingTraceTracker:
+    """Forensic Greeting Startup Trace Tracker (GREETING_TRACE).
+    
+    Tracks exact monotonic timestamps (time.perf_counter()) for all 23 required greeting events,
+    emits structured [GREETING_TRACE] logs, and calculates the 14 precise non-substituted intervals.
+    """
+
+    REQUIRED_EVENTS = [
+        "CALL_ACCEPTED",
+        "PLIVO_START_RECEIVED",
+        "RUNTIME_CONFIG_START",
+        "RUNTIME_CONFIG_READY",
+        "TTS_CREATE_START",
+        "TTS_CREATE_COMPLETE",
+        "TTS_CONNECT_START",
+        "TTS_WS_CONNECTED",
+        "TTS_WS_READY",
+        "STT_CREATE_START",
+        "STT_CREATE_COMPLETE",
+        "STT_WS_READY",
+        "LLM_CREATE_START",
+        "LLM_CREATE_COMPLETE",
+        "PIPELINE_CREATE_START",
+        "PIPELINE_READY",
+        "GREETING_CREATE_START",
+        "GREETING_QUEUED",
+        "GREETING_RELEASED",
+        "GREETING_TTS_TEXT_SEND",
+        "GREETING_TTS_FIRST_SERVER_MESSAGE",
+        "GREETING_TTS_FIRST_AUDIO",
+        "GREETING_PLIVO_SEND",
+    ]
+
+    def __init__(
+        self,
+        call_id: str = "unknown",
+        session_start_time: Optional[float] = None,
+        session_start_monotonic: Optional[float] = None,
+    ):
+        self.call_id = call_id
+        start_t = session_start_monotonic if session_start_monotonic is not None else session_start_time
+        self.session_start_time: float = start_t if start_t is not None else time.perf_counter()
+        self._sequence: int = 0
+        self.events: List[Dict[str, Any]] = []
+        self.timestamps: Dict[str, Optional[float]] = {evt: None for evt in self.REQUIRED_EVENTS}
+
+    def record_event(self, event_name: str, ts: Optional[float] = None, **extra) -> Optional[Dict[str, Any]]:
+        now = ts if ts is not None else time.perf_counter()
+        if self.timestamps.get(event_name) is not None:
+            # Latch first occurrence
+            return None
+
+        self._sequence += 1
+        self.timestamps[event_name] = now
+        elapsed_ms = round((now - self.session_start_time) * 1000)
+
+        payload = {
+            "call_id": self.call_id,
+            "event": event_name,
+            "perf_counter": round(now, 6),
+            "monotonicTimestamp": round(now, 6),
+            "sequence": self._sequence,
+            "elapsedFromCallStartMs": max(0, elapsed_ms),
+            **extra,
+        }
+        self.events.append(payload)
+        logger.info(f"[GREETING_TRACE] {json.dumps(payload, separators=(',', ':'))}")
+        return payload
+
+    def calculate_intervals(self) -> Dict[str, Optional[int]]:
+        """Calculates exact non-substituted intervals in milliseconds directly from monotonic timestamps.
+        
+        Returns null for any missing event.
+        """
+        def diff_ms(end_event: str, start_event: str) -> Optional[int]:
+            t_end = self.timestamps.get(end_event)
+            t_start = self.timestamps.get(start_event)
+            if t_end is not None and t_start is not None:
+                delta = t_end - t_start
+                return round(delta * 1000) if delta >= 0 else None
+            return None
+
+        return {
+            "callAcceptToPlivoStartMs": diff_ms("PLIVO_START_RECEIVED", "CALL_ACCEPTED"),
+            "plivoStartToRuntimeConfigReadyMs": diff_ms("RUNTIME_CONFIG_READY", "PLIVO_START_RECEIVED"),
+            "runtimeConfigReadyToTtsCreateMs": diff_ms("TTS_CREATE_START", "RUNTIME_CONFIG_READY"),
+            "ttsCreateToConnectStartMs": diff_ms("TTS_CONNECT_START", "TTS_CREATE_START"),
+            "ttsConnectMs": diff_ms("TTS_WS_READY", "TTS_CONNECT_START"),
+            "ttsReadyToPipelineReadyMs": diff_ms("PIPELINE_READY", "TTS_WS_READY"),
+            "pipelineReadyToGreetingQueuedMs": diff_ms("GREETING_QUEUED", "PIPELINE_READY"),
+            "greetingQueuedToGreetingReleasedMs": diff_ms("GREETING_RELEASED", "GREETING_QUEUED"),
+            "greetingReleasedToTtsTextSendMs": diff_ms("GREETING_TTS_TEXT_SEND", "GREETING_RELEASED"),
+            "greetingTtsTextSendToFirstServerMessageMs": diff_ms("GREETING_TTS_FIRST_SERVER_MESSAGE", "GREETING_TTS_TEXT_SEND"),
+            "greetingFirstServerMessageToFirstAudioMs": diff_ms("GREETING_TTS_FIRST_AUDIO", "GREETING_TTS_FIRST_SERVER_MESSAGE"),
+            "greetingFirstAudioToPlivoMs": diff_ms("GREETING_PLIVO_SEND", "GREETING_TTS_FIRST_AUDIO"),
+            "callAcceptedToGreetingFirstAudioMs": diff_ms("GREETING_TTS_FIRST_AUDIO", "CALL_ACCEPTED"),
+            "callAcceptedToGreetingPlivoMs": diff_ms("GREETING_PLIVO_SEND", "CALL_ACCEPTED"),
+        }
+
+
 def build_unified_call_timeline(
     startup_tracker: Optional[StartupTimingTracker] = None,
     turn_tracker: Optional[TurnTimingTracker] = None,
@@ -1260,4 +1593,5 @@ def build_unified_call_timeline(
     # Sort strictly by monotonicTimestamp
     raw_events.sort(key=lambda x: x.get("monotonicTimestamp", 0.0))
     return raw_events
+
 
