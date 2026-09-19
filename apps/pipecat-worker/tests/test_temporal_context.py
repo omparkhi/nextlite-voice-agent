@@ -11,6 +11,8 @@ from app.temporal_context import (
     get_calendar_context,
     get_temporal_context,
     is_past_date,
+    is_past_slot,
+    parse_time_to_24h,
     is_valid_timezone,
     resolve_relative_or_absolute_date,
 )
@@ -187,8 +189,8 @@ async def test_appointment_tool_past_date_rejection():
 
         result = await schema.handler(params)
         assert result["success"] is False
-        assert result["error"] == "PAST_DATE_NOT_ALLOWED"
-        assert "is in the past" in result["message"]
+        assert result["error"] == "PAST_SLOT_NOT_ALLOWED"
+        assert "has already passed" in result["message"]
 
 
 @pytest.mark.asyncio
@@ -240,3 +242,65 @@ async def test_appointment_tool_future_date_normalization_and_success():
             assert result["appointmentNumber"] == "A-101"
             assert result["status"] == "REQUESTED"
             assert posted_payload["bookingDate"] == "2026-09-12"
+
+
+def test_is_past_slot_calculations():
+    # 2026-09-19 12:00:00 IST (UTC: 2026-09-19 06:30:00)
+    fixed_utc = datetime(2026, 9, 19, 6, 30, 0, tzinfo=timezone.utc)
+    tz = "Asia/Kolkata"
+
+    # Same day past slots (at 12:00 PM IST)
+    assert is_past_slot("2026-09-19", "10:00 AM", now=fixed_utc, time_zone=tz) is True
+    assert is_past_slot("2026-09-19", "10:30 AM", now=fixed_utc, time_zone=tz) is True
+    assert is_past_slot("2026-09-19", "11:30 AM", now=fixed_utc, time_zone=tz) is True
+    assert is_past_slot("today", "10:00 AM", now=fixed_utc, time_zone=tz) is True
+    assert is_past_slot("aaj", "11:00 AM", now=fixed_utc, time_zone=tz) is True
+
+    # Same day future slots (at 12:00 PM IST)
+    assert is_past_slot("2026-09-19", "12:30 PM", now=fixed_utc, time_zone=tz) is False
+    assert is_past_slot("2026-09-19", "02:00 PM", now=fixed_utc, time_zone=tz) is False
+    assert is_past_slot("2026-09-19", "06:00 PM", now=fixed_utc, time_zone=tz) is False
+    assert is_past_slot("today", "03:00 PM", now=fixed_utc, time_zone=tz) is False
+
+    # Tomorrow slots (any time tomorrow is NOT past)
+    assert is_past_slot("2026-09-20", "10:00 AM", now=fixed_utc, time_zone=tz) is False
+    assert is_past_slot("tomorrow", "10:00 AM", now=fixed_utc, time_zone=tz) is False
+    assert is_past_slot("udya", "10:00 AM", now=fixed_utc, time_zone=tz) is False
+
+    # Yesterday slots (any time yesterday IS past)
+    assert is_past_slot("2026-09-18", "06:00 PM", now=fixed_utc, time_zone=tz) is True
+    assert is_past_slot("yesterday", "06:00 PM", now=fixed_utc, time_zone=tz) is True
+
+
+@pytest.mark.asyncio
+async def test_appointment_tool_same_day_past_slot_rejection():
+    # Context with current time = 2026-09-19 12:00 PM IST
+    fixed_utc = datetime(2026, 9, 19, 6, 30, 0, tzinfo=timezone.utc)
+    context = ToolRuntimeContext(
+        deployment_id="dep-123",
+        caller_phone="+919876543210",
+        timezone="Asia/Kolkata",
+    )
+
+    with patch("app.tools.appointment_tool.is_past_slot", side_effect=lambda d, t, time_zone=None: is_past_slot(d, t, now=fixed_utc, time_zone=time_zone)), \
+         patch("app.tools.appointment_tool.resolve_relative_or_absolute_date", side_effect=lambda d, time_zone=None: resolve_relative_or_absolute_date(d, now=fixed_utc, time_zone=time_zone)):
+        
+        schema = create_book_appointment_tool_factory(context=context)
+
+        # Attempt to book 10:00 AM on today
+        params = MockFunctionCallParams(
+            function_name="book_appointment",
+            tool_call_id="call-past-slot-1",
+            arguments={
+                "customerName": "Ramesh Patil",
+                "title": "General Consultation",
+                "bookingDate": "today",
+                "bookingTime": "10:00 AM",
+            },
+        )
+
+        result = await schema.handler(params)
+        assert result["success"] is False
+        assert result["error"] == "PAST_SLOT_NOT_ALLOWED"
+        assert "has already passed" in result["message"]
+

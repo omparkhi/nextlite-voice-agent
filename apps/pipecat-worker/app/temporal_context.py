@@ -341,3 +341,105 @@ def is_past_date(
         return target_date < current_date
     except Exception:
         return False
+
+
+def parse_time_to_24h(time_str: str) -> Optional[tuple[int, int]]:
+    """Parses standard or Indic time strings into (hour_24, minute).
+    
+    Examples:
+        - "10:00 AM" -> (10, 0)
+        - "01:30 PM" -> (13, 30)
+        - "12:00 PM" -> (12, 0)
+        - "12:30 AM" -> (0, 30)
+        - "17:00" -> (17, 0)
+    """
+    if not time_str or not isinstance(time_str, str):
+        return None
+    s = time_str.strip().upper()
+    # Normalize Devanagari numerals if any
+    dev_map = {"०": "0", "१": "1", "२": "2", "३": "3", "४": "4", "५": "5", "६": "6", "७": "7", "८": "8", "९": "9"}
+    for k, v in dev_map.items():
+        s = s.replace(k, v)
+
+    match = re.search(r"(\d{1,2})(?:[:.](\d{2}))?\s*(AM|PM)?", s)
+    if not match:
+        return None
+
+    hour = int(match.group(1))
+    minute = int(match.group(2)) if match.group(2) else 0
+    tag = match.group(3)
+
+    if tag == "PM":
+        if hour < 12:
+            hour += 12
+    elif tag == "AM":
+        if hour == 12:
+            hour = 0
+    elif hour <= 12 and not tag:
+        # Default heuristics if untagged: 9-11 -> AM, 1-8 -> PM, 12 -> PM
+        if hour < 9:
+            hour += 12
+
+    if 0 <= hour <= 23 and 0 <= minute <= 59:
+        return (hour, minute)
+    return None
+
+
+def is_past_slot(
+    date_str: str,
+    time_str: str,
+    now: Optional[datetime] = None,
+    time_zone: Optional[str] = DEFAULT_TIMEZONE,
+    buffer_minutes: int = 0,
+) -> bool:
+    """Returns True if the combined appointment date and time slot is in the past relative to the local clock.
+    
+    Checks:
+    1. If date is strictly before today -> True (past date)
+    2. If date is in the future -> False (future date)
+    3. If date is TODAY -> evaluates whether slot time is <= current local time.
+    """
+    if is_past_date(date_str, now=now, time_zone=time_zone):
+        return True
+
+    resolved_iso = resolve_relative_or_absolute_date(date_str, now=now, time_zone=time_zone)
+    if not resolved_iso:
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_str.strip()):
+            resolved_iso = date_str.strip()
+        else:
+            return False
+
+    try:
+        y, m, d = [int(p) for p in resolved_iso.split("-")]
+        target_date = date(y, m, d)
+        temporal_ctx = get_temporal_context(now, time_zone)
+        current_date = date(temporal_ctx.year, temporal_ctx.month, temporal_ctx.day)
+
+        # If strictly in the future, it is not in the past
+        if target_date > current_date:
+            return False
+
+        # If today, compare the slot time with current local time
+        parsed_time = parse_time_to_24h(time_str)
+        if not parsed_time:
+            return False
+
+        slot_h, slot_m = parsed_time
+        resolved_tz_name = time_zone.strip() if (time_zone and is_valid_timezone(time_zone)) else DEFAULT_TIMEZONE
+        tz = ZoneInfo(resolved_tz_name)
+
+        if now is None:
+            local_now = datetime.now(tz)
+        else:
+            if now.tzinfo is None:
+                local_now = now.replace(tzinfo=timezone.utc).astimezone(tz)
+            else:
+                local_now = now.astimezone(tz)
+
+        slot_dt = datetime.combine(target_date, dtime(slot_h, slot_m), tzinfo=tz)
+        # Check if slot datetime is at or before current time (accounting for optional buffer)
+        cutoff_dt = local_now - timedelta(minutes=buffer_minutes)
+        return slot_dt <= cutoff_dt
+    except Exception as e:
+        logger.warning(f"[TemporalContext] Error evaluating is_past_slot for {date_str} {time_str}: {e}")
+        return False

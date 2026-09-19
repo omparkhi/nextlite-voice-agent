@@ -355,7 +355,7 @@ async def test_appointment_tool_context_injection_and_anti_hallucination():
     )
     res_past = await schema.handler(params_past)
     assert res_past["success"] is False
-    assert res_past["error"] == "PAST_DATE_NOT_ALLOWED"
+    assert res_past["error"] in ("PAST_DATE_NOT_ALLOWED", "PAST_SLOT_NOT_ALLOWED")
 
 
 

@@ -167,16 +167,16 @@ async def test_reschedule_appointment_tool():
         "success": True,
         "appointment": {
             "id": "apt-123",
-            "bookingDate": "2026-09-17",
+            "bookingDate": "2026-09-25",
             "bookingTime": "04:00 PM",
         },
-        "message": "Appointment rescheduled to 2026-09-17 at 04:00 PM",
+        "message": "Appointment rescheduled to 2026-09-25 at 04:00 PM",
     }
 
     params = MockFunctionCallParams(
         function_name=RESCHEDULE_APPOINTMENT_TOOL_NAME,
         tool_call_id="call-3",
-        arguments={"newBookingDate": "2026-09-17", "newBookingTime": "04:00 PM", "reason": "Patient requested evening slot"},
+        arguments={"newBookingDate": "2026-09-25", "newBookingTime": "04:00 PM", "reason": "Patient requested evening slot"},
     )
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:

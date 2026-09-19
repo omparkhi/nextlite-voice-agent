@@ -222,3 +222,87 @@ def sanitize_service_title(raw_title: Optional[Any], default_service: str = "Gen
         return default_service
 
     return s
+
+
+def parse_time_to_24h(time_str: Optional[str]) -> Optional[tuple[int, int]]:
+    """Parses standard or Indic time strings into (hour_24, minute)."""
+    if not time_str or not isinstance(time_str, str):
+        return None
+    norm = normalize_indic_time(time_str).strip().upper()
+    match = re.search(r"(\d{1,2}):(\d{2})\s*(AM|PM)", norm)
+    if match:
+        h = int(match.group(1))
+        m = int(match.group(2))
+        tag = match.group(3)
+        if tag == "PM" and h < 12:
+            h += 12
+        elif tag == "AM" and h == 12:
+            h = 0
+        return (h, m)
+
+    # Fallback to direct digits
+    m2 = re.search(r"(\d{1,2})(?:[:.](\d{2}))?\s*(AM|PM)?", norm)
+    if m2:
+        h = int(m2.group(1))
+        m = int(m2.group(2)) if m2.group(2) else 0
+        tag = m2.group(3)
+        if tag == "PM" and h < 12:
+            h += 12
+        elif tag == "AM" and h == 12:
+            h = 0
+        elif h < 9 and not tag:
+            h += 12
+        return (h, m)
+    return None
+
+
+def is_past_slot(
+    date_str: str,
+    time_str: str,
+    time_zone: str = "Asia/Kolkata",
+    buffer_minutes: int = 0
+) -> bool:
+    """Checks if a given date and time slot is in the past relative to the timezone clock."""
+    import zoneinfo
+    from datetime import datetime as dt, date as d_cls, time as t_cls, timedelta as td_cls
+
+    try:
+        tz = zoneinfo.ZoneInfo(time_zone)
+    except Exception:
+        tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+
+    local_now = dt.now(tz)
+    current_date = local_now.date()
+
+    # Parse target date
+    s_date = date_str.strip().lower()
+    if s_date in ("today", "आज", "aaj"):
+        target_date = current_date
+    elif s_date in ("tomorrow", "कल", "kal", "उद्या", "udya"):
+        target_date = current_date + td_cls(days=1)
+    else:
+        iso_m = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", s_date)
+        if iso_m:
+            target_date = d_cls(int(iso_m.group(1)), int(iso_m.group(2)), int(iso_m.group(3)))
+        else:
+            dmy_m = re.match(r"^(\d{1,2})[/\-\.](\d{1,2})[/\-\.](\d{4})$", s_date)
+            if dmy_m:
+                target_date = d_cls(int(dmy_m.group(3)), int(dmy_m.group(2)), int(dmy_m.group(1)))
+            else:
+                return False
+
+    if target_date < current_date:
+        return True
+    if target_date > current_date:
+        return False
+
+    # Today -> compare time
+    parsed = parse_time_to_24h(time_str)
+    if not parsed:
+        return False
+
+    slot_h, slot_m = parsed
+    slot_dt = dt.combine(target_date, t_cls(slot_h, slot_m), tzinfo=tz)
+    cutoff = local_now - td_cls(minutes=buffer_minutes)
+    return slot_dt <= cutoff
+

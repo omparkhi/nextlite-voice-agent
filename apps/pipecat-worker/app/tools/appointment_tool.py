@@ -16,7 +16,7 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import FunctionCallResultProperties, TTSSpeakFrame
 from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import FunctionCallParams
-from app.temporal_context import is_past_date, resolve_relative_or_absolute_date
+from app.temporal_context import is_past_date, is_past_slot, resolve_relative_or_absolute_date
 from app.turn_timing import log_phone_trace
 from app.tools.indic_normalizers import (
     normalize_indic_age,
@@ -152,18 +152,18 @@ def create_book_appointment_tool_factory(
         raw_booking_date = str(raw_date).strip()
         booking_time = normalize_indic_time(raw_time)
 
-        # Check for past date protection against authoritative current date
+        # Check for past date and time slot protection against authoritative real-time clock
         tz_name = getattr(context, "timezone", None)
-        if is_past_date(raw_booking_date, time_zone=tz_name):
+        if is_past_slot(raw_booking_date, booking_time, time_zone=tz_name):
             logger.warning(
-                f"[AppointmentTool] Rejected past appointment date: '{raw_booking_date}' in timezone={tz_name or 'Asia/Kolkata'}"
+                f"[AppointmentTool] Rejected past appointment slot: date='{raw_booking_date}', time='{booking_time}' in timezone={tz_name or 'Asia/Kolkata'}"
             )
             failure_result = {
                 "success": False,
-                "error": "PAST_DATE_NOT_ALLOWED",
+                "error": "PAST_SLOT_NOT_ALLOWED",
                 "message": (
-                    f"The requested appointment date '{raw_booking_date}' is in the past. "
-                    "Please ask the caller for a future appointment date."
+                    f"The requested appointment slot '{booking_time}' on '{raw_booking_date}' has already passed. "
+                    "Please offer the caller an upcoming future time slot today or tomorrow."
                 ),
             }
             return await deliver_result(params, failure_result)
@@ -380,6 +380,15 @@ def create_reschedule_appointment_tool_factory(
 
         tz_name = getattr(context, "timezone", None)
         normalized_date = resolve_relative_or_absolute_date(raw_date, time_zone=tz_name)
+
+        if is_past_slot(normalized_date or raw_date, normalized_time, time_zone=tz_name):
+            result = {
+                "success": False,
+                "error": "PAST_SLOT_NOT_ALLOWED",
+                "message": f"The requested reschedule time slot '{normalized_time}' on '{normalized_date or raw_date}' is in the past. Please suggest an upcoming time slot.",
+            }
+            await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=True))
+            return
 
         payload = {
             "deploymentId": trusted_deployment_id,

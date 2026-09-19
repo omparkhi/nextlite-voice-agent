@@ -16,6 +16,7 @@ from ..domain.indic_normalizers import (
     normalize_indic_age,
     normalize_indic_time,
     sanitize_service_title,
+    is_past_slot,
 )
 
 router = APIRouter(prefix="/api/internal", tags=["internal"])
@@ -283,6 +284,13 @@ async def create_internal_appointment(
     apt_time = normalize_indic_time(raw_time)
     phone = payload.get("customerPhone") or payload.get("phone")
     call_session_id = uuid.UUID(payload["callSessionId"]) if payload.get("callSessionId") else None
+
+    # Temporal validation: Reject slots in the past
+    if is_past_slot(apt_date, apt_time, time_zone="Asia/Kolkata", buffer_minutes=0):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot book appointment for past time slot '{apt_time}' on {apt_date}."
+        )
 
     # Inherit caller phone number from active CallSession if phone is missing or dummy
     if (not phone or phone == "+910000000000") and call_session_id:

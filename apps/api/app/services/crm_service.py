@@ -15,6 +15,8 @@ from ..domain.indic_normalizers import (
     normalize_indic_age,
     normalize_indic_time,
     sanitize_service_title,
+    is_past_slot,
+    parse_time_to_24h,
 )
 
 class CRMService:
@@ -407,6 +409,12 @@ class CRMService:
         norm_age = normalize_indic_age(age)
         clean_title = sanitize_service_title(title, default_service="General Consultation")
 
+        # Temporal validation: Reject slots in the past
+        if is_past_slot(booking_date, norm_booking_time, time_zone="Asia/Kolkata", buffer_minutes=0):
+            raise ValueError(
+                f"Cannot book appointment for past time slot '{norm_booking_time}' on {booking_date}."
+            )
+
         # Slot Conflict Check: Prevent duplicate booking if slot is already occupied on the given date
         def _norm_time(t: str) -> str:
             if not t:
@@ -578,19 +586,28 @@ class CRMService:
         for a in day_appointments:
             booked_slots.add(_norm_time(a.bookingTime))
 
-        available_slots = [s for s in standard_slots if _norm_time(s) not in booked_slots]
+        # Filter out slots that have already passed if booking_date is today
+        candidate_slots = [
+            s for s in standard_slots
+            if not is_past_slot(booking_date, s, time_zone="Asia/Kolkata", buffer_minutes=0)
+        ]
+        available_slots = [s for s in candidate_slots if _norm_time(s) not in booked_slots]
 
         slot_available = True
         normalized_pref = _norm_time(preferred_time) if preferred_time else None
         if normalized_pref:
-            matched_booked = any(
-                _norm_time(b) == normalized_pref
-                or _norm_time(b).replace(":00", "") == normalized_pref.replace(":00", "")
-                or _norm_time(b).lstrip("0") == normalized_pref.lstrip("0")
-                for b in booked_slots
-            )
-            if matched_booked:
+            # If preferred time is already in the past for booking_date, it is unavailable
+            if is_past_slot(booking_date, preferred_time, time_zone="Asia/Kolkata", buffer_minutes=0):
                 slot_available = False
+            else:
+                matched_booked = any(
+                    _norm_time(b) == normalized_pref
+                    or _norm_time(b).replace(":00", "") == normalized_pref.replace(":00", "")
+                    or _norm_time(b).lstrip("0") == normalized_pref.lstrip("0")
+                    for b in booked_slots
+                )
+                if matched_booked:
+                    slot_available = False
 
         existing_booking = None
         if phone:
@@ -662,6 +679,9 @@ class CRMService:
             return None
 
         norm_new_time = normalize_indic_time(new_time)
+        if is_past_slot(new_date, norm_new_time, time_zone="Asia/Kolkata", buffer_minutes=0):
+            raise ValueError(f"Cannot reschedule appointment to past time slot '{norm_new_time}' on {new_date}.")
+
         appt.bookingDate = new_date
         appt.bookingTime = norm_new_time
         appt.status = AppointmentStatus.SCHEDULED
