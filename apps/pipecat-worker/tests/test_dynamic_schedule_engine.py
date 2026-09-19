@@ -132,3 +132,19 @@ def test_generate_dynamic_slots_single_shift():
         "04:00 PM",
     ]
     assert slots == expected
+
+
+def test_extract_business_schedule_case_insensitive():
+    from app.dynamic_schedule_engine import extract_business_schedule_from_version
+
+    cfg = {
+        "variables": {
+            "inputVariables": [
+                {"key": "businesshours", "defaultValue": "Monday to Saturday: 10:00 AM to 01:00 PM and 06:00 PM to 09:00 PM"},
+                {"key": "slotduration", "defaultValue": "45 min"},
+            ]
+        }
+    }
+    hours, duration = extract_business_schedule_from_version(cfg)
+    assert hours == "Monday to Saturday: 10:00 AM to 01:00 PM and 06:00 PM to 09:00 PM"
+    assert duration == "45 min"

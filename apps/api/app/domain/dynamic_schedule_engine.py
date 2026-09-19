@@ -241,7 +241,11 @@ def generate_dynamic_slots(
 
 
 def extract_business_schedule_from_version(version_configuration: Optional[dict]) -> Tuple[Optional[str], Optional[str]]:
-    """Extracts businessHours and slotDuration safely from an AgentVersion configuration JSON dict."""
+    """Extracts businessHours and slotDuration safely from an AgentVersion configuration JSON dict.
+    
+    Supports case-insensitive variations and aliases (e.g. slotduration, slotDuration, slot_duration,
+    businessHours, businesshours, workingHours).
+    """
     if not version_configuration or not isinstance(version_configuration, dict):
         return None, None
 
@@ -249,18 +253,21 @@ def extract_business_schedule_from_version(version_configuration: Optional[dict]
     biz_hours = biz_info.get("hours") if isinstance(biz_info, dict) else None
 
     vars_cfg = version_configuration.get("variables") or {}
-    input_vars = vars_cfg.get("inputVariables") if isinstance(vars_cfg, dict) else []
+    input_vars = vars_cfg.get("inputVariables") or vars_cfg.get("input") if isinstance(vars_cfg, dict) else []
     if not isinstance(input_vars, list):
         input_vars = []
 
     slot_duration = None
     for v in input_vars:
         if isinstance(v, dict):
-            k = v.get("key")
+            raw_k = str(v.get("key") or "").strip()
+            norm_k = re.sub(r"[_\-\s]", "", raw_k).lower()
             val = v.get("defaultValue") if v.get("defaultValue") is not None else v.get("value")
-            if k == "businessHours" and val:
+            if not val:
+                continue
+            if norm_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):
                 biz_hours = str(val)
-            elif k == "slotDuration" and val:
+            elif norm_k in ("slotduration", "slotinterval", "appointmentduration", "slotminutes", "duration"):
                 slot_duration = str(val)
 
     return biz_hours, slot_duration
