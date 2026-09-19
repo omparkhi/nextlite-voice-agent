@@ -34,7 +34,7 @@ async def test_receptionist_endpoints():
             "patientPhone": "+91 9988776655",
             "doctorId": "doc-sharma",
             "date": f"2026-11-{unique_day}",
-            "time": "04:00 PM",
+            "time": "10:00 AM",
             "reason": "Consultation"
         }
         res = await ac.post("/api/appointments/book", json=book_payload)

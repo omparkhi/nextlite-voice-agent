@@ -17,6 +17,7 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import FunctionCallResultProperties
 from pipecat.services.llm_service import FunctionCallParams
 from app.temporal_context import resolve_relative_or_absolute_date
+from app.dynamic_schedule_engine import generate_dynamic_slots, is_time_within_shifts
 
 if TYPE_CHECKING:
     from app.tools.tool_registry import ToolRuntimeContext
@@ -79,6 +80,10 @@ def create_check_slots_tool_factory(
             query_params["phone"] = caller_phone
         if pref_time:
             query_params["preferredTime"] = pref_time
+        if getattr(context, "business_hours", None):
+            query_params["businessHours"] = context.business_hours
+        if getattr(context, "slot_duration", None):
+            query_params["slotDuration"] = context.slot_duration
 
         headers = {
             "Authorization": f"Bearer {worker_secret}",
@@ -117,10 +122,17 @@ def create_check_slots_tool_factory(
                         f"would like to reschedule or keep this booking."
                     )
                 elif not data.get("slotAvailable") and pref_time:
-                    result_data["guidance"] = (
-                        f"The requested slot {pref_time} is already booked. Politely inform the caller that {pref_time} "
-                        f"is busy and offer available alternative slots such as {', '.join(data.get('availableSlots', [])[:3])}."
-                    )
+                    avail = data.get("availableSlots", [])
+                    if avail:
+                        result_data["guidance"] = (
+                            f"The requested slot {pref_time} is already booked or outside open operational shifts. "
+                            f"Politely inform the caller that {pref_time} is already booked and offer available alternative slots such as {', '.join(avail[:3])}."
+                        )
+                    else:
+                        result_data["guidance"] = (
+                            f"The requested slot {pref_time} is not available on {resolved_date}, and no further open slots remain for this date. "
+                            f"Politely suggest booking for the next business day."
+                        )
                 else:
                     result_data["guidance"] = (
                         f"Slot {pref_time or 'time'} on {resolved_date} is available. You may proceed to confirm details "
@@ -133,24 +145,43 @@ def create_check_slots_tool_factory(
                 )
             else:
                 logger.warning(f"[SlotTool] Non-200 check slots response: {resp.status_code} - {resp.text}")
+                fallback_slots = generate_dynamic_slots(
+                    business_hours=getattr(context, "business_hours", None),
+                    slot_duration=getattr(context, "slot_duration", None),
+                    booking_date=resolved_date,
+                    timezone=target_tz
+                ) if getattr(context, "business_hours", None) else []
                 await params.result_callback(
                     {
                         "success": True,
                         "date": resolved_date,
                         "slotAvailable": True,
-                        "availableSlots": ["10:00 AM", "11:30 AM", "02:00 PM", "04:30 PM", "06:00 PM"],
-                        "guidance": f"Slots appear open for {resolved_date}. Proceed with booking.",
+                        "availableSlots": fallback_slots,
+                        "guidance": (
+                            f"Available slots for {resolved_date}: {', '.join(fallback_slots[:4])}. Proceed with booking."
+                            if fallback_slots else f"Check with the caller for their preferred time during open hours on {resolved_date}."
+                        ),
                     },
                     properties=FunctionCallResultProperties(run_llm=True),
                 )
         except Exception as e:
             logger.error(f"[SlotTool] Network or execution failure: {e}")
+            fallback_slots = generate_dynamic_slots(
+                business_hours=getattr(context, "business_hours", None),
+                slot_duration=getattr(context, "slot_duration", None),
+                booking_date=resolved_date,
+                timezone=target_tz
+            ) if getattr(context, "business_hours", None) else []
             await params.result_callback(
                 {
                     "success": True,
                     "date": resolved_date,
                     "slotAvailable": True,
-                    "guidance": "Proceed with booking normally.",
+                    "availableSlots": fallback_slots,
+                    "guidance": (
+                        f"Available slots for {resolved_date}: {', '.join(fallback_slots[:4])}. Proceed with booking."
+                        if fallback_slots else "Proceed with booking normally during open operating hours."
+                    ),
                 },
                 properties=FunctionCallResultProperties(run_llm=True),
             )

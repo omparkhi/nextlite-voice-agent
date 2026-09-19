@@ -18,6 +18,13 @@ from ..domain.indic_normalizers import (
     is_past_slot,
     parse_time_to_24h,
 )
+from ..domain.dynamic_schedule_engine import (
+    generate_dynamic_slots,
+    is_time_within_shifts,
+    parse_business_shifts,
+    parse_slot_duration_minutes,
+    extract_business_schedule_from_version,
+)
 
 class CRMService:
     def __init__(self, session: AsyncSession):
@@ -403,6 +410,7 @@ class CRMService:
         walk_in: bool = False,
         notes: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        business_hours: Optional[str] = None,
     ) -> Dict[str, Any]:
         # Normalize time, age, and service title
         norm_booking_time = normalize_indic_time(booking_time)
@@ -413,6 +421,24 @@ class CRMService:
         if is_past_slot(booking_date, norm_booking_time, time_zone="Asia/Kolkata", buffer_minutes=0):
             raise ValueError(
                 f"Cannot book appointment for past time slot '{norm_booking_time}' on {booking_date}."
+            )
+
+        # Shift validation: Reject bookings outside operational shifts / during break
+        if not business_hours:
+            biz_hours_query = await self.session.execute(
+                select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+                .where(Agent.tenantId == tenant_id)
+                .order_by(AgentVersion.versionNumber.desc())
+                .limit(1)
+            )
+            cfg_json = biz_hours_query.scalar_one_or_none()
+            if cfg_json and isinstance(cfg_json, dict):
+                b_h, _ = extract_business_schedule_from_version(cfg_json)
+                business_hours = b_h
+
+        if business_hours and not is_time_within_shifts(norm_booking_time, business_hours):
+            raise ValueError(
+                f"Requested slot '{norm_booking_time}' falls during closed/break hours in configured schedule: {business_hours}."
             )
 
         # Slot Conflict Check: Prevent duplicate booking if slot is already occupied on the given date
@@ -555,17 +581,37 @@ class CRMService:
         booking_date: str,
         phone: Optional[str] = None,
         preferred_time: Optional[str] = None,
+        business_hours: Optional[str] = None,
+        slot_duration: Optional[str] = None,
+        timezone: str = "Asia/Kolkata",
     ) -> Dict[str, Any]:
-        """Calculates available clinic slots for a given date, detects if preferred slot is free,
-        and checks if the caller already has an active upcoming appointment.
+        """Calculates available clinic slots dynamically from tenant businessHours & slotDuration,
+        detects if preferred slot is free & within shift, and checks for existing bookings.
         """
-        standard_slots = [
-            "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
-            "12:00 PM", "12:30 PM", "01:00 PM", "01:30 PM",
-            "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM",
-            "04:00 PM", "04:30 PM", "05:00 PM", "05:30 PM",
-            "06:00 PM", "06:30 PM", "07:00 PM", "07:30 PM", "08:00 PM"
-        ]
+        # Resolve tenant business hours & slot duration dynamically if not passed
+        if not business_hours or not slot_duration:
+            biz_res = await self.session.execute(
+                select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+                .where(Agent.tenantId == tenant_id)
+                .order_by(AgentVersion.versionNumber.desc())
+                .limit(1)
+            )
+            cfg_json = biz_res.scalar_one_or_none()
+            if cfg_json and isinstance(cfg_json, dict):
+                b_h, s_d = extract_business_schedule_from_version(cfg_json)
+                if not business_hours:
+                    business_hours = b_h
+                if not slot_duration:
+                    slot_duration = s_d
+
+        # Generate candidate slots dynamically on-the-fly (break hours are never generated)
+        candidate_slots = generate_dynamic_slots(
+            business_hours=business_hours,
+            slot_duration=slot_duration or "30 mins",
+            booking_date=booking_date,
+            time_zone=timezone or "Asia/Kolkata",
+            filter_past=True,
+        )
 
         res = await self.session.execute(
             select(Appointment).where(
@@ -586,19 +632,18 @@ class CRMService:
         for a in day_appointments:
             booked_slots.add(_norm_time(a.bookingTime))
 
-        # Filter out slots that have already passed if booking_date is today
-        candidate_slots = [
-            s for s in standard_slots
-            if not is_past_slot(booking_date, s, time_zone="Asia/Kolkata", buffer_minutes=0)
-        ]
         available_slots = [s for s in candidate_slots if _norm_time(s) not in booked_slots]
 
         slot_available = True
         normalized_pref = _norm_time(preferred_time) if preferred_time else None
         if normalized_pref:
-            # If preferred time is already in the past for booking_date, it is unavailable
-            if is_past_slot(booking_date, preferred_time, time_zone="Asia/Kolkata", buffer_minutes=0):
+            # Check 1: Is preferred time within tenant's open shifts?
+            if business_hours and not is_time_within_shifts(preferred_time, business_hours):
                 slot_available = False
+            # Check 2: Has preferred time already passed for today?
+            elif is_past_slot(booking_date, preferred_time, time_zone=timezone or "Asia/Kolkata", buffer_minutes=0):
+                slot_available = False
+            # Check 3: Is preferred time already booked in database?
             else:
                 matched_booked = any(
                     _norm_time(b) == normalized_pref

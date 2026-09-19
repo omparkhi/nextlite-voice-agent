@@ -56,6 +56,8 @@ class ToolRuntimeContext:
     api_url: Optional[str] = None
     worker_secret: Optional[str] = None
     timezone: Optional[str] = None
+    business_hours: Optional[str] = None
+    slot_duration: Optional[str] = None
     transcript_collector: Optional["CallTranscriptCollector"] = None
     timing_tracker: Optional[Any] = None
     _call_session_task: Optional[Any] = None

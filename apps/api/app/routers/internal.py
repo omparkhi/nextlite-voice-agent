@@ -11,13 +11,14 @@ from ..schemas import RuntimeAgentConfig
 from ..services.runtime_config_service import RuntimeAgentConfigService
 from ..services.crm_service import CRMService
 from ..repositories import CallSessionRepository, AppointmentRepository, KnowledgeRepository
-from ..models import CallStatus, CallDirection, Appointment, Lead, AppointmentStatus, LeadStatus, LeadPriority, Deployment
+from ..models import CallStatus, CallDirection, Appointment, Lead, AppointmentStatus, LeadStatus, LeadPriority, Deployment, Agent, AgentVersion
 from ..domain.indic_normalizers import (
     normalize_indic_age,
     normalize_indic_time,
     sanitize_service_title,
     is_past_slot,
 )
+from ..domain.dynamic_schedule_engine import is_time_within_shifts, extract_business_schedule_from_version
 
 router = APIRouter(prefix="/api/internal", tags=["internal"])
 
@@ -292,6 +293,26 @@ async def create_internal_appointment(
             detail=f"Cannot book appointment for past time slot '{apt_time}' on {apt_date}."
         )
 
+    # Shift validation: Reject slots outside operational shifts / during break
+    business_hours = payload.get("businessHours")
+    if not business_hours and effective_tenant_id:
+        biz_hours_query = await session.execute(
+            select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+            .where(Agent.tenantId == effective_tenant_id)
+            .order_by(AgentVersion.versionNumber.desc())
+            .limit(1)
+        )
+        cfg_json = biz_hours_query.scalar_one_or_none()
+        if cfg_json and isinstance(cfg_json, dict):
+            b_h, _ = extract_business_schedule_from_version(cfg_json)
+            business_hours = b_h
+
+    if business_hours and not is_time_within_shifts(apt_time, business_hours):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Requested slot '{apt_time}' falls during closed/break hours in configured schedule: {business_hours}."
+        )
+
     # Inherit caller phone number from active CallSession if phone is missing or dummy
     if (not phone or phone == "+910000000000") and call_session_id:
         cs_res = await session.execute(select(CallSession).where(CallSession.id == call_session_id))
@@ -439,6 +460,8 @@ async def check_internal_appointment_slots(
     booking_date: str = Query(..., alias="bookingDate"),
     phone: Optional[str] = Query(None),
     preferred_time: Optional[str] = Query(None, alias="preferredTime"),
+    business_hours: Optional[str] = Query(None, alias="businessHours"),
+    slot_duration: Optional[str] = Query(None, alias="slotDuration"),
     authenticated: bool = Depends(require_worker),
     session: AsyncSession = Depends(get_db)
 ):
@@ -460,6 +483,8 @@ async def check_internal_appointment_slots(
         booking_date=booking_date,
         phone=phone,
         preferred_time=preferred_time,
+        business_hours=business_hours,
+        slot_duration=slot_duration,
     )
 
 

@@ -248,22 +248,28 @@ async def book_receptionist_appointment(
             detail=f"Slot {norm_time} on {body.date} is already booked by {collision.customerName} ({collision.appointmentNumber or 'APT'})."
         )
 
-    crm = CRMService(session)
-    appt = await crm.create_appointment(
-        tenant_id=tenant_uuid,
-        customer_name=body.patientName,
-        customer_phone=body.patientPhone,
-        booking_date=body.date,
-        booking_time=norm_time,
-        title=body.reason or "General Consultation",
-        resource_name=doc["name"],
-        booked_by=body.bookedBy or "RECEPTIONIST",
-        booked_by_name=body.bookedByName or "Walk-in Desk Receptionist",
-        age=body.age,
-        place=body.place,
-        walk_in=body.walkIn if body.walkIn is not None else True,
-        notes=body.reason,
-    )
+    try:
+        crm = CRMService(session)
+        appt = await crm.create_appointment(
+            tenant_id=tenant_uuid,
+            customer_name=body.patientName,
+            customer_phone=body.patientPhone,
+            booking_date=body.date,
+            booking_time=norm_time,
+            title=body.reason or "General Consultation",
+            resource_name=doc["name"],
+            booked_by=body.bookedBy or "RECEPTIONIST",
+            booked_by_name=body.bookedByName or "Walk-in Desk Receptionist",
+            age=body.age,
+            place=body.place,
+            walk_in=body.walkIn if body.walkIn is not None else True,
+            notes=body.reason,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
     return {
         "success": True,

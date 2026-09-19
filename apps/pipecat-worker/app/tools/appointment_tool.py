@@ -18,6 +18,7 @@ from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import FunctionCallParams
 from app.temporal_context import is_past_date, is_past_slot, resolve_relative_or_absolute_date
 from app.turn_timing import log_phone_trace
+from app.dynamic_schedule_engine import is_time_within_shifts
 from app.tools.indic_normalizers import (
     normalize_indic_age,
     normalize_indic_time,
@@ -168,6 +169,22 @@ def create_book_appointment_tool_factory(
             }
             return await deliver_result(params, failure_result)
 
+        # Check against shift boundaries / break hours
+        biz_hours = getattr(context, "business_hours", None)
+        if biz_hours and not is_time_within_shifts(booking_time, biz_hours):
+            logger.warning(
+                f"[AppointmentTool] Rejected appointment slot during break/closed hours: time='{booking_time}', business_hours='{biz_hours}'"
+            )
+            failure_result = {
+                "success": False,
+                "error": "SLOT_OUTSIDE_BUSINESS_HOURS",
+                "message": (
+                    f"The requested appointment slot '{booking_time}' falls during closed or afternoon break hours in configured clinic schedule. "
+                    "Please offer the caller an open time slot during clinic operating hours."
+                ),
+            }
+            return await deliver_result(params, failure_result)
+
         # Normalize relative/natural date to standard YYYY-MM-DD
         normalized_date = resolve_relative_or_absolute_date(raw_booking_date, time_zone=tz_name)
         booking_date = normalized_date if normalized_date else raw_booking_date
@@ -213,6 +230,10 @@ def create_book_appointment_tool_factory(
             "bookedBy": "AGENT",
             "bookedByName": "AI Voice Assistant",
         }
+        if biz_hours:
+            payload["businessHours"] = biz_hours
+        if getattr(context, "slot_duration", None):
+            payload["slotDuration"] = context.slot_duration
         if context.tenant_id:
             payload["tenantId"] = context.tenant_id
         if context.agent_id:

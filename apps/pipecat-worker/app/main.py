@@ -2583,6 +2583,15 @@ async def websocket_plivo_endpoint(
 
         # 9. Resolve Authoritative Runtime Tools & Instantiate Native Conversation Context
         startup_tracker.record_stage("tool_registry_start")
+        var_map = {}
+        if runtime_config.variables and runtime_config.variables.input_variables:
+            var_map = {
+                v.key: (v.default_value if v.default_value is not None else "")
+                for v in runtime_config.variables.input_variables
+            }
+        biz_hours_val = var_map.get("businessHours") or None
+        slot_duration_val = var_map.get("slotDuration") or None
+
         tool_context = ToolRuntimeContext(
             deployment_id=resolved_deployment_id,
             call_session_id=call_session_id,
@@ -2592,6 +2601,8 @@ async def websocket_plivo_endpoint(
             api_url=settings.NEXTLITE_API_URL,
             worker_secret=settings.WORKER_API_SECRET,
             timezone=tz_name,
+            business_hours=biz_hours_val,
+            slot_duration=slot_duration_val,
             transcript_collector=transcript_collector,
             timing_tracker=turn_tracker,
             _call_session_task=call_session_task,
