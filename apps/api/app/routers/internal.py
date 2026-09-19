@@ -12,6 +12,11 @@ from ..services.runtime_config_service import RuntimeAgentConfigService
 from ..services.crm_service import CRMService
 from ..repositories import CallSessionRepository, AppointmentRepository, KnowledgeRepository
 from ..models import CallStatus, CallDirection, Appointment, Lead, AppointmentStatus, LeadStatus, LeadPriority, Deployment
+from ..domain.indic_normalizers import (
+    normalize_indic_age,
+    normalize_indic_time,
+    sanitize_service_title,
+)
 
 router = APIRouter(prefix="/api/internal", tags=["internal"])
 
@@ -271,9 +276,11 @@ async def create_internal_appointment(
     if not customer_name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="customerName is required")
 
-    service_type = payload.get("title") or payload.get("serviceType") or payload.get("service") or "General Appointment"
+    raw_service = payload.get("title") or payload.get("serviceType") or payload.get("service")
+    service_type = sanitize_service_title(raw_service)
     apt_date = payload.get("bookingDate") or payload.get("appointmentDate") or payload.get("date") or "Tomorrow"
-    apt_time = payload.get("bookingTime") or payload.get("appointmentTime") or payload.get("time") or "10:00 AM"
+    raw_time = payload.get("bookingTime") or payload.get("appointmentTime") or payload.get("time") or "10:00 AM"
+    apt_time = normalize_indic_time(raw_time)
     phone = payload.get("customerPhone") or payload.get("phone")
     call_session_id = uuid.UUID(payload["callSessionId"]) if payload.get("callSessionId") else None
 
@@ -288,7 +295,8 @@ async def create_internal_appointment(
         phone = "+910000000000"
 
     # Handle age, place/location details
-    age = payload.get("age")
+    raw_age = payload.get("age")
+    age = normalize_indic_age(raw_age)
     place = payload.get("place") or payload.get("location")
     raw_notes = payload.get("notes")
 
@@ -347,14 +355,10 @@ async def create_internal_appointment(
                 "isUpdated": True
             }
 
-    import re
     def _norm_time(t: str) -> str:
         if not t:
             return ""
-        clean = re.sub(r"\s+", " ", t.strip().upper())
-        if re.match(r"^\d:\d{2}\s*(AM|PM)$", clean):
-            clean = "0" + clean
-        return clean
+        return normalize_indic_time(t).strip().upper()
 
     # Slot Conflict Check: Prevent duplicate bookings for the same date and time
     norm_target_time = _norm_time(apt_time)

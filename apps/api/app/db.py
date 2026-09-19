@@ -1,6 +1,7 @@
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import declarative_base
+from sqlalchemy import text
 import redis.asyncio as redis
 from .config import settings
 from .logging import logger
@@ -20,13 +21,11 @@ if settings.NODE_ENV in ["test", "testing"] or "pytest" in sys.modules:
 else:
     engine = create_async_engine(
         settings.get_normalized_database_url(),
-        pool_size=20,
-        max_overflow=10,
+        pool_size=10,
+        max_overflow=5,
         pool_recycle=3600,
         echo=(settings.LOG_LEVEL == "debug")
     )
-
-
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -52,7 +51,26 @@ async def get_redis() -> redis.Redis:
     return redis_client
 
 async def init_db():
-    from sqlalchemy import text
+    """Idempotent database schema initialization and migrations."""
+    from . import models
+
+    # 1. Ensure pgvector extension is enabled (required before vector columns are referenced)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            logger.info("Verified pgvector extension is active.")
+    except Exception as e:
+        logger.warning(f"init_db pgvector extension notice: {e}")
+
+    # 2. Bootstrap base schema tables if starting on a clean database
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(models.Base.metadata.create_all)
+            logger.info("Verified base database schema tables exist.")
+    except Exception as e:
+        logger.warning(f"init_db Base.metadata.create_all notice: {e}")
+
+    # 3. Apply incremental / backward-compatible column migrations
     statements = [
         "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS booked_by VARCHAR(50) DEFAULT 'AGENT';",
         "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS booked_by_name VARCHAR(255);",
@@ -67,7 +85,7 @@ async def init_db():
             for stmt in statements:
                 await conn.execute(text(stmt))
     except Exception as e:
-        logger.warning(f"init_db migration warning: {e}")
+        logger.warning(f"init_db incremental column migrations notice: {e}")
 
     try:
         async with engine.connect() as conn:
@@ -76,11 +94,9 @@ async def init_db():
     except Exception as e:
         logger.debug(f"init_db enum migration: {e}")
 
-
 async def close_db():
     await engine.dispose()
     try:
         await redis_client.aclose()
     except Exception:
         pass
-

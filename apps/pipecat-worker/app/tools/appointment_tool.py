@@ -18,6 +18,11 @@ from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import FunctionCallParams
 from app.temporal_context import is_past_date, resolve_relative_or_absolute_date
 from app.turn_timing import log_phone_trace
+from app.tools.indic_normalizers import (
+    normalize_indic_age,
+    normalize_indic_time,
+    sanitize_service_title,
+)
 
 if TYPE_CHECKING:
     from app.tools.tool_registry import ToolRuntimeContext
@@ -35,15 +40,15 @@ APPOINTMENT_TOOL_PROPERTIES: Dict[str, Any] = {
     },
     "bookingTime": {
         "type": "string",
-        "description": "Time of appointment (e.g. 10:00 AM, 3:00 PM)",
+        "description": "Time of appointment strictly in standard format (e.g. 10:00 AM, 01:30 PM, 06:00 PM)",
     },
     "title": {
         "type": "string",
-        "description": "Reason for visit or service type",
+        "description": "Reason for visit or service type (e.g. 'Dental Checkup', 'General Consultation')",
     },
     "age": {
         "type": "string",
-        "description": "Age of the person (e.g. '22')",
+        "description": "Age of the person as numeric digits (e.g. '22')",
     },
     # "place": {
     #     "type": "string",
@@ -143,9 +148,9 @@ def create_book_appointment_tool_factory(
             return await deliver_result(params, failure_result)
 
         customer_name = str(raw_name).strip()
-        title = str(raw_title).strip()
+        title = sanitize_service_title(raw_title)
         raw_booking_date = str(raw_date).strip()
-        booking_time = str(raw_time).strip()
+        booking_time = normalize_indic_time(raw_time)
 
         # Check for past date protection against authoritative current date
         tz_name = getattr(context, "timezone", None)
@@ -216,8 +221,9 @@ def create_book_appointment_tool_factory(
             payload["callSessionId"] = trusted_call_session_id
 
         raw_age = raw_args.get("age")
-        if raw_age and str(raw_age).strip():
-            payload["age"] = str(raw_age).strip()
+        normalized_age = normalize_indic_age(raw_age)
+        if normalized_age:
+            payload["age"] = normalized_age
 
         raw_place = raw_args.get("place") or raw_args.get("location")
         if raw_place and str(raw_place).strip():
@@ -369,6 +375,7 @@ def create_reschedule_appointment_tool_factory(
         raw_args = params.arguments or {}
         raw_date = str(raw_args.get("newBookingDate") or "").strip()
         raw_time = str(raw_args.get("newBookingTime") or "").strip()
+        normalized_time = normalize_indic_time(raw_time)
         reason = str(raw_args.get("reason") or "").strip() or None
 
         tz_name = getattr(context, "timezone", None)
@@ -377,7 +384,7 @@ def create_reschedule_appointment_tool_factory(
         payload = {
             "deploymentId": trusted_deployment_id,
             "newBookingDate": normalized_date,
-            "newBookingTime": raw_time,
+            "newBookingTime": normalized_time,
             "phone": context.caller_phone,
             "reason": reason,
         }

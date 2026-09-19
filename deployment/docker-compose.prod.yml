@@ -1,0 +1,187 @@
+services:
+  # ==========================================
+  # 1. PostgreSQL Database with pgvector Extension
+  # ==========================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: nextlite_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-nextlite}
+      POSTGRES_USER: ${POSTGRES_USER:-nextlite_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nextlite_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nextlite_user} -d ${POSTGRES_DB:-nextlite}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  # ==========================================
+  # 2. Redis In-Memory State & Cache
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: nextlite_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - nextlite_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 192M
+
+  # ==========================================
+  # 3. NextLite FastAPI Control Plane API
+  # ==========================================
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    image: ghcr.io/${GITHUB_REPOSITORY:-nextlite}/nextlite-api:latest
+    container_name: nextlite_api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-nextlite_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nextlite}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      WORKER_API_SECRET: ${WORKER_API_SECRET:?WORKER_API_SECRET is required}
+      PIPECAT_URL: http://worker:8000
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      TELEPHONY_PROVIDER: plivo
+      PLIVO_AUTH_ID: ${PLIVO_AUTH_ID:-}
+      PLIVO_AUTH_TOKEN: ${PLIVO_AUTH_TOKEN:-}
+      PLIVO_CALLER_ID: ${PLIVO_CALLER_ID:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nextlite_internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 600M
+
+  # ==========================================
+  # 4. Pipecat Realtime Voice Pipeline Worker
+  # ==========================================
+  worker:
+    build:
+      context: ../apps/pipecat-worker
+      dockerfile: Dockerfile
+    image: ghcr.io/${GITHUB_REPOSITORY:-nextlite}/nextlite-worker:latest
+    container_name: nextlite_worker
+    restart: unless-stopped
+    environment:
+      PORT: 8000
+      NEXTLITE_API_URL: http://api:3001
+      WORKER_API_SECRET: ${WORKER_API_SECRET:?WORKER_API_SECRET is required}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SARVAM_API_KEY: ${SARVAM_API_KEY:?SARVAM_API_KEY is required}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      PLIVO_AUTH_ID: ${PLIVO_AUTH_ID:-}
+      PLIVO_AUTH_TOKEN: ${PLIVO_AUTH_TOKEN:-}
+      STT_MODEL: ${STT_MODEL:-saaras:v3-realtime}
+      LLM_MODEL: ${LLM_MODEL:-sarvam-2b}
+      TTS_MODEL: ${TTS_MODEL:-bulbul:v2}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nextlite_internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1024M
+
+  # ==========================================
+  # 5. Production Nginx Reverse Proxy & TLS
+  # ==========================================
+  nginx:
+    image: nginx:alpine
+    container_name: nextlite_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ../apps/web/dist:/var/www/nextlite-web:ro
+    depends_on:
+      - api
+      - worker
+    networks:
+      - nextlite_internal
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+
+volumes:
+  postgres_data:
+    name: nextlite_postgres_data
+  redis_data:
+    name: nextlite_redis_data
+
+networks:
+  nextlite_internal:
+    name: nextlite_network
+    driver: bridge

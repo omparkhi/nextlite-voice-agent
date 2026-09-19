@@ -124,7 +124,7 @@ logger.remove()
 logger.add(
     sys.stdout,
     format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-    level=settings.LOG_LEVEL,
+    level=settings.LOG_LEVEL.upper() if isinstance(settings.LOG_LEVEL, str) else settings.LOG_LEVEL,
 )
 
 
@@ -359,7 +359,7 @@ async def plivo_inbound_xml(
     server_host = host or request.headers.get("host", f"localhost:{settings.PORT}")
     scheme = "wss" if request.headers.get("x-forwarded-proto") == "https" or "https" in str(request.url) else "ws"
     
-    # Extract caller number and call UUID from query params or POST form data
+    # Extract caller number and call UUID from query params or POST form/raw data
     query_params = dict(request.query_params)
     form_params = {}
     if request.method == "POST":
@@ -368,6 +368,18 @@ async def plivo_inbound_xml(
             form_params = dict(form_data)
         except Exception:
             pass
+        if not form_params:
+            try:
+                raw_body = await request.body()
+                if raw_body:
+                    import urllib.parse
+                    decoded_body = raw_body.decode("utf-8", errors="ignore")
+                    parsed_qs = urllib.parse.parse_qs(decoded_body)
+                    for k, v in parsed_qs.items():
+                        if v:
+                            form_params[k] = v[0]
+            except Exception as parse_err:
+                logger.warning(f"[Plivo XML] Raw body parse notice: {parse_err}")
 
     caller_direction = (
         query_params.get("Direction")
@@ -399,6 +411,11 @@ async def plivo_inbound_xml(
         or form_params.get("callId")
         or form_params.get("ALegUUID")
     )
+
+    if caller_to:
+        caller_to = str(caller_to).strip()
+        if not caller_to.startswith("+") and not caller_to.startswith("00"):
+            caller_to = "+" + caller_to
 
     if not deployment_id and caller_to:
         try:

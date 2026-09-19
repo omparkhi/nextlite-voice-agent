@@ -11,6 +11,11 @@ from ..models import (
     UserRole, TenantAppointmentCounter
 )
 from ..logging import logger
+from ..domain.indic_normalizers import (
+    normalize_indic_age,
+    normalize_indic_time,
+    sanitize_service_title,
+)
 
 class CRMService:
     def __init__(self, session: AsyncSession):
@@ -397,16 +402,18 @@ class CRMService:
         notes: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
+        # Normalize time, age, and service title
+        norm_booking_time = normalize_indic_time(booking_time)
+        norm_age = normalize_indic_age(age)
+        clean_title = sanitize_service_title(title, default_service="General Consultation")
+
         # Slot Conflict Check: Prevent duplicate booking if slot is already occupied on the given date
         def _norm_time(t: str) -> str:
             if not t:
                 return ""
-            clean = re.sub(r"\s+", " ", t.strip().upper())
-            if re.match(r"^\d:\d{2}\s*(AM|PM)$", clean):
-                clean = "0" + clean
-            return clean
+            return normalize_indic_time(t).strip().upper()
 
-        target_norm_time = _norm_time(booking_time)
+        target_norm_time = _norm_time(norm_booking_time)
         existing_res = await self.session.execute(
             select(Appointment).where(
                 Appointment.tenantId == tenant_id,
@@ -420,7 +427,7 @@ class CRMService:
         for existing in existing_res.scalars().all():
             if _norm_time(existing.bookingTime) == target_norm_time:
                 raise ValueError(
-                    f"Slot {booking_time} on {booking_date} is already booked for patient '{existing.customerName}' ({existing.appointmentNumber})."
+                    f"Slot {norm_booking_time} on {booking_date} is already booked for patient '{existing.customerName}' ({existing.appointmentNumber})."
                 )
 
         # Generate friendly appointment number
@@ -428,36 +435,17 @@ class CRMService:
             select(TenantAppointmentCounter).where(TenantAppointmentCounter.tenantId == tenant_id).with_for_update()
         )
         counter = res.scalar_one_or_none()
-
-        max_num = 1000
-        existing_appts_res = await self.session.execute(
-            select(Appointment.appointmentNumber).where(Appointment.tenantId == tenant_id)
-        )
-        for num_str in existing_appts_res.scalars().all():
-            if num_str and num_str.startswith("APT-"):
-                try:
-                    val = int(num_str.split("-")[1])
-                    if val > max_num:
-                        max_num = val
-                except (ValueError, IndexError):
-                    pass
-
         if not counter:
-            next_num = max_num + 1
-            counter = TenantAppointmentCounter(
-                tenantId=tenant_id,
-                lastNumber=next_num,
-                updatedAt=datetime.utcnow()
-            )
+            counter = TenantAppointmentCounter(tenantId=tenant_id, lastNumber=1000)
             self.session.add(counter)
-        else:
-            next_num = max(counter.lastNumber + 1, max_num + 1)
-            counter.lastNumber = next_num
-            counter.updatedAt = datetime.utcnow()
+
+        counter.lastNumber += 1
+        counter.updatedAt = datetime.utcnow()
+        next_num = counter.lastNumber
 
         meta = dict(metadata or {})
-        if age:
-            meta["age"] = str(age).strip()
+        if norm_age:
+            meta["age"] = norm_age
         if place:
             meta["place"] = str(place).strip()
             meta["location"] = str(place).strip()
@@ -470,14 +458,14 @@ class CRMService:
             appointmentNumber=f"APT-{next_num}",
             customerName=customer_name,
             customerPhone=customer_phone,
-            title=title or "Consultation",
+            title=clean_title,
             resourceName=resource_name,
             bookingDate=booking_date,
-            bookingTime=booking_time,
+            bookingTime=norm_booking_time,
             status=AppointmentStatus.SCHEDULED,
             bookedBy=booked_by or "RECEPTIONIST",
             bookedByName=booked_by_name or ("Walk-in Desk Receptionist" if booked_by == "RECEPTIONIST" else "Client Portal"),
-            age=str(age).strip() if age else None,
+            age=norm_age,
             place=str(place).strip() if place else None,
             walkIn=walk_in,
             notes=notes,
@@ -524,6 +512,12 @@ class CRMService:
         )
         calls_deleted = call_res.rowcount or 0
 
+        # Delete follow-ups (WhatsApp messages / reminders)
+        fu_res = await self.session.execute(
+            delete(FollowUp).where(FollowUp.tenantId == tenant_id)
+        )
+        fu_deleted = fu_res.rowcount or 0
+
         # Reset appointment counter to 1000
         counter_res = await self.session.execute(
             select(TenantAppointmentCounter).where(TenantAppointmentCounter.tenantId == tenant_id)
@@ -534,7 +528,7 @@ class CRMService:
             counter.updatedAt = datetime.utcnow()
 
         await self.session.commit()
-        logger.info(f"Reset operational data for tenant {tenant_id}: {appts_deleted} appts, {leads_deleted} leads, {calls_deleted} call sessions deleted.")
+        logger.info(f"Reset operational data for tenant {tenant_id}: {appts_deleted} appts, {leads_deleted} leads, {calls_deleted} call sessions, {fu_deleted} follow-ups deleted.")
 
         return {
             "success": True,
@@ -543,6 +537,7 @@ class CRMService:
                 "appointments": appts_deleted,
                 "leads": leads_deleted,
                 "callSessions": calls_deleted,
+                "followUps": fu_deleted,
             }
         }
 
@@ -666,8 +661,9 @@ class CRMService:
         if not appt:
             return None
 
+        norm_new_time = normalize_indic_time(new_time)
         appt.bookingDate = new_date
-        appt.bookingTime = new_time
+        appt.bookingTime = norm_new_time
         appt.status = AppointmentStatus.SCHEDULED
         current_meta = dict(appt.metadataJson or {})
         current_meta["rescheduledAt"] = datetime.utcnow().isoformat()

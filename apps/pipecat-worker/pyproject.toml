@@ -13,8 +13,9 @@ dependencies = [
     "pydantic-settings>=2.4.0",
     "python-dotenv>=1.0.0",
     "loguru>=0.7.2",
-    "audioop-lts>=0.2.0",
+    "audioop-lts>=0.2.0;python_version>='3.13'",
     "soxr>=1.0.0",
+    "redis>=5.0.0",
 ]
 
 [project.optional-dependencies]

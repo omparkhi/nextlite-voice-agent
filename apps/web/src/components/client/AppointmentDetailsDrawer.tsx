@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Appointment } from '../../types';
 import { api } from '../../services/api';
+import { formatDateDDMMYYYY } from '../../utils/dateFormatters';
 
 interface AppointmentDetailsDrawerProps {
   appointment: Appointment | null;
@@ -185,7 +186,7 @@ export function AppointmentDetailsDrawer({
               <div className="flex justify-between py-1">
                 <span className="text-[#777169]">Date & Time</span>
                 <span className="font-semibold text-[#0c0a09]">
-                  {appointment.bookingDate} at {appointment.bookingTime}
+                  {formatDateDDMMYYYY(appointment.bookingDate)} at {appointment.bookingTime}
                 </span>
               </div>
 

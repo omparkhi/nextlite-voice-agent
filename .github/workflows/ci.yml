@@ -1,0 +1,72 @@
+name: CI Test Suite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    name: Backend Unit & Domain Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install System Audio & Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libsox-dev
+
+      - name: Install Pipecat Worker & API Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e apps/pipecat-worker
+          pip install -r apps/api/requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run Domain Test Suite
+        env:
+          PYTHONPATH: apps/pipecat-worker:apps/api:.
+        run: |
+          pytest tests/domain
+
+      - name: Run WhatsApp Integration Security Tests
+        env:
+          PYTHONPATH: apps/api:apps/pipecat-worker:.
+        run: |
+          pytest apps/api/tests/test_whatsapp_integration_router.py
+
+      - name: Run Pipecat Worker Suite
+        env:
+          PYTHONPATH: apps/pipecat-worker:apps/api:.
+        run: |
+          pytest apps/pipecat-worker/tests
+
+  test-frontend:
+    name: Frontend Build & Typecheck
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install Workspace Dependencies
+        run: npm ci
+
+      - name: Build Web Application
+        run: npm run build --workspace=@nextlite/web

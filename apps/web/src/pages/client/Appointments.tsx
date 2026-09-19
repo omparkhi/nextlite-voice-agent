@@ -6,6 +6,7 @@ import { TableSkeleton } from '../../components/client/LoadingSkeleton';
 import { EmptyState } from '../../components/client/EmptyState';
 import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
 import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
+import { formatDateDDMMYYYY } from '../../utils/dateFormatters';
 
 const STANDARD_TIME_SLOTS = [
   '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
@@ -413,7 +414,7 @@ export function ClientAppointments() {
                       </td> */}
 
                       <td className="px-5 py-4 whitespace-nowrap font-medium text-[#0c0a09]">
-                        <span>{appt.bookingDate}</span>
+                        <span>{formatDateDDMMYYYY(appt.bookingDate)}</span>
                         <span className="text-[#777169] text-[11px] block">{appt.bookingTime}</span>
                       </td>
 
@@ -422,8 +423,8 @@ export function ClientAppointments() {
                       </td>
 
                       <td className="px-4 py-4 whitespace-nowrap text-[#4e4e4e]">
-                        <span className="font-medium text-[#0c0a09] block">{appt.title}</span>
-                        <span className="text-[#777169] text-[11px]">{appt.resourceName || 'Clinic Staff'}</span>
+                        <span className="font-medium text-[#0c0a09] block">{appt.title || 'General Consultation'}</span>
+                        <span className="text-[#777169] text-[11px] block">{appt.resourceName || 'Clinic Staff'}</span>
                       </td>
 
                       <td className="px-4 py-4 whitespace-nowrap">
@@ -630,7 +631,7 @@ export function ClientAppointments() {
 
               {existingBookingInfo && (
                 <div className="p-2.5 rounded-xl bg-[#fffbeb] border border-[#fef3c7] text-[11px] text-[#92400e]">
-                  Patient already has booking <strong>{existingBookingInfo.appointmentNumber}</strong> on {existingBookingInfo.bookingDate} at {existingBookingInfo.bookingTime}.
+                  Patient already has booking <strong>{existingBookingInfo.appointmentNumber}</strong> on {formatDateDDMMYYYY(existingBookingInfo.bookingDate)} at {existingBookingInfo.bookingTime}.
                 </div>
               )}
 

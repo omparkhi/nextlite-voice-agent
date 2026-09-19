@@ -1,7 +1,10 @@
 import os
+import logging
 from typing import Optional, Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, AliasChoices
+
+_log = logging.getLogger("nextlite-api")
 
 class Settings(BaseSettings):
     PORT: int = 3001
@@ -65,5 +68,16 @@ class Settings(BaseSettings):
         elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
+
+    def validate_production_security(self) -> None:
+        """Validates that production environments do not execute with insecure default development secrets."""
+        if self.NODE_ENV == "production":
+            if not self.JWT_SECRET or "dev-jwt-secret" in self.JWT_SECRET or len(self.JWT_SECRET) < 32:
+                raise ValueError("FATAL SECURITY CONFIGURATION: In production mode, JWT_SECRET must be set to a secure random string of at least 32 characters.")
+            if not self.JWT_REFRESH_SECRET or "dev-jwt-refresh" in self.JWT_REFRESH_SECRET or len(self.JWT_REFRESH_SECRET) < 32:
+                raise ValueError("FATAL SECURITY CONFIGURATION: In production mode, JWT_REFRESH_SECRET must be set to a secure random string of at least 32 characters.")
+            if not self.WORKER_API_SECRET or self.WORKER_API_SECRET == "dev-worker-api-secret":
+                raise ValueError("FATAL SECURITY CONFIGURATION: In production mode, WORKER_API_SECRET must be customized.")
+            _log.info("Production security secrets validation passed.")
 
 settings = Settings()
