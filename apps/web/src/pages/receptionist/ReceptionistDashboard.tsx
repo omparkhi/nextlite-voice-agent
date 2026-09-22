@@ -344,11 +344,10 @@ export function ReceptionistDashboard() {
             <button
               type="button"
               onClick={() => setSelectedDate(todayStr)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
-                selectedDate === todayStr
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${selectedDate === todayStr
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
             >
               Today
             </button>
@@ -360,12 +359,11 @@ export function ReceptionistDashboard() {
                 tmr.setDate(tmr.getDate() + 1);
                 setSelectedDate(tmr.toISOString().split('T')[0]);
               }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${
-                selectedDate !== todayStr &&
+              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${selectedDate !== todayStr &&
                 selectedDate === new Date(Date.now() + 86400000).toISOString().split('T')[0]
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
             >
               Tomorrow
             </button>
@@ -468,7 +466,7 @@ export function ReceptionistDashboard() {
               <button
                 type="submit"
                 disabled={addingRow}
-                className="w-full h-8.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1 disabled:opacity-50"
+                className="w-full h-[38px] bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-md transition-all shadow-xs flex items-center justify-center gap-1 disabled:opacity-50"
               >
                 {addingRow ? (
                   <span>Saving...</span>
@@ -497,27 +495,24 @@ export function ReceptionistDashboard() {
                 <button
                   type="button"
                   onClick={() => setSourceFilter('ALL')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] ${
-                    sourceFilter === 'ALL' ? 'bg-white text-gray-900 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] ${sourceFilter === 'ALL' ? 'bg-white text-gray-900 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                    }`}
                 >
                   All Sources
                 </button>
                 <button
                   type="button"
                   onClick={() => setSourceFilter('AI')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] flex items-center gap-1 ${
-                    sourceFilter === 'AI' ? 'bg-white text-purple-700 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] flex items-center gap-1 ${sourceFilter === 'AI' ? 'bg-white text-purple-700 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                    }`}
                 >
                   <span>🎙️</span> AI Calls
                 </button>
                 <button
                   type="button"
                   onClick={() => setSourceFilter('DESK')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] flex items-center gap-1 ${
-                    sourceFilter === 'DESK' ? 'bg-white text-emerald-700 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] flex items-center gap-1 ${sourceFilter === 'DESK' ? 'bg-white text-emerald-700 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                    }`}
                 >
                   <span>📋</span> Desk Walk-ins
                 </button>
@@ -579,9 +574,8 @@ export function ReceptionistDashboard() {
                     return (
                       <tr
                         key={appt.id}
-                        className={`hover:bg-slate-50/80 transition-colors ${
-                          isCompleted ? 'bg-gray-50/40 text-gray-400' : isCancelled ? 'bg-rose-50/20 text-gray-400 line-through' : ''
-                        }`}
+                        className={`hover:bg-slate-50/80 transition-colors ${isCompleted ? 'bg-gray-50/40 text-gray-400' : isCancelled ? 'bg-rose-50/20 text-gray-400 line-through' : ''
+                          }`}
                       >
                         {/* Token # */}
                         <td className="py-3 px-4 font-mono font-bold text-gray-600 text-[11px]">
@@ -644,13 +638,12 @@ export function ReceptionistDashboard() {
                         {/* Status */}
                         <td className="py-3 px-4">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                              isCompleted
-                                ? 'bg-blue-100 text-blue-800'
-                                : isCancelled
+                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isCompleted
+                              ? 'bg-blue-100 text-blue-800'
+                              : isCancelled
                                 ? 'bg-rose-100 text-rose-800'
                                 : 'bg-emerald-100 text-emerald-800'
-                            }`}
+                              }`}
                           >
                             {appt.status}
                           </span>

@@ -45,8 +45,8 @@ export default {
         },
       },
       fontFamily: {
-        display: ['"EB Garamond"', 'Waldenburg', 'Times New Roman', 'serif'],
-        sans: ['Inter', 'sans-serif'],
+        display: ['"Instrument Sans"', '"Google Sans Flex"', 'Inter', 'sans-serif'],
+        sans: ['"Instrument Sans"', '"Google Sans Flex"', 'Inter', 'sans-serif'],
       },
       borderRadius: {
         'pill': '9999px',
