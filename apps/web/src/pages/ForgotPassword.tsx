@@ -6,11 +6,11 @@ export function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
+
     try {
       await api.forgotPassword(email);
       setSubmitted(true);
@@ -20,7 +20,7 @@ export function ForgotPassword() {
       setLoading(false);
     }
   };
-  
+
   if (submitted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#0c0a09] px-4 font-sans relative overflow-hidden">
@@ -41,27 +41,29 @@ export function ForgotPassword() {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#0c0a09] px-4 font-sans relative overflow-hidden">
       <div className="absolute top-[-100px] left-[20%] w-[450px] h-[450px] rounded-full bg-radial from-[#a7e5d3]/40 via-[#f4c5a8]/20 to-transparent blur-3xl pointer-events-none" />
 
       <div className="w-full max-w-md p-8 md:p-10 bg-white rounded-2xl border border-[#e7e5e4] shadow-[0_4px_24px_rgba(0,0,0,0.04)] relative z-10">
         <div className="text-center mb-6">
-          <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 bg-[#0c0a09] rounded-sm flex items-center justify-center text-white text-xs font-bold">
-              NL
-            </div>
-            <span className="font-display-serif text-2xl font-light text-[#0c0a09]">
-              NextLite <span className="font-sans text-xs uppercase tracking-widest text-[#777169]">Voice</span>
+          <Link to="/" className="inline-flex items-center gap-2.5 mb-4 group">
+            <img
+              src="/vanifyai-logo.jpg"
+              alt="VanifyAI"
+              className="w-8 h-8 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5"
+            />
+            <span className="text-2xl font-bold tracking-tight text-[#0c0a09]">
+              VanifyAI
             </span>
           </Link>
-          <h1 className="font-display-serif text-3xl font-light text-[#0c0a09]">Forgot Password</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[#0c0a09]">Forgot Password</h1>
           <p className="text-xs text-[#777169] mt-1">
             Enter your account email to receive a reset link
           </p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-medium uppercase tracking-wider text-[#4e4e4e] mb-1.5">
@@ -76,7 +78,7 @@ export function ForgotPassword() {
               required
             />
           </div>
-          
+
           <button
             type="submit"
             disabled={loading}
@@ -85,7 +87,7 @@ export function ForgotPassword() {
             {loading ? 'Sending Instructions...' : 'Send Reset Link'}
           </button>
         </form>
-        
+
         <div className="mt-6 text-center text-xs text-[#777169]">
           Remember your password? <Link to="/login" className="text-[#0c0a09] font-medium hover:underline">Back to Sign In</Link>
         </div>

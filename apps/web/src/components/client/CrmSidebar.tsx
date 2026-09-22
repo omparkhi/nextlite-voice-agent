@@ -116,23 +116,27 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-[#e7e5e4] flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-[#e7e5e4] flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div>
           {/* Brand Header */}
-          <div className="h-16 px-6 border-b border-[#f0efed] flex items-center justify-between">
-            <Link to="/dashboard" onClick={onClose} className="flex items-center gap-2.5">
-              <div className="w-6 h-6 bg-[#0c0a09] rounded-md flex items-center justify-center text-white text-[11px] font-bold">
-                NL
-              </div>
-              <div>
-                <span className="font-display-serif text-lg tracking-tight text-[#0c0a09] block leading-none">
-                  NextLite <span className="font-sans text-[10px] uppercase tracking-widest text-[#777169] ml-0.5">CRM</span>
+          <div className="h-16 px-5 border-b border-[#f0efed] flex items-center justify-between">
+            <Link to="/dashboard" onClick={onClose} className="flex items-center gap-2.5 group">
+              <img
+                src="/vanifyai-logo.jpg"
+                alt="VanifyAI"
+                className="w-8 h-8 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5"
+              />
+              <div className="flex flex-col">
+                <span className="font-semibold text-xl text-[#0c0a09] leading-tight flex items-center gap-1">
+                  VanifyAI
+                  {/* <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 ml-0.5">
+                    CRM
+                  </span> */}
                 </span>
                 {businessName && (
-                  <span className="text-[10px] text-[#777169] block truncate max-w-[140px]">
+                  <span className="text-[10px] font-medium text-[#777169] block truncate max-w-[135px]">
                     {businessName}
                   </span>
                 )}
@@ -158,11 +162,10 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
                   key={item.path}
                   to={item.path}
                   onClick={onClose}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                    active
-                      ? 'bg-[#0c0a09] text-white shadow-sm'
-                      : 'text-[#4e4e4e] hover:text-[#0c0a09] hover:bg-[#fafafa]'
-                  }`}
+                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${active
+                    ? 'bg-[#0c0a09] text-white shadow-sm'
+                    : 'text-[#4e4e4e] hover:text-[#0c0a09] hover:bg-[#fafafa]'
+                    }`}
                 >
                   <div className="flex items-center gap-3">
                     <span className={active ? 'text-white' : 'text-[#777169]'}>{item.icon}</span>
@@ -171,9 +174,8 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
 
                   {item.badge && (
                     <span
-                      className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md ${
-                        active ? 'bg-white/20 text-white' : 'bg-[#dcfce7] text-[#15803d]'
-                      }`}
+                      className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md ${active ? 'bg-white/20 text-white' : 'bg-[#dcfce7] text-[#15803d]'
+                        }`}
                     >
                       {item.badge}
                     </span>
@@ -189,9 +191,8 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
           <div className="flex items-center justify-between mb-3">
             <div className="truncate">
               <p className="text-xs font-medium text-[#0c0a09] truncate">{user?.email || 'Authenticated User'}</p>
-              <span className={`inline-block text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full mt-0.5 ${
-                isViewer ? 'bg-[#f0efed] text-[#777169]' : 'bg-[#dcfce7] text-[#15803d]'
-              }`}>
+              <span className={`inline-block text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full mt-0.5 ${isViewer ? 'bg-[#f0efed] text-[#777169]' : 'bg-[#dcfce7] text-[#15803d]'
+                }`}>
                 {isViewer ? 'Client Viewer (Read Only)' : 'Client Owner'}
               </span>
             </div>

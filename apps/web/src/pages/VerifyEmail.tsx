@@ -10,34 +10,34 @@ export function VerifyEmail() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   useEffect(() => {
     if (!token) {
       setStatus('error');
       return;
     }
-    
+
     api.verifyEmail(token)
       .then(() => setStatus('ready'))
       .catch(() => setStatus('error'));
   }, [token]);
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-    
+
     if (password.length < 8) {
       setError('Password must be at least 8 characters');
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
       await api.setPassword(token!, password);
       navigate('/login', { state: { message: 'Password set successfully. Please log in.' } });
@@ -47,7 +47,7 @@ export function VerifyEmail() {
       setLoading(false);
     }
   };
-  
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#0c0a09] font-sans">
@@ -61,7 +61,7 @@ export function VerifyEmail() {
       </div>
     );
   }
-  
+
   if (status === 'error') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#0c0a09] px-4 font-sans">
@@ -82,32 +82,34 @@ export function VerifyEmail() {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f5f5f5] text-[#0c0a09] px-4 font-sans relative overflow-hidden">
       <div className="w-full max-w-md p-8 md:p-10 bg-white rounded-2xl border border-[#e7e5e4] shadow-[0_4px_24px_rgba(0,0,0,0.04)] relative z-10">
         <div className="text-center mb-6">
-          <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <div className="w-6 h-6 bg-[#0c0a09] rounded-sm flex items-center justify-center text-white text-xs font-bold">
-              NL
-            </div>
-            <span className="font-display-serif text-2xl font-light text-[#0c0a09]">
-              NextLite <span className="font-sans text-xs uppercase tracking-widest text-[#777169]">Voice</span>
+          <Link to="/" className="inline-flex items-center gap-2.5 mb-4 group">
+            <img
+              src="/vanifyai-logo.jpg"
+              alt="VanifyAI"
+              className="w-8 h-8 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5"
+            />
+            <span className="text-2xl font-semibold tracking-tight text-[#0c0a09]">
+              VanifyAI
             </span>
           </Link>
-          <h1 className="font-display-serif text-3xl font-light text-[#0c0a09]">Activate Account</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-[#0c0a09]">Activate Account</h1>
           <p className="text-xs text-[#777169] mt-1">
             Your email has been verified. Set your password to activate your account.
           </p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="p-3 bg-[#fef2f2] border border-[#fecaca] text-[#dc2626] rounded-xl text-xs font-medium">
               {error}
             </div>
           )}
-          
+
           <div>
             <label className="block text-xs font-medium uppercase tracking-wider text-[#4e4e4e] mb-1.5">
               Password
@@ -122,7 +124,7 @@ export function VerifyEmail() {
               minLength={8}
             />
           </div>
-          
+
           <div>
             <label className="block text-xs font-medium uppercase tracking-wider text-[#4e4e4e] mb-1.5">
               Confirm Password
@@ -137,7 +139,7 @@ export function VerifyEmail() {
               minLength={8}
             />
           </div>
-          
+
           <button
             type="submit"
             disabled={loading}

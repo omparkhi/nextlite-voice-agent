@@ -41,19 +41,21 @@ export function Login() {
 
       <div className="w-full max-w-md p-8 md:p-10 bg-white rounded-2xl border border-[#e7e5e4] shadow-[0_4px_24px_rgba(0,0,0,0.04)] relative z-10">
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-4 group">
-            <div className="w-6 h-6 bg-[#0c0a09] rounded-sm flex items-center justify-center text-white text-xs font-bold">
-              NL
-            </div>
-            <span className="font-display-serif text-7xl font-light tracking-tight text-[#0c0a09]">
-              NextLite <span className="font-sans text-xs uppercase tracking-widest text-[#777169]">Voice</span>
+          <Link to="/" className="inline-flex items-center gap-2.5 mb-4 group">
+            <img
+              src="/vanifyai-logo.jpg"
+              alt="VanifyAI"
+              className="w-8 h-8 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5"
+            />
+            <span className="text-2xl font-semibold tracking-tight text-[#0c0a09]">
+              VanifyAI
             </span>
           </Link>
-          <h2 className="font-display-serif text-3xl font-light text-[#0c0a09]">
+          <h2 className="text-2xl font-bold text-[#0c0a09] tracking-tight">
             Sign in to platform
           </h2>
           <p className="text-xs text-[#777169] mt-1">
-            Access your AI voice agents and client dashboard
+            Access your AI voice agents and client CRM dashboard
           </p>
         </div>
 

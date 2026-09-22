@@ -22,12 +22,14 @@ export function Home() {
       <header className="sticky top-0 z-50 bg-[#f5f5f5]/85 backdrop-blur-md border-b border-[#e7e5e4] transition-all">
         <div className="max-w-[1200px] mx-auto px-6 h-[64px] flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="w-5 h-5 bg-[#0c0a09] rounded-sm flex items-center justify-center text-white text-[10px] font-bold tracking-tighter">
-                NL
-              </div>
-              <span className="font-display-serif text-xl tracking-tight font-light text-[#0c0a09] group-hover:opacity-80 transition-opacity">
-                NextLite <span className="font-sans text-xs uppercase tracking-widest text-[#777169] ml-1">Voice</span>
+            <Link to="/" className="inline-flex items-center gap-2.5 mb-4 group">
+              <img
+                src="/vanifyai-logo.jpg"
+                alt="VanifyAI"
+                className="w-8 h-8 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5"
+              />
+              <span className="text-2xl font-semibold tracking-tight text-[#0c0a09]">
+                VanifyAI
               </span>
             </Link>
 
@@ -62,7 +64,7 @@ export function Home() {
           <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full bg-[#f0efed] border border-[#e7e5e4]">
             <span className="w-2 h-2 rounded-full bg-[#16a34a] animate-ping" />
             <span className="text-xs font-semibold uppercase tracking-wider text-[#0c0a09]">
-              NextLite Voice Platform 2.0
+              VanifyAI Voice Platform
             </span>
           </div>
 
@@ -87,14 +89,14 @@ export function Home() {
         {/* Audio Waveform Card Showcase */}
         <div id="demo" className="mt-16 max-w-3xl mx-auto el-card p-6 md:p-8 bg-white relative overflow-hidden">
           {/* Subtle gradient background glow */}
-          <div 
+          <div
             className="absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl opacity-30 pointer-events-none transition-colors duration-700"
             style={{ backgroundColor: selectedVoice.color }}
           />
 
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 border-b border-[#f0efed] pb-6">
             <div className="flex items-center gap-4">
-              <button 
+              <button
                 onClick={() => setIsPlaying(!isPlaying)}
                 className="w-12 h-12 rounded-full bg-[#292524] hover:bg-[#0c0a09] text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95 shadow-md"
                 aria-label={isPlaying ? "Pause voice demo" : "Play voice demo"}
@@ -126,11 +128,10 @@ export function Home() {
                 <button
                   key={voice.id}
                   onClick={() => setSelectedVoice(voice)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${
-                    selectedVoice.id === voice.id
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${selectedVoice.id === voice.id
                       ? 'bg-[#292524] text-white'
                       : 'bg-[#f0efed] text-[#4e4e4e] hover:bg-[#e7e5e4]'
-                  }`}
+                    }`}
                 >
                   {voice.name}
                 </button>
@@ -145,9 +146,8 @@ export function Home() {
               return (
                 <div
                   key={i}
-                  className={`w-1 rounded-full transition-all duration-300 ${
-                    isPlaying ? 'bg-[#292524]' : 'bg-[#d6d3d1]'
-                  }`}
+                  className={`w-1 rounded-full transition-all duration-300 ${isPlaying ? 'bg-[#292524]' : 'bg-[#d6d3d1]'
+                    }`}
                   style={{
                     height: isPlaying ? `${Math.max(15, heightMultiplier * 56)}px` : `${Math.max(8, heightMultiplier * 24)}px`,
                     opacity: isPlaying ? 0.85 : 0.4,
@@ -252,18 +252,18 @@ export function Home() {
                 <span className="text-xs text-[#777169]">/ month</span>
               </div>
               <p className="text-xs text-[#777169] mb-6">Ideal for testing and individual experimentation.</p>
-              
+
               <ul className="space-y-3 text-sm text-[#4e4e4e] border-t border-[#f0efed] pt-6">
                 <li className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   10,000 characters per month
                 </li>
                 <li className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   3 Custom Voices
                 </li>
                 <li className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   API Access (Standard Rate)
                 </li>
               </ul>
@@ -287,18 +287,18 @@ export function Home() {
                 <span className="text-xs text-[#a8a29e]">/ month</span>
               </div>
               <p className="text-xs text-[#a8a29e] mb-6">For creators & teams building voice AI products.</p>
-              
+
               <ul className="space-y-3 text-sm text-[#a8a29e] border-t border-white/10 pt-6">
                 <li className="flex items-center gap-2 text-white">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   100,000 characters per month
                 </li>
                 <li className="flex items-center gap-2 text-white">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   30 Custom Voices & Cloning
                 </li>
                 <li className="flex items-center gap-2 text-white">
-                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   Ultra-low Latency Agent API
                 </li>
               </ul>
@@ -316,18 +316,18 @@ export function Home() {
                 <span className="text-4xl font-light font-display-serif">Custom</span>
               </div>
               <p className="text-xs text-[#777169] mb-6">Dedicated infrastructure & custom voice design.</p>
-              
+
               <ul className="space-y-3 text-sm text-[#4e4e4e] border-t border-[#f0efed] pt-6">
                 <li className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   Unlimited Volumes & SLA
                 </li>
                 <li className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   Custom Brand Voice Design
                 </li>
                 <li className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"/></svg>
+                  <svg className="w-4 h-4 text-[#16a34a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                   Dedicated Support & On-prem
                 </li>
               </ul>
@@ -398,7 +398,7 @@ export function Home() {
           </div>
         </div>
         <div className="max-w-[1200px] mx-auto pt-6 border-t border-[#e7e5e4] flex flex-col md:flex-row items-center justify-between gap-4">
-          <div>© {new Date().getFullYear()} NextLite Voice AI. All rights reserved.</div>
+          <div>© {new Date().getFullYear()} VanifyAI Voice Platform. All rights reserved.</div>
           <div className="flex gap-4">
             <a href="#" className="hover:text-[#0c0a09]">Twitter / X</a>
             <a href="#" className="hover:text-[#0c0a09]">GitHub</a>
