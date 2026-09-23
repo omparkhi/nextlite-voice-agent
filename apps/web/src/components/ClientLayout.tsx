@@ -10,8 +10,19 @@ export function ClientLayout() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    return localStorage.getItem('crm_sidebar_collapsed') === 'true';
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(new Date());
+
+  const toggleCollapsed = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('crm_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   const loadProfile = useCallback(async () => {
     try {
@@ -61,19 +72,24 @@ export function ClientLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] text-[#0c0a09] font-sans flex">
+    <div className="min-h-screen bg-[#ffffff] text-[#0c0a09] font-sans flex">
       {/* Sidebar */}
       <CrmSidebar
         businessName={profile?.tenant?.name}
+        doctorName={profile?.doctorName || profile?.user?.name}
         isOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
+        isCollapsed={isCollapsed}
+        onToggleCollapse={toggleCollapsed}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
+      <div className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-300 ease-in-out ${isCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         <CrmTopbar
           title={getPageTitle(location.pathname)}
           onOpenMobileNav={() => setMobileNavOpen(true)}
+          onToggleCollapse={toggleCollapsed}
+          isCollapsed={isCollapsed}
           onRefresh={handleManualRefresh}
           isRefreshing={isRefreshing}
           lastUpdated={lastUpdated}

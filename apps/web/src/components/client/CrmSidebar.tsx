@@ -1,26 +1,73 @@
+import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface CrmSidebarProps {
   businessName?: string;
+  doctorName?: string;
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
+export function CrmSidebar({
+  businessName,
+  doctorName,
+  isOpen,
+  onClose,
+  isCollapsed = false,
+  onToggleCollapse,
+}: CrmSidebarProps) {
   const location = useLocation();
   const { user, logout } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const isViewer = user?.role === 'CLIENT_VIEWER';
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUserMenuOpen]);
 
-  const navItems = [
+  // Use the full Dr. / Client owner name from profile or user record, fallback to email
+  const displayName =
+    doctorName?.trim() ||
+    user?.name?.trim() ||
+    (user?.email
+      ? user.email
+        .split('@')[0]
+        .replace(/[._-]/g, ' ')
+        .replace(/\b\w/g, (c: string) => c.toUpperCase())
+      : 'Account');
+
+  const initial = displayName.charAt(0).toUpperCase() || 'U';
+
+  interface NavItem {
+    name: string;
+    path: string;
+    exact?: boolean;
+    badge?: string;
+    icon: JSX.Element;
+  }
+
+  const navItems: NavItem[] = [
     {
       name: 'Overview',
       path: '/dashboard',
       exact: true,
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 10.5L10.5 4.2a2.3 2.3 0 0 1 3 0l7.5 6.3a1.5 1.5 0 0 1 .5 1.15V19a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 19v-7.35a1.5 1.5 0 0 1 .5-1.15z" />
+          <path d="M9.5 21.5v-6a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v6" />
         </svg>
       ),
     },
@@ -28,8 +75,8 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
       name: 'Calls CRM',
       path: '/dashboard/calls',
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
         </svg>
       ),
     },
@@ -37,8 +84,11 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
       name: 'Leads CRM',
       path: '/dashboard/leads',
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       ),
     },
@@ -46,27 +96,32 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
       name: 'Appointments',
       path: '/dashboard/appointments',
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="17" rx="4" ry="4" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+          <circle cx="8" cy="15" r="1" fill="currentColor" />
+          <circle cx="12" cy="15" r="1" fill="currentColor" />
+          <circle cx="16" cy="15" r="1" fill="currentColor" />
         </svg>
       ),
     },
     {
       name: 'WhatsApp CRM',
       path: '/dashboard/follow-ups',
-      badge: 'WhatsApp',
+      // badge: 'WhatsApp',
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
         </svg>
       ),
     },
     {
-      name: 'Analytics',
+      name: 'Agent Analytics',
       path: '/dashboard/analytics',
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="5" ry="5" />
+          <path d="M8 17v-4M12 17v-8M16 17v-6" />
         </svg>
       ),
     },
@@ -74,8 +129,12 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
       name: 'Phone & Agents',
       path: '/dashboard/phone-agents',
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="6" width="16" height="14" rx="4" ry="4" />
+          <path d="M12 2v4M2 13h2M20 13h2" />
+          <circle cx="9" cy="12" r="1.2" fill="currentColor" />
+          <circle cx="15" cy="12" r="1.2" fill="currentColor" />
+          <path d="M9 16c.8.6 1.8 1 3 1s2.2-.4 3-1" />
         </svg>
       ),
     },
@@ -83,8 +142,10 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
       name: 'Staff Receptionists',
       path: '/dashboard/receptionists',
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+          <circle cx="12" cy="10" r="3" />
+          <path d="M7 18c0-2.2 2.2-4 5-4s5 1.8 5 4" />
         </svg>
       ),
     },
@@ -92,8 +153,9 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
       name: 'My Plan & Usage',
       path: '/dashboard/plan',
       icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="5" width="20" height="14" rx="4" ry="4" />
+          <path d="M2 10h20M7 15h3" />
         </svg>
       ),
     },
@@ -116,33 +178,50 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-64 bg-white border-r border-[#e7e5e4] flex flex-col justify-between transition-transform duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+        className={`fixed top-0 bottom-0 left-0 z-50 bg-white border-r border-[#e7e5e4] flex flex-col justify-between transition-all duration-300 ease-in-out lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          } ${isCollapsed ? 'w-64 lg:w-20' : 'w-64'}`}
       >
         <div>
           {/* Brand Header */}
-          <div className="h-16 px-5 border-b border-[#f0efed] flex items-center justify-between">
-            <Link to="/dashboard" onClick={onClose} className="flex items-center gap-2.5 group">
-              <img
-                src="/vanifyai-logo.jpg"
-                alt="VanifyAI"
-                className="w-8 h-8 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5"
-              />
-              <div className="flex flex-col">
-                <span className="font-semibold text-xl text-[#0c0a09] leading-tight flex items-center gap-1">
-                  VanifyAI
-                  {/* <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 ml-0.5">
-                    CRM
-                  </span> */}
-                </span>
-                {businessName && (
-                  <span className="text-[10px] font-medium text-[#777169] block truncate max-w-[135px]">
-                    {businessName}
-                  </span>
-                )}
-              </div>
-            </Link>
+          <div className={`h-16  px-5 border-b border-[#f0efed] flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
+            <div className="w-full flex items-center justify-between overflow-hidden">
+              {/* Desktop Hamburger Toggle Button on the Left */}
 
+
+              {/* Logo & Brand Name */}
+              <Link to="/dashboard" onClick={onClose} className={`flex items-center gap-2 group overflow-hidden ${isCollapsed ? 'hidden lg:hidden' : 'flex'}`}>
+                <img
+                  src="/vanifyai-logo.jpg"
+                  alt="VanifyAI"
+                  className="w-7 h-7 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5 shrink-0"
+                />
+                <div className="flex flex-col">
+                  <span className="font-semibold text-lg text-[#0c0a09] leading-tight flex items-center gap-1">
+                    VanifyAI
+                  </span>
+                  {businessName && (
+                    <span className="text-[10px] font-medium text-[#777169] block truncate max-w-[120px]">
+                      {businessName}
+                    </span>
+                  )}
+                </div>
+              </Link>
+
+              {onToggleCollapse && (
+                <button
+                  onClick={onToggleCollapse}
+                  className="hidden lg:flex items-center justify-center p-1.5 rounded-lg border border-[#e7e5e4] bg-white text-[#777169] hover:text-[#0c0a09] hover:bg-[#fafafa] transition-colors shadow-2xs cursor-pointer shrink-0"
+                  title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                  aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Close Button */}
             <button
               onClick={onClose}
               className="lg:hidden p-1 text-[#777169] hover:text-[#0c0a09] rounded-md"
@@ -154,7 +233,7 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
           </div>
 
           {/* Navigation Links */}
-          <nav className="p-4 space-y-1">
+          <nav className={`space-y-1 ${isCollapsed ? 'p-3 lg:px-2.5' : 'p-3.5'}`}>
             {navItems.map((item) => {
               const active = isActive(item.path, item.exact);
               return (
@@ -162,19 +241,26 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
                   key={item.path}
                   to={item.path}
                   onClick={onClose}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all ${active
-                    ? 'bg-[#0c0a09] text-white shadow-sm'
-                    : 'text-[#4e4e4e] hover:text-[#0c0a09] hover:bg-[#fafafa]'
+                  title={isCollapsed ? item.name : undefined}
+                  className={`group flex items-center ${isCollapsed ? 'justify-between lg:justify-center px-4 lg:px-0' : 'justify-between px-4'} py-2.5 rounded-2xl lg:rounded-full text-sm transition-all duration-150 ${active
+                    ? 'bg-[#f0efed] text-[#0c0a09] font-medium shadow-2xs'
+                    : 'text-[#4b5563] hover:text-[#0c0a09] hover:bg-[#fafafa] font-medium'
                     }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className={active ? 'text-white' : 'text-[#777169]'}>{item.icon}</span>
-                    <span>{item.name}</span>
+                  <div className={`flex items-center ${isCollapsed ? 'gap-3 lg:gap-0' : 'gap-3'}`}>
+                    <span className={`transition-colors shrink-0 ${active ? 'text-[#0c0a09]' : 'text-[#6b7280] group-hover:text-[#0c0a09]'}`}>
+                      {item.icon}
+                    </span>
+                    <span className={`tracking-tight text-[#0c0a09] ${isCollapsed ? 'lg:hidden' : 'block'}`}>
+                      {item.name}
+                    </span>
                   </div>
 
                   {item.badge && (
                     <span
-                      className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-md ${active ? 'bg-white/20 text-white' : 'bg-[#dcfce7] text-[#15803d]'
+                      className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isCollapsed ? 'lg:hidden' : 'inline-block'} ${active
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-emerald-50 text-emerald-700'
                         }`}
                     >
                       {item.badge}
@@ -186,23 +272,80 @@ export function CrmSidebar({ businessName, isOpen, onClose }: CrmSidebarProps) {
           </nav>
         </div>
 
-        {/* User & Role Footer */}
-        <div className="p-4 border-t border-[#f0efed] bg-[#fafafa]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="truncate">
-              <p className="text-xs font-medium text-[#0c0a09] truncate">{user?.email || 'Authenticated User'}</p>
-              <span className={`inline-block text-[9px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full mt-0.5 ${isViewer ? 'bg-[#f0efed] text-[#777169]' : 'bg-[#dcfce7] text-[#15803d]'
-                }`}>
-                {isViewer ? 'Client Viewer (Read Only)' : 'Client Owner'}
-              </span>
-            </div>
-          </div>
+        {/* User Profile Pill & Dropdown Footer */}
+        <div ref={userMenuRef} className={`border-t border-[#f0efed] relative ${isCollapsed ? 'p-2.5 lg:p-2' : 'p-3'}`}>
+          {/* Floating Logout & Account Details Popup */}
+          {isUserMenuOpen && (
+            <div className={`absolute bottom-[68px] ${isCollapsed ? 'left-3 right-3 lg:left-2 lg:right-auto lg:w-56' : 'left-3 right-3'} bg-white border border-[#e7e5e4] rounded-2xl shadow-xl p-1.5 z-50 transition-all`}>
+              <button
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  logout();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-[#dc2626] hover:bg-[#fef2f2] transition-colors text-left group"
+              >
+                <svg
+                  className="w-4 h-4 text-[#dc2626] transition-transform group-hover:-translate-x-0.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>Logout</span>
+              </button>
 
+              {/* Full Email Address */}
+              {user?.email && (
+                <div className="pt-2 pb-1.5 px-3 border-t border-[#f0efed] mt-1">
+                  <span className="text-[10px] text-[#a8a29e] uppercase tracking-wider block font-semibold">
+                    Signed in as
+                  </span>
+                  <p className="text-xs text-[#4e4e4e] font-medium truncate mt-0.5" title={user.email}>
+                    {user.email}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* User Profile Pill */}
           <button
-            onClick={() => logout()}
-            className="w-full el-btn-outline h-8 text-xs justify-center hover:bg-white"
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            title={isCollapsed ? (doctorName || displayName) : undefined}
+            className={`w-full flex items-center ${isCollapsed ? 'justify-between lg:justify-center' : 'justify-between'} p-2 rounded-2xl transition-all duration-150 text-left ${isUserMenuOpen ? 'bg-[#f0efed]' : 'hover:bg-[#f0efed]/70'
+              }`}
           >
-            Sign Out
+            <div className={`flex items-center ${isCollapsed ? 'gap-2.5 lg:gap-0' : 'gap-2.5'} truncate`}>
+              {/* Custom SVG Avatar */}
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#ea580c] to-[#f97316] text-white flex items-center justify-center font-semibold text-xs shadow-xs shrink-0 select-none">
+                {initial}
+              </div>
+
+              <div className={`truncate ${isCollapsed ? 'lg:hidden' : 'block'}`}>
+                <span className="text-sm font-medium text-[#0c0a09] block truncate leading-tight">
+                  {doctorName}
+                </span>
+              </div>
+            </div>
+
+            {/* Chevron toggle */}
+            <svg
+              className={`w-4 h-4 text-[#777169] transition-transform duration-200 shrink-0 ${isUserMenuOpen ? 'rotate-180' : ''} ${isCollapsed ? 'lg:hidden' : 'block'}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
         </div>
       </aside>

@@ -108,7 +108,7 @@ export function ClientCalls() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-display-serif text-3xl font-light text-[#0c0a09]">
+          <h1 className="text-2xl md:text-3xl font-light text-[#0c0a09]">
             Voice Calls CRM
           </h1>
           <p className="text-xs text-[#777169] mt-0.5">
@@ -179,57 +179,60 @@ export function ClientCalls() {
         <div className="el-card bg-white overflow-hidden border border-[#e7e5e4] shadow-sm">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#f0efed] text-left">
-              <thead className="bg-[#fafafa] text-[#777169] text-[10px] font-semibold uppercase tracking-wider">
+              <thead className="bg-[#fafafa] text-[#777169] text-[11px] font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-3.5">Caller / Number</th>
-                  <th className="px-6 py-3.5">Assigned Agent</th>
-                  <th className="px-6 py-3.5">Direction</th>
-                  <th className="px-6 py-3.5">Language</th>
-                  <th className="px-6 py-3.5">Duration</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Date & Time</th>
-                  <th className="px-6 py-3.5 text-right">Action</th>
+                  <th className="px-6 py-3.5 text-center">Caller / Number</th>
+                  <th className="px-6 py-3.5 text-center">Assigned Agent</th>
+                  <th className="px-6 py-3.5 text-center">Direction</th>
+                  {/* <th className="px-6 py-3.5">Language</th> */}
+                  <th className="px-6 py-3.5 text-center">Duration</th>
+                  <th className="px-6 py-3.5 text-center">Status</th>
+                  <th className="px-6 py-3.5 text-center">Date & Time</th>
+                  <th className="px-6 py-3.5 text-center">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#f0efed] text-xs">
+              <tbody className="divide-y divide-[#f0efed] text-xs h-10">
                 {filteredCalls.map((call) => (
                   <tr
                     key={call.id}
                     onClick={() => handleRowClick(call)}
                     className="hover:bg-[#fafafa] cursor-pointer transition-colors group"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap font-medium text-[#0c0a09]">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#16a34a]" />
+                    <td className="px-6 py-2 whitespace-nowrap font-medium text-[#0c0a09]">
+                      <div className="flex items-center justify-center gap-2">
+                        {/* <span className="w-2 h-2 rounded-full bg-[#16a34a]" /> */}
+                        <svg className="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
                         <span>{call.callerNumber || 'Anonymous Caller'}</span>
                       </div>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-[#4e4e4e]">
+                    <td className="px-6 py-4 whitespace-nowrap text-[#4e4e4e] text-center">
                       {call.agent?.name || 'Voice Assistant'}
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-[#f0efed] text-[#4e4e4e]">
                         {call.direction}
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-[#777169]">
+                    {/* <td className="px-6 py-4 whitespace-nowrap text-[#777169]">
                       {call.primaryLanguage || 'en-IN'}
-                    </td>
+                    </td> */}
 
-                    <td className="px-6 py-4 whitespace-nowrap font-medium text-[#0c0a09]">
+                    <td className="px-6 py-4 whitespace-nowrap font-medium text-[#0c0a09] text-center">
                       {formatDuration(call.durationSeconds)}
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${getStatusBadge(call.status)}`}>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${getStatusBadge(call.status)}`}>
                         {call.status}
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-[#777169] text-[11px]">
+                    <td className="px-6 py-4 whitespace-nowrap text-[#777169] text-[11px] text-center">
                       {new Date(call.createdAt).toLocaleString(undefined, {
                         month: 'short',
                         day: 'numeric',
@@ -238,15 +241,15 @@ export function ClientCalls() {
                       })}
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-6 py-3 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => handleRowClick(call)}
                           className="el-btn-outline h-7 px-2.5 text-[11px] bg-white group-hover:border-[#0c0a09]"
                         >
                           Transcript
                         </button>
-                        <button
+                        {/* <button
                           onClick={() => handleOpenWhatsApp(call)}
                           className="el-btn-outline h-7 px-2 text-[11px] bg-white text-[#15803d] hover:bg-[#f0fdf4]"
                           title="Send WhatsApp Follow-up"
@@ -254,7 +257,7 @@ export function ClientCalls() {
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                           </svg>
-                        </button>
+                        </button> */}
                       </div>
                     </td>
                   </tr>

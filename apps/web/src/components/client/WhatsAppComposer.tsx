@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../../services/api';
 import type { Appointment, Lead, CallSession } from '../../types';
 
@@ -139,7 +140,7 @@ export function WhatsAppComposer({
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-[#e7e5e4] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
@@ -306,6 +307,7 @@ export function WhatsAppComposer({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

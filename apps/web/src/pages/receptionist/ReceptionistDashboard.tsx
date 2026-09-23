@@ -44,7 +44,6 @@ export function ReceptionistDashboard() {
   const [slotTime, setSlotTime] = useState<string>('10:00 AM');
   const [patientName, setPatientName] = useState<string>('');
   const [age, setAge] = useState<string>('');
-  const [place, setPlace] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [reason, setReason] = useState<string>('General Consultation');
   const [addingRow, setAddingRow] = useState<boolean>(false);
@@ -54,7 +53,11 @@ export function ReceptionistDashboard() {
   // Resolve Clinic Display Name
   const clinicDisplayName =
     user?.tenantName ||
-    (clinicSlug ? formatSlugToName(clinicSlug) : 'NextLite Clinic');
+    (clinicSlug ? formatSlugToName(clinicSlug) : 'VanifyAI Clinic');
+
+  // Staff Name
+  const staffName = user?.name || (user?.email ? user.email.split('@')[0] : 'Desk Receptionist');
+  const staffInitial = staffName.charAt(0).toUpperCase() || 'D';
 
   // Load appointments for selected date
   const loadAppointments = useCallback(async (silent = false) => {
@@ -109,8 +112,8 @@ export function ReceptionistDashboard() {
 
     try {
       const bookedByName = user?.name
-        ? `${user.name} (Desk Receptionist)`
-        : 'Front Desk Receptionist';
+        ? `${user.name} (Desk Staff)`
+        : 'Front Desk Staff';
 
       const res = await api.createClientAppointment({
         customerName: patientName.trim(),
@@ -119,20 +122,18 @@ export function ReceptionistDashboard() {
         bookingTime: slotTime,
         title: reason.trim() || 'General Consultation',
         age: age.trim() || undefined,
-        place: place.trim() || undefined,
         bookedBy: 'RECEPTIONIST',
         bookedByName,
         walkIn: true,
       });
 
       const apptNum = res.appointment?.appointmentNumber || 'APT';
-      setSuccessToast(`Added ${patientName.trim()} (${slotTime}) [${apptNum}] to OPD schedule!`);
+      setSuccessToast(`Added ${patientName.trim()} (${slotTime}) [${apptNum}] to queue!`);
       setTimeout(() => setSuccessToast(null), 4000);
 
       // Reset horizontal inputs for next rapid entry
       setPatientName('');
       setAge('');
-      setPlace('');
       setPhone('');
       setReason('General Consultation');
 
@@ -170,7 +171,6 @@ export function ReceptionistDashboard() {
       appt.customerName?.toLowerCase().includes(q) ||
       appt.customerPhone?.toLowerCase().includes(q) ||
       appt.appointmentNumber?.toLowerCase().includes(q) ||
-      (appt.place && appt.place.toLowerCase().includes(q)) ||
       (appt.title && appt.title.toLowerCase().includes(q))
     );
   });
@@ -183,95 +183,103 @@ export function ReceptionistDashboard() {
   const completedCount = appointments.filter((a) => a.status === 'COMPLETED').length;
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-[#0f172a] font-sans flex flex-col">
-      {/* Top Professional Header */}
-      <header className="bg-white border-b border-[#e2e8f0] px-6 py-3.5 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          {/* Business Brand & Title */}
-          <div className="flex items-center gap-3.5">
-            <img
-              src="/vanifyai-logo.jpg"
-              alt="VanifyAI"
-              className="w-8 h-8 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-bold text-gray-900 tracking-tight">
-                  {clinicDisplayName}
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                  <span className="text-[9px] font-extrabold text-emerald-600">VanifyAI</span>
-                  <span>Desk</span>
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
-                <span>Staff:</span>
-                <strong className="text-gray-700">{user?.name || user?.email || 'Desk Receptionist'}</strong>
-                <span className="text-gray-300">•</span>
-                <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Live CRM Sync
-                </span>
-              </p>
+    <div className="min-h-screen bg-white text-[#0c0a09] font-sans flex flex-col">
+      {/* Top Navbar Header */}
+      <header className="h-16 px-6 md:px-8 border-b border-[#e7e5e4] bg-white sticky top-0 z-30 flex items-center justify-between shadow-2xs">
+        {/* Business Brand & Desk Identity */}
+        <div className="flex items-center gap-3.5">
+          <img
+            src="/vanifyai-logo.jpg"
+            alt="VanifyAI"
+            className="w-8 h-8 rounded-lg object-contain bg-black p-1 shadow-xs ring-1 ring-black/5"
+          />
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-lg text-[#0c0a09] tracking-tight">
+                {clinicDisplayName}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-[#f0efed] text-[#0c0a09] border border-[#e7e5e4]">
+                Front Desk
+              </span>
             </div>
           </div>
+        </div>
 
-          {/* Header Controls & Sign Out */}
-          <div className="flex items-center gap-3">
-            {/* Quick Live Clock / Last Sync */}
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-600">
-              <span className={syncing ? 'animate-spin inline-block text-emerald-600' : 'text-gray-400'}>
-                ↻
-              </span>
-              <span>Sync: {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-            </div>
+        {/* Live CRM Status & User Controls */}
+        <div className="flex items-center gap-3">
+          {/* Live Sync Status Pill */}
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#e7e5e4] bg-[#fafafa] text-xs text-[#777169]">
+            <span className="w-2 h-2 rounded-full bg-[#16a34a] animate-pulse" />
+            <span>
+              Synced:{' '}
+              {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => loadAppointments(false)}
-              disabled={loading || syncing}
-              className="px-3 py-1.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-              title="Refresh schedule now"
+          <button
+            type="button"
+            onClick={() => loadAppointments(false)}
+            disabled={loading || syncing}
+            className="px-3.5 py-1.5 rounded-full border border-[#e7e5e4] bg-white hover:bg-[#f0efed] text-[#0c0a09] text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="Refresh schedule now"
+          >
+            <svg
+              className={`w-3.5 h-3.5 text-[#777169] ${syncing ? 'animate-spin' : ''}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <span className={syncing ? 'animate-spin' : ''}>🔄</span>
-              <span>Refresh</span>
-            </button>
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
+            <span>Refresh</span>
+          </button>
 
-            {user ? (
+          {user ? (
+            <div className="flex items-center gap-2 pl-2 border-l border-[#f0efed]">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#ea580c] to-[#f97316] text-white flex items-center justify-center font-semibold text-xs shadow-xs select-none">
+                {staffInitial}
+              </div>
               <button
                 type="button"
                 onClick={async () => {
                   await logout();
                   navigate('/login');
                 }}
-                className="px-3.5 py-1.5 rounded-xl bg-gray-100 hover:bg-rose-50 hover:text-rose-600 text-gray-700 text-xs font-medium transition border border-gray-200 cursor-pointer"
+                className="px-3 py-1.5 rounded-full bg-white hover:bg-[#fef2f2] text-[#dc2626] border border-[#fecaca] text-xs font-medium transition cursor-pointer"
               >
                 Sign Out
               </button>
-            ) : (
-              <Link
-                to="/login"
-                className="px-3.5 py-1.5 rounded-xl bg-gray-900 text-white text-xs font-medium hover:bg-gray-800 transition"
-              >
-                Sign In
-              </Link>
-            )}
-          </div>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="px-4 py-1.5 rounded-full bg-[#0c0a09] text-white text-xs font-medium hover:opacity-90 transition"
+            >
+              Sign In
+            </Link>
+          )}
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-5 flex-1">
+      <main className="w-full mx-auto p-6 md:p-8 space-y-6 flex-1">
         {/* Toast / Error alerts */}
         {errorMsg && (
-          <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center justify-between shadow-2xs animate-in fade-in duration-150">
+          <div className="p-3.5 rounded-2xl bg-[#fef2f2] border border-[#fecaca] text-xs text-[#dc2626] flex items-center justify-between shadow-2xs animate-in fade-in duration-150">
             <div className="flex items-center gap-2">
-              <span>⚠️</span>
+              <svg className="w-4 h-4 text-[#dc2626]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
               <span>{errorMsg}</span>
             </div>
             <button
               onClick={() => setErrorMsg(null)}
-              className="text-rose-400 hover:text-rose-700 text-sm font-bold cursor-pointer"
+              className="text-[#dc2626] hover:opacity-80 text-sm font-bold cursor-pointer"
             >
               ✕
             </button>
@@ -279,77 +287,41 @@ export function ReceptionistDashboard() {
         )}
 
         {successToast && (
-          <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between shadow-2xs animate-in fade-in duration-150">
+          <div className="p-3.5 rounded-2xl bg-[#f0fdf4] border border-[#bbf7d0] text-xs text-[#166534] flex items-center justify-between shadow-2xs animate-in fade-in duration-150">
             <div className="flex items-center gap-2 font-medium">
-              <span>✅</span>
+              <svg className="w-4 h-4 text-[#16a34a]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
               <span>{successToast}</span>
             </div>
             <button
               onClick={() => setSuccessToast(null)}
-              className="text-emerald-500 hover:text-emerald-800 text-sm font-bold cursor-pointer"
+              className="text-[#16a34a] hover:opacity-80 text-sm font-bold cursor-pointer"
             >
               ✕
             </button>
           </div>
         )}
 
-        {/* Top Summary Bar & Date Picker */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
-          {/* Quick Metrics */}
-          <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-medium">Date Schedule:</span>
-              <span className="text-xs font-bold text-gray-900 font-mono">
-                {selectedDate === todayStr ? 'Today' : selectedDate}
-              </span>
-            </div>
-
-            <div className="h-4 w-px bg-gray-200 hidden sm:block" />
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Total Booked:</span>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-gray-100 text-gray-800 font-mono">
-                {totalCount}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">🎙️ AI Phone:</span>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 font-mono">
-                {aiCount}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">📋 Desk Walk-ins:</span>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
-                {deskCount}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">💬 WhatsApp:</span>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
-                {whatsappCount}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Completed:</span>
-              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 font-mono">
-                {completedCount}
-              </span>
-            </div>
+        {/* Header Greeting & Action */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-light text-[#0c0a09] tracking-tight">
+              Reception Desk Schedule
+            </h1>
+            <p className="text-xs text-[#777169] mt-1">
+              Live multi-channel queue across AI voice reception, WhatsApp bookings, and front desk walk-ins.
+            </p>
           </div>
 
-          {/* Date Selector */}
-          <div className="flex items-center gap-2">
+          {/* Date Selector Control */}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <button
               type="button"
               onClick={() => setSelectedDate(todayStr)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${selectedDate === todayStr
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              className={`px-3 py-1.5 text-xs font-medium rounded-full border transition cursor-pointer ${selectedDate === todayStr
+                ? 'bg-[#0c0a09] text-white border-[#0c0a09] shadow-2xs'
+                : 'bg-white text-[#4e4e4e] border-[#e7e5e4] hover:bg-[#f0efed]'
                 }`}
             >
               Today
@@ -362,10 +334,10 @@ export function ReceptionistDashboard() {
                 tmr.setDate(tmr.getDate() + 1);
                 setSelectedDate(tmr.toISOString().split('T')[0]);
               }}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition cursor-pointer ${selectedDate !== todayStr &&
+              className={`px-3 py-1.5 text-xs font-medium rounded-full border transition cursor-pointer ${selectedDate !== todayStr &&
                 selectedDate === new Date(Date.now() + 86400000).toISOString().split('T')[0]
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                ? 'bg-[#0c0a09] text-white border-[#0c0a09] shadow-2xs'
+                : 'bg-white text-[#4e4e4e] border-[#e7e5e4] hover:bg-[#f0efed]'
                 }`}
             >
               Tomorrow
@@ -375,33 +347,65 @@ export function ReceptionistDashboard() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-xl bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer shadow-2xs"
+              className="px-3 py-1.5 text-xs font-medium border border-[#e7e5e4] rounded-full bg-white text-[#0c0a09] focus:outline-none focus:border-[#0c0a09] cursor-pointer shadow-2xs"
             />
           </div>
         </div>
 
+        {/* 5-Column Overview KPI Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="p-5 bg-white border border-[#e7e5e4] rounded-2xl flex flex-col justify-between shadow-2xs hover:bg-[#f0efed]/80 transition-all">
+            <span className="text-xs font-medium text-[#777169]">Total Booked</span>
+            <p className="text-2xl md:text-3xl font-light text-[#0c0a09] mt-2">{totalCount}</p>
+          </div>
+
+          <div className="p-5 bg-white border border-[#e7e5e4] rounded-2xl flex flex-col justify-between shadow-2xs hover:bg-[#f0efed]/80 transition-all">
+            <span className="text-xs font-medium text-[#777169]">AI Phone Bookings</span>
+            <p className="text-2xl md:text-3xl font-light text-[#0c0a09] mt-2">{aiCount}</p>
+          </div>
+
+          <div className="p-5 bg-white border border-[#e7e5e4] rounded-2xl flex flex-col justify-between shadow-2xs hover:bg-[#f0efed]/80 transition-all">
+            <span className="text-xs font-medium text-[#777169]">Desk Walk-ins</span>
+            <p className="text-2xl md:text-3xl font-light text-[#0c0a09] mt-2">{deskCount}</p>
+          </div>
+
+          <div className="p-5 bg-white border border-[#e7e5e4] rounded-2xl flex flex-col justify-between shadow-2xs hover:bg-[#f0efed]/80 transition-all">
+            <span className="text-xs font-medium text-[#777169]">WhatsApp Bookings</span>
+            <p className="text-2xl md:text-3xl font-light text-[#0c0a09] mt-2">{whatsappCount}</p>
+          </div>
+
+          <div className="p-5 bg-white border border-[#e7e5e4] rounded-2xl flex flex-col justify-between shadow-2xs hover:bg-[#f0efed]/80 transition-all">
+            <span className="text-xs font-medium text-[#777169]">Completed Visits</span>
+            <p className="text-2xl md:text-3xl font-light text-[#0c0a09] mt-2">{completedCount}</p>
+          </div>
+        </div>
+
         {/* FAST HORIZONTAL ROW-ENTRY APPOINTMENT REGISTER FORM */}
-        <div className="bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-white rounded-2xl border border-emerald-200/90 p-4 shadow-xs">
-          <div className="flex items-center justify-between mb-2.5">
+        <div className="bg-white border border-[#e7e5e4] rounded-2xl p-5 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-base">⚡</span>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-emerald-950">
-                Quick Walk-In Entry (Horizontal Row-Fill)
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-[#0c0a09]">
+                Quick Walk-In Registration
               </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#f0efed] text-[#4e4e4e]">
+                Fast Queue Entry
+              </span>
             </div>
-            <span className="text-[11px] text-emerald-700 font-medium">
-              Fill details &amp; press <kbd className="px-1.5 py-0.5 bg-white border border-emerald-200 rounded text-[10px] font-mono shadow-2xs">Enter</kbd> to add
+            <span className="text-[11px] text-[#777169]">
+              Press <kbd className="px-1.5 py-0.5 bg-[#f0efed] border border-[#e7e5e4] rounded text-[10px] font-mono">Enter</kbd> to add
             </span>
           </div>
 
-          <form onSubmit={handleQuickAdd} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-2.5 items-center">
+          <form onSubmit={handleQuickAdd} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 items-end">
             {/* Slot Time */}
             <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Time Slot</label>
+              <label className="block text-[11px] font-medium text-[#777169] uppercase tracking-wider mb-1.5">
+                Time Slot
+              </label>
               <select
                 value={slotTime}
                 onChange={(e) => setSlotTime(e.target.value)}
-                className="w-full px-2.5 py-2 text-xs font-semibold bg-white border border-emerald-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs cursor-pointer"
+                className="w-full px-3 py-2 text-xs font-medium bg-white border border-[#d6d3d1] rounded-xl text-[#0c0a09] focus:outline-none focus:border-[#0c0a09] shadow-2xs cursor-pointer h-10"
               >
                 {STANDARD_TIME_SLOTS.map((slot) => (
                   <option key={slot} value={slot}>
@@ -412,9 +416,9 @@ export function ReceptionistDashboard() {
             </div>
 
             {/* Patient Name */}
-            <div className="md:col-span-3">
-              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                Patient Name <span className="text-rose-500">*</span>
+            <div className="md:col-span-4">
+              <label className="block text-[11px] font-medium text-[#777169] uppercase tracking-wider mb-1.5">
+                Patient / Customer Name <span className="text-rose-500">*</span>
               </label>
               <input
                 ref={nameInputRef}
@@ -423,53 +427,44 @@ export function ReceptionistDashboard() {
                 placeholder="e.g. Ramesh Kulkarni"
                 value={patientName}
                 onChange={(e) => setPatientName(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-medium bg-white border border-emerald-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                className="w-full px-3.5 py-2 text-xs font-medium bg-white border border-[#d6d3d1] rounded-xl text-[#0c0a09] placeholder:text-[#a8a29e] focus:outline-none focus:border-[#0c0a09] shadow-2xs h-10"
               />
             </div>
 
             {/* Age */}
             <div className="md:col-span-1">
-              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Age</label>
+              <label className="block text-[11px] font-medium text-[#777169] uppercase tracking-wider mb-1.5 text-center">
+                Age
+              </label>
               <input
                 type="text"
-                placeholder="e.g. 34"
+                placeholder="32"
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
-                className="w-full px-2 py-2 text-xs font-medium bg-white border border-emerald-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs text-center"
+                className="w-full px-2 py-2 text-xs font-medium bg-white border border-[#d6d3d1] rounded-xl text-[#0c0a09] placeholder:text-[#a8a29e] focus:outline-none focus:border-[#0c0a09] shadow-2xs text-center h-10"
               />
             </div>
 
-            {/* Place (Disconnected for current deployment - preserved for future reuse) */}
-            {/* <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Place / City</label>
-              <input
-                type="text"
-                placeholder="e.g. Nagpur"
-                value={place}
-                onChange={(e) => setPlace(e.target.value)}
-                className="w-full px-2.5 py-2 text-xs font-medium bg-white border border-emerald-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
-              />
-            </div> */}
-
             {/* Phone */}
             <div className="md:col-span-3">
-              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">Phone Number</label>
+              <label className="block text-[11px] font-medium text-[#777169] uppercase tracking-wider mb-1.5">
+                Phone Number
+              </label>
               <input
                 type="tel"
                 placeholder="e.g. 9876543210"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-2.5 py-2 text-xs font-medium bg-white border border-emerald-300 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
+                className="w-full px-3.5 py-2 text-xs font-medium bg-white border border-[#d6d3d1] rounded-xl text-[#0c0a09] placeholder:text-[#a8a29e] focus:outline-none focus:border-[#0c0a09] shadow-2xs h-10"
               />
             </div>
 
             {/* Submit Button */}
-            <div className="md:col-span-3 flex flex-col justify-end">
-              <label className="block text-[10px] font-bold text-transparent uppercase mb-1">Action</label>
+            <div className="md:col-span-2">
               <button
                 type="submit"
                 disabled={addingRow}
-                className="w-full h-[38px] bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-md transition-all shadow-xs flex items-center justify-center gap-1 disabled:opacity-50"
+                className="w-full h-10 bg-[#0c0a09] hover:opacity-90 text-white rounded-xl text-xs font-medium transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {addingRow ? (
                   <span>Saving...</span>
@@ -483,22 +478,26 @@ export function ReceptionistDashboard() {
           </form>
         </div>
 
-        {/* Schedule Table */}
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
-          <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 bg-gray-50/50">
+        {/* Schedule Queue Table */}
+        <div className="bg-white border border-[#e7e5e4] rounded-2xl overflow-hidden shadow-2xs">
+          {/* Table Header Controls */}
+          <div className="p-4 md:p-5 border-b border-[#f0efed] flex flex-wrap items-center justify-between gap-3 bg-white">
             <div className="flex items-center gap-3 flex-wrap">
               <div>
-                <h3 className="font-bold text-sm text-gray-900">
-                  Scheduled Appointments ({filteredAppointments.length})
+                <h3 className="font-semibold text-base text-[#0c0a09] tracking-tight">
+                  Appointment Queue ({filteredAppointments.length})
                 </h3>
-                <p className="text-xs text-gray-500">Real-time live queue across AI phone reception and front desk</p>
+                <p className="text-xs text-[#777169] mt-0.5">Live queue synchronized across AI phone reception and desk</p>
               </div>
 
-              <div className="inline-flex rounded-xl bg-gray-200/80 p-0.5 text-xs font-medium">
+              {/* Source Filters */}
+              <div className="inline-flex rounded-full bg-[#f0efed] p-0.5 text-xs font-medium">
                 <button
                   type="button"
                   onClick={() => setSourceFilter('ALL')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] ${sourceFilter === 'ALL' ? 'bg-white text-gray-900 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  className={`px-3 py-1 rounded-full transition cursor-pointer text-xs ${sourceFilter === 'ALL'
+                    ? 'bg-white text-[#0c0a09] font-semibold shadow-2xs'
+                    : 'text-[#777169] hover:text-[#0c0a09]'
                     }`}
                 >
                   All Sources
@@ -506,67 +505,86 @@ export function ReceptionistDashboard() {
                 <button
                   type="button"
                   onClick={() => setSourceFilter('AI')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] flex items-center gap-1 ${sourceFilter === 'AI' ? 'bg-white text-purple-700 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  className={`px-3 py-1 rounded-full transition cursor-pointer text-xs flex items-center gap-1 ${sourceFilter === 'AI'
+                    ? 'bg-white text-[#0c0a09] font-semibold shadow-2xs'
+                    : 'text-[#777169] hover:text-[#0c0a09]'
                     }`}
                 >
-                  <span>🎙️</span> AI Calls
+                  <span>AI Calls</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSourceFilter('DESK')}
-                  className={`px-2.5 py-1 rounded-lg transition cursor-pointer text-[11px] flex items-center gap-1 ${sourceFilter === 'DESK' ? 'bg-white text-emerald-700 font-bold shadow-2xs' : 'text-gray-600 hover:text-gray-900'
+                  className={`px-3 py-1 rounded-full transition cursor-pointer text-xs flex items-center gap-1 ${sourceFilter === 'DESK'
+                    ? 'bg-white text-[#0c0a09] font-semibold shadow-2xs'
+                    : 'text-[#777169] hover:text-[#0c0a09]'
                     }`}
                 >
-                  <span>📋</span> Desk Walk-ins
+                  <span>Desk Walk-ins</span>
                 </button>
               </div>
             </div>
 
+            {/* Search Input */}
             <div className="relative w-full sm:w-64">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-gray-400">
-                🔍
-              </span>
+              <svg
+                className="w-4 h-4 text-[#777169] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
               <input
                 type="text"
                 placeholder="Search patient, phone..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:border-emerald-500 font-medium"
+                className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-white border border-[#d6d3d1] rounded-full text-[#0c0a09] placeholder:text-[#a8a29e] focus:outline-none focus:border-[#0c0a09] font-medium"
               />
             </div>
           </div>
 
+          {/* Table Body */}
           <div className="overflow-x-auto">
             {loading ? (
-              <div className="p-12 text-center text-xs text-gray-400 space-y-2">
-                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                <p>Loading clinic OPD register...</p>
+              <div className="p-12 text-center text-xs text-[#777169] space-y-2">
+                <div className="w-6 h-6 border-2 border-[#0c0a09] border-t-transparent rounded-full animate-spin mx-auto" />
+                <p>Loading OPD register...</p>
               </div>
             ) : filteredAppointments.length === 0 ? (
-              <div className="p-10 text-center space-y-2">
-                <span className="text-3xl block">📋</span>
-                <p className="font-semibold text-xs text-gray-700">No appointments scheduled for this date</p>
-                <p className="text-[11px] text-gray-400">
-                  Use the quick-fill bar above to add a walk-in patient, or incoming AI phone bookings will appear here in real time.
+              <div className="p-12 text-center space-y-2">
+                <div className="w-12 h-12 rounded-full bg-[#f0efed] text-[#777169] flex items-center justify-center mx-auto mb-2">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <rect x="3" y="4" width="18" height="17" rx="4" ry="4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M16 2v4M8 2v4M3 10h18" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <p className="font-semibold text-sm text-[#0c0a09]">No appointments scheduled for this date</p>
+                <p className="text-xs text-[#777169] max-w-sm mx-auto">
+                  Use the quick registration bar above to add a walk-in patient, or incoming AI phone bookings will appear in real time.
                 </p>
               </div>
             ) : (
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-                    <th className="py-3 px-4 w-16">Token</th>
-                    <th className="py-3 px-4 w-28">Time Slot</th>
-                    <th className="py-3 px-4">Patient Name</th>
-                    <th className="py-3 px-3 w-16 text-center">Age</th>
-                    {/* <th className="py-3 px-4">Place / City</th> */}
-                    <th className="py-3 px-4">Phone Number</th>
-                    <th className="py-3 px-4">Reason / Notes</th>
-                    <th className="py-3 px-4">Origin / Booked By</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                  <tr className="bg-[#fafafa] border-b border-[#f0efed] text-[11px] font-semibold text-[#777169] uppercase tracking-wider">
+                    <th className="py-3.5 px-4 w-16">Token</th>
+                    <th className="py-3.5 px-4 w-28">Time Slot</th>
+                    <th className="py-3.5 px-4">Patient Name</th>
+                    <th className="py-3.5 px-3 w-16 text-center">Age</th>
+                    <th className="py-3.5 px-4">Phone Number</th>
+                    <th className="py-3.5 px-4">Reason / Notes</th>
+                    <th className="py-3.5 px-4">Channel / Origin</th>
+                    <th className="py-3.5 px-4">Status</th>
+                    <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 font-medium text-gray-800">
+                <tbody className="divide-y divide-[#f0efed] font-medium text-[#0c0a09]">
                   {filteredAppointments.map((appt, idx) => {
                     const isAi = appt.bookedBy === 'AGENT';
                     const isDesk = appt.bookedBy === 'RECEPTIONIST' || appt.bookedBy === 'MANUAL_CLIENT';
@@ -577,75 +595,70 @@ export function ReceptionistDashboard() {
                     return (
                       <tr
                         key={appt.id}
-                        className={`hover:bg-slate-50/80 transition-colors ${isCompleted ? 'bg-gray-50/40 text-gray-400' : isCancelled ? 'bg-rose-50/20 text-gray-400 line-through' : ''
+                        className={`hover:bg-[#fafafa] transition-colors ${isCompleted ? 'bg-[#fafafa] text-[#777169]' : isCancelled ? 'bg-[#fef2f2]/30 text-[#a8a29e] line-through' : ''
                           }`}
                       >
                         {/* Token # */}
-                        <td className="py-3 px-4 font-mono font-bold text-gray-600 text-[11px]">
+                        <td className="py-3.5 px-4 font-mono font-semibold text-[#4e4e4e] text-xs">
                           {appt.appointmentNumber || `#${idx + 1}`}
                         </td>
 
                         {/* Time Slot */}
-                        <td className="py-3 px-4">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-gray-100 text-gray-900 border border-gray-200">
-                            🕒 {appt.bookingTime}
+                        <td className="py-3.5 px-4">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-mono font-medium text-xs bg-[#f0efed] text-[#0c0a09] border border-[#e7e5e4]">
+                            {appt.bookingTime}
                           </span>
                         </td>
 
                         {/* Patient Name */}
-                        <td className="py-3 px-4 font-bold text-gray-900">
+                        <td className="py-3.5 px-4 font-semibold text-[#0c0a09]">
                           {appt.customerName}
                         </td>
 
                         {/* Age */}
-                        <td className="py-3 px-3 text-center text-gray-600 font-mono">
+                        <td className="py-3.5 px-3 text-center text-[#777169] font-mono">
                           {appt.age || '—'}
                         </td>
 
-                        {/* Place (Disconnected) */}
-                        {/* <td className="py-3 px-4 text-gray-600">
-                          {appt.place || '—'}
-                        </td> */}
-
                         {/* Phone */}
-                        <td className="py-3 px-4 font-mono text-gray-600 text-[11px]">
+                        <td className="py-3.5 px-4 font-mono text-[#777169] text-xs">
                           {appt.customerPhone}
                         </td>
 
                         {/* Reason / Title */}
-                        <td className="py-3 px-4 text-gray-600 text-[11px] max-w-xs truncate" title={appt.title || 'Consultation'}>
+                        <td className="py-3.5 px-4 text-[#777169] text-xs max-w-xs truncate" title={appt.title || 'Consultation'}>
                           {appt.title || 'Consultation'}
                         </td>
 
                         {/* Origin */}
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           {isWhatsapp ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-800 border border-green-300 shadow-2xs">
-                              <span>💬</span> WhatsApp Bot
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              WhatsApp Bot
                             </span>
                           ) : isAi ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200 shadow-2xs">
-                              <span>🎙️</span> AI Phone Agent
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                              AI Voice Call
                             </span>
                           ) : isDesk ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs" title={appt.bookedByName || 'Desk Staff'}>
-                              <span>📋</span> {appt.bookedByName || 'Desk Staff'}
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#f0efed] text-[#0c0a09] border border-[#e7e5e4]" title={appt.bookedByName || 'Desk Staff'}>
+                              {appt.bookedByName || 'Front Desk'}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                              <span>👤</span> Clinic Staff
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#f0efed] text-[#4e4e4e]">
+                              Clinic Staff
                             </span>
                           )}
                         </td>
 
                         {/* Status */}
-                        <td className="py-3 px-4">
+                        <td className="py-3.5 px-4">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${isCompleted
-                              ? 'bg-blue-100 text-blue-800'
+                            className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${isCompleted
+                              ? 'bg-[#f0efed] text-[#4e4e4e]'
                               : isCancelled
-                                ? 'bg-rose-100 text-rose-800'
-                                : 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-[#fef2f2] text-[#dc2626]'
+                                : 'bg-[#dcfce7] text-[#15803d]'
                               }`}
                           >
                             {appt.status}
@@ -653,22 +666,22 @@ export function ReceptionistDashboard() {
                         </td>
 
                         {/* Quick Actions */}
-                        <td className="py-3 px-4 text-right space-x-1">
+                        <td className="py-3.5 px-4 text-right space-x-1.5">
                           {!isCompleted && !isCancelled && (
                             <>
                               <button
                                 type="button"
                                 onClick={() => handleUpdateStatus(appt.id, 'COMPLETED')}
                                 title="Mark as Completed"
-                                className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium text-[11px] border border-emerald-200 transition cursor-pointer"
+                                className="px-2.5 py-1 rounded-full bg-white hover:bg-[#f0fdf4] text-[#15803d] font-medium text-[11px] border border-[#bbf7d0] transition cursor-pointer shadow-2xs"
                               >
-                                ✓ Complete
+                                ✓ Done
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handleUpdateStatus(appt.id, 'CANCELLED')}
                                 title="Cancel Appointment"
-                                className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-medium text-[11px] border border-rose-200 transition cursor-pointer"
+                                className="px-2.5 py-1 rounded-full bg-white hover:bg-[#fef2f2] text-[#dc2626] font-medium text-[11px] border border-[#fecaca] transition cursor-pointer shadow-2xs"
                               >
                                 ✕ Cancel
                               </button>
@@ -678,7 +691,7 @@ export function ReceptionistDashboard() {
                             <button
                               type="button"
                               onClick={() => handleUpdateStatus(appt.id, 'SCHEDULED')}
-                              className="px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] transition cursor-pointer"
+                              className="px-2.5 py-1 rounded-full bg-[#f0efed] hover:bg-[#e7e5e4] text-[#0c0a09] text-[11px] transition cursor-pointer"
                             >
                               Restore
                             </button>
@@ -695,8 +708,8 @@ export function ReceptionistDashboard() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 py-3 text-center text-xs text-gray-400">
-        NextLite Unified Clinic Reception Desk &bull; Connected to {clinicDisplayName} CRM &bull; Real-time AI Agent Voice Sync
+      <footer className="bg-white border-t border-[#f0efed] py-4 text-center text-xs text-[#777169]">
+        VanifyAI Unified Front Desk &bull; Connected to {clinicDisplayName} CRM &bull; Real-time AI Agent Voice Sync
       </footer>
     </div>
   );

@@ -47,6 +47,31 @@ class CRMService:
         )
         sub = sub_res.scalar_one_or_none()
 
+        # Resolve doctor or service provider name from user or agent variables
+        doctor_name = getattr(user, "name", None) if user else None
+        if not doctor_name:
+            agent_res = await self.session.execute(
+                select(Agent).where(Agent.tenantId == tenant_id).order_by(Agent.createdAt.desc()).limit(1)
+            )
+            agent = agent_res.scalar_one_or_none()
+            if agent:
+                ver_res = await self.session.execute(
+                    select(AgentVersion).where(AgentVersion.agentId == agent.id).order_by(AgentVersion.versionNumber.desc()).limit(1)
+                )
+                ver = ver_res.scalar_one_or_none()
+                if ver and isinstance(ver.configuration, dict):
+                    vars_list = ver.configuration.get("variables", [])
+                    if isinstance(vars_list, list):
+                        for v in vars_list:
+                            if isinstance(v, dict) and v.get("key") in ("serviceProviderName", "doctorName", "doctor_name", "providerName", "ownerName", "clientName"):
+                                val = v.get("defaultValue") or v.get("value")
+                                if val and val != "Your service provider":
+                                    doctor_name = val
+                                    if user:
+                                        user.name = val
+                                        await self.session.commit()
+                                    break
+
         return {
             "tenant": {
                 "id": str(tenant.id),
@@ -56,11 +81,13 @@ class CRMService:
             },
             "user": {
                 "id": str(user.id),
+                "name": doctor_name or getattr(user, "name", None),
                 "email": user.email,
                 "role": user.role.value if hasattr(user.role, "value") else str(user.role),
                 "emailVerified": user.emailVerified,
                 "createdAt": user.createdAt.isoformat() if user.createdAt else None,
             } if user else None,
+            "doctorName": doctor_name,
             "subscription": {
                 "id": str(sub.id),
                 "status": sub.status.value if hasattr(sub.status, "value") else str(sub.status),

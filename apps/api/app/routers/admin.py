@@ -72,6 +72,7 @@ async def create_client(
     user = User(
         id=uuid.uuid4(),
         tenantId=tenant.id,
+        name=name.strip() if name else None,
         email=email.strip().lower(),
         passwordHash=password_hash,
         role=UserRole.CLIENT_OWNER,
@@ -140,12 +141,34 @@ async def get_client(
     t = res.scalar_one_or_none()
     if not t:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+
+    user_res = await session.execute(
+        select(User).where(User.tenantId == t.id).order_by(User.createdAt.asc()).limit(1)
+    )
+    client_user = user_res.scalar_one_or_none()
+
+    sub_res = await session.execute(
+        select(Subscription).where(Subscription.tenantId == t.id).limit(1)
+    )
+    sub = sub_res.scalar_one_or_none()
+
     return {
         "id": str(t.id),
         "name": t.name,
         "slug": t.slug,
         "status": t.status,
         "createdAt": t.createdAt.isoformat() if t.createdAt else None,
+        "users": [{
+            "id": str(client_user.id),
+            "name": getattr(client_user, "name", None),
+            "email": client_user.email,
+            "emailVerified": client_user.emailVerified,
+        }] if client_user else [],
+        "subscriptions": [{
+            "id": str(sub.id),
+            "status": sub.status.value if hasattr(sub.status, "value") else str(sub.status),
+            "planName": sub.planName,
+        }] if sub else []
     }
 
 @router.post("/clients/{client_id}/reset-data")
@@ -170,12 +193,26 @@ async def update_client(
     if not t:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
-    if "name" in body or "businessName" in body:
-        t.name = body.get("businessName") or body.get("name")
+    if "businessName" in body:
+        t.name = body["businessName"]
     if "status" in body:
         t.status = body["status"]
-    t.updatedAt = datetime.utcnow()
 
+    owner_name = (
+        body.get("ownerName")
+        or body.get("contactName")
+        or body.get("doctorName")
+        or body.get("name")
+    )
+    if owner_name:
+        clean_name = str(owner_name).strip()
+        await session.execute(
+            update(User)
+            .where(User.tenantId == t.id)
+            .values(name=clean_name, updatedAt=datetime.utcnow())
+        )
+
+    t.updatedAt = datetime.utcnow()
     await session.commit()
     return {
         "id": str(t.id),

@@ -121,7 +121,7 @@ export function ClientDashboard() {
       {/* Header Greeting */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-display-serif text-3xl md:text-4xl font-light text-[#0c0a09]">
+          <h1 className="text-2xl md:text-3xl font-light text-[#0c0a09]">
             {getGreetingTime()}, {tenantName}
           </h1>
           <p className="text-xs text-[#777169] mt-1">
@@ -132,7 +132,7 @@ export function ClientDashboard() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/dashboard/calls')}
-            className="el-btn-primary h-9 px-4 text-xs"
+            className="bg-black text-white rounded-full font-light h-9 px-4 text-sm"
           >
             + View Recent Calls
           </button>
@@ -143,7 +143,7 @@ export function ClientDashboard() {
       {loading ? (
         <CardSkeleton count={6} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid  grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           <MetricCard
             label="Total Calls"
             value={analytics?.totalCalls ?? 0}
@@ -188,14 +188,14 @@ export function ClientDashboard() {
             badgeColor="amber"
             onClick={() => navigate('/dashboard/appointments')}
           />
-          <MetricCard
+          {/* <MetricCard
             label="WhatsApp Follow-ups"
             value={analytics?.sentFollowUps ?? 0}
             subtext={`${analytics?.pendingFollowUps ?? 0} pending action`}
             badge="Automation"
             badgeColor="green"
             onClick={() => navigate('/dashboard/follow-ups')}
-          />
+          /> */}
         </div>
       )}
 

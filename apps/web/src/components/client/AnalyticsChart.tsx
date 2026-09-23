@@ -1,12 +1,12 @@
 import { useState } from 'react';
 
 // ==========================================
-// 1. Daily Trend Bar Chart
+// 1. Sleek Natural Line / Area Trend Chart (Sarvam / Modern Minimalist Aesthetic)
 // ==========================================
 export function TrendBarChart({
   data,
-  title = 'Call Volume Trend',
-  subtitle = 'Last 7 days call activity',
+  title = 'Daily Call Volume & Outcomes',
+  subtitle = '7-day aggregated volume across all AI voice channels',
 }: {
   data: Array<{ date: string; total: number; completed: number; missed: number; failed: number }>;
   title?: string;
@@ -14,95 +14,279 @@ export function TrendBarChart({
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const maxTotal = Math.max(...data.map((d) => d.total), 5);
+  const hasData = data && data.length > 0 && data.some((d) => d.total > 0);
+
+  // Layout parameters for SVG
+  const width = 680;
+  const height = 210;
+  const paddingLeft = 32;
+  const paddingRight = 24;
+  const paddingTop = 24;
+  const paddingBottom = 32;
+
+  const chartWidth = width - paddingLeft - paddingRight;
+  const chartHeight = height - paddingTop - paddingBottom;
+  const baselineY = height - paddingBottom;
+
+  const rawMax = Math.max(...(data?.map((d) => d.total) || [0]), 1);
+  const maxY = Math.max(Math.ceil(rawMax * 1.2), 4);
 
   const formatDate = (dateStr: string) => {
     try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      }
+      return dateStr;
     } catch {
       return dateStr;
     }
   };
 
+  // Compute points
+  const points = (data || []).map((d, i) => {
+    const x = paddingLeft + (i / Math.max((data?.length || 1) - 1, 1)) * chartWidth;
+    const y = paddingTop + chartHeight - (d.total / maxY) * chartHeight;
+    return { x, y, d, index: i };
+  });
+
+  // Catmull-Rom to Cubic Bezier curve path generator
+  const generateSplinePath = (pts: Array<{ x: number; y: number }>) => {
+    if (pts.length === 0) return '';
+    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+    if (pts.length === 2) return `M ${pts[0].x} ${pts[0].y} L ${pts[1].x} ${pts[1].y}`;
+
+    let path = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(i - 1, 0)];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[Math.min(i + 2, pts.length - 1)];
+
+      const tension = 0.2;
+      const cp1x = p1.x + (p2.x - p0.x) * tension;
+      const cp1y = p1.y + (p2.y - p0.y) * tension;
+      const cp2x = p2.x - (p3.x - p1.x) * tension;
+      const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+      path += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+    }
+    return path;
+  };
+
+  const linePath = generateSplinePath(points);
+  const areaPath = points.length > 0 ? `${linePath} L ${points[points.length - 1].x} ${baselineY} L ${points[0].x} ${baselineY} Z` : '';
+
+  // Grid tick values (4 steps)
+  const yTicks = [0, Math.round(maxY / 2), maxY];
+
   return (
-    <div className="el-card p-6 bg-white flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white border border-[#e7e5e4] rounded-2xl p-6 shadow-2xs flex flex-col justify-between transition-all relative z-10">
+      {/* Header */}
+      <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="font-display-serif text-xl font-light text-[#0c0a09]">{title}</h3>
+          <h3 className="text-base md:text-lg font-medium text-[#0c0a09] tracking-tight">{title}</h3>
           <p className="text-xs text-[#777169] mt-0.5">{subtitle}</p>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-[#777169]">
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-[#16a34a]" /> Completed
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-[#d97706]" /> Missed
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm bg-[#dc2626]" /> Failed
-          </span>
+
+        {/* Minimal pill indicators */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 text-xs text-[#777169]">
+            <span className="flex items-center gap-1.5 font-medium text-[#4e4e4e]">
+              <span className="w-2 h-2 rounded-full bg-[#9ca3af]" /> Total Calls
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#16a34a]" /> Completed
+            </span>
+          </div>
+
+          <div className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-[#e7e5e4] bg-[#fafafa] text-[11px] font-medium text-[#4e4e4e]">
+            <span>Day</span>
+            <svg className="w-3 h-3 text-[#777169]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
         </div>
       </div>
 
-      {data.length === 0 || data.every((d) => d.total === 0) ? (
-        <div className="h-48 flex items-center justify-center text-xs text-[#777169] bg-[#fafafa] rounded-xl border border-dashed border-[#e7e5e4]">
-          No call traffic recorded in this period yet.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <div className="h-44 flex items-end justify-between gap-2 pt-6 pb-2 px-2 border-b border-[#f0efed] relative">
-            {data.map((d, index) => {
-              const heightPct = Math.max((d.total / maxTotal) * 100, d.total > 0 ? 8 : 2);
-              const completedPct = d.total > 0 ? (d.completed / d.total) * 100 : 0;
-              const missedPct = d.total > 0 ? (d.missed / d.total) * 100 : 0;
-              const failedPct = d.total > 0 ? (d.failed / d.total) * 100 : 0;
+      {/* Graph Area */}
+      <div className="relative w-full overflow-visible select-none pt-2">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="w-full h-auto overflow-visible"
+        >
+          <defs>
+            <linearGradient id="callVolumeGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f5f5f5" stopOpacity="0.08" />
+              <stop offset="60%" stopColor="#f5f5f5" stopOpacity="0.02" />
+              <stop offset="100%" stopColor="#f5f5f5" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
 
-              return (
-                <div
-                  key={d.date}
-                  className="flex-1 flex flex-col items-center h-full justify-end group relative cursor-pointer"
-                  onMouseEnter={() => setHoveredIndex(index)}
-                  onMouseLeave={() => setHoveredIndex(null)}
+          {/* Horizontal Gridlines */}
+          {yTicks.map((val) => {
+            const y = paddingTop + chartHeight - (val / maxY) * chartHeight;
+            return (
+              <g key={val}>
+                <line
+                  x1={paddingLeft}
+                  y1={y}
+                  x2={width - paddingRight}
+                  y2={y}
+                  stroke="#f0efed"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
+                />
+                <text
+                  x={paddingLeft - 8}
+                  y={y + 3.5}
+                  textAnchor="end"
+                  className="text-[10px] fill-[#a8a29e] font-sans font-medium"
                 >
-                  {/* Tooltip */}
-                  {hoveredIndex === index && (
-                    <div className="absolute -top-14 z-20 bg-[#0c0a09] text-white text-[11px] rounded-lg py-1.5 px-3 whitespace-nowrap shadow-xl">
-                      <p className="font-semibold">{formatDate(d.date)}</p>
-                      <p className="text-white/80">
-                        Total: {d.total} (✓ {d.completed} · ⚠ {d.missed} · ✗ {d.failed})
-                      </p>
-                    </div>
-                  )}
+                  {val}
+                </text>
+              </g>
+            );
+          })}
 
-                  <div
-                    className="w-full max-w-[36px] rounded-t-md overflow-hidden flex flex-col-reverse transition-all group-hover:opacity-90 bg-[#f0efed]"
-                    style={{ height: `${heightPct}%` }}
-                  >
-                    <div style={{ height: `${completedPct}%` }} className="bg-[#16a34a] w-full" />
-                    <div style={{ height: `${missedPct}%` }} className="bg-[#d97706] w-full" />
-                    <div style={{ height: `${failedPct}%` }} className="bg-[#dc2626] w-full" />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {!hasData ? (
+            /* Sleek subtle ambient empty-state wave */
+            <g>
+              <path
+                d={`M ${paddingLeft},${baselineY - 20} Q 150,${baselineY - 60} 250,${baselineY - 25} T 450,${baselineY - 50} T ${width - paddingRight},${baselineY - 15}`}
+                fill="none"
+                stroke="#e7e5e4"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <text
+                x={width / 2}
+                y={height / 2 + 10}
+                textAnchor="middle"
+                className="text-xs fill-[#a8a29e] font-sans font-medium"
+              >
+                No call traffic recorded yet
+              </text>
+            </g>
+          ) : (
+            <g>
+              {/* Area fill */}
+              <path d={areaPath} fill="url(#callVolumeGradient)" className="transition-all duration-300" />
 
-          <div className="flex justify-between px-2 text-[10px] font-medium text-[#777169]">
-            {data.map((d) => (
-              <span key={d.date} className="truncate text-center flex-1">
-                {d.date.substring(5)}
-              </span>
-            ))}
+              {/* Main curved line */}
+              <path
+                d={linePath}
+                fill="none"
+                stroke="#dcdcdcff"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="transition-all duration-300"
+              />
+
+              {/* Hover vertical tracking line */}
+              {hoveredIndex !== null && points[hoveredIndex] && (
+                <line
+                  x1={points[hoveredIndex].x}
+                  y1={paddingTop}
+                  x2={points[hoveredIndex].x}
+                  y2={baselineY}
+                  stroke="#a8a29e"
+                  strokeWidth="1.2"
+                  strokeDasharray="3 3"
+                />
+              )}
+
+              {/* Data points */}
+              {points.map((pt, i) => {
+                const isHovered = hoveredIndex === i;
+                return (
+                  <g key={pt.d.date}>
+                    {/* Interaction hit zone */}
+                    <rect
+                      x={pt.x - chartWidth / (points.length * 2)}
+                      y={paddingTop}
+                      width={chartWidth / points.length}
+                      height={chartHeight + paddingBottom}
+                      fill="transparent"
+                      className="cursor-pointer"
+                      onMouseEnter={() => setHoveredIndex(i)}
+                      onMouseLeave={() => setHoveredIndex(null)}
+                    />
+
+                    {/* Outer node glow/ring on hover */}
+                    {isHovered && (
+                      <circle
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={7.5}
+                        fill="#9ca3af"
+                        opacity="0.25"
+                      />
+                    )}
+
+                    {/* Node circle */}
+                    <circle
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={isHovered ? 4.5 : 3}
+                      fill="#ffffff"
+                      stroke="#9ca3af"
+                      strokeWidth={isHovered ? 2.5 : 2}
+                      className="transition-all duration-150 pointer-events-none"
+                    />
+                  </g>
+                );
+              })}
+            </g>
+          )}
+
+          {/* X Axis dates */}
+          {points.map((pt) => (
+            <text
+              key={pt.d.date}
+              x={pt.x}
+              y={baselineY + 18}
+              textAnchor="middle"
+              className={`text-[10px] font-sans transition-colors ${hoveredIndex === pt.index ? 'fill-[#0c0a09] font-semibold' : 'fill-[#777169]'
+                }`}
+            >
+              {formatDate(pt.d.date)}
+            </text>
+          ))}
+        </svg>
+
+        {/* Floating Tooltip with high z-index and gray theme */}
+        {hoveredIndex !== null && points[hoveredIndex] && (
+          <div
+            className="absolute z-50 pointer-events-none bg-[#f0efed] border border-[#f0efed] text-black text-[11px] rounded-xl py-2 px-3 shadow-xl transform -translate-x-1/2 -translate-y-full transition-all duration-75"
+            style={{
+              left: `${(points[hoveredIndex].x / width) * 100}%`,
+              top: `${Math.max((points[hoveredIndex].y / height) * 100 - 6, 0)}%`,
+            }}
+          >
+            <div className="font-semibold text-black/95 pb-1 border-b border-black/15 mb-1">
+              {formatDate(points[hoveredIndex].d.date)}
+            </div>
+            <div className="flex items-center gap-2 text-black/90">
+              <span>Total Calls:</span>
+              <span className="font-bold text-black">{points[hoveredIndex].d.total}</span>
+            </div>
+            <div className="flex items-center gap-3 text-[10px] text-black/70 mt-0.5">
+              <span className="text-[#4ade80]">✓ {points[hoveredIndex].d.completed} completed</span>
+              {points[hoveredIndex].d.missed > 0 && <span className="text-[#fbbf24]">⚠ {points[hoveredIndex].d.missed} missed</span>}
+              {points[hoveredIndex].d.failed > 0 && <span className="text-[#f87171]">✗ {points[hoveredIndex].d.failed} failed</span>}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
 // ==========================================
-// 2. Donut Breakdown Chart
+// 2. Donut Breakdown Chart (Polished Minimalist)
 // ==========================================
 export function DonutBreakdown({
   title,
@@ -115,18 +299,17 @@ export function DonutBreakdown({
 }) {
   const total = items.reduce((acc, item) => acc + item.count, 0);
 
-  // SVG parameters
   const size = 130;
-  const strokeWidth = 18;
+  const strokeWidth = 16;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
 
   let currentOffset = 0;
 
   return (
-    <div className="el-card p-6 bg-white flex flex-col justify-between">
+    <div className="bg-white border border-[#e7e5e4] rounded-2xl p-6 shadow-2xs flex flex-col justify-between transition-all">
       <div>
-        <h3 className="font-display-serif text-xl font-light text-[#0c0a09]">{title}</h3>
+        <h3 className="text-base md:text-lg font-medium text-[#0c0a09] tracking-tight">{title}</h3>
         {subtitle && <p className="text-xs text-[#777169] mt-0.5">{subtitle}</p>}
       </div>
 
@@ -170,8 +353,8 @@ export function DonutBreakdown({
               })}
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="font-display-serif text-2xl font-light text-[#0c0a09]">{total}</span>
-              <span className="text-[10px] text-[#777169] uppercase font-semibold">Total</span>
+              <span className="text-2xl font-light text-[#0c0a09]">{total}</span>
+              <span className="text-[10px] text-[#777169] uppercase font-semibold tracking-wider">Total</span>
             </div>
           </div>
 
@@ -179,9 +362,9 @@ export function DonutBreakdown({
             {items.map((item) => {
               const pct = total > 0 ? Math.round((item.count / total) * 100) : 0;
               return (
-                <div key={item.label} className="flex items-center justify-between py-1 border-b border-[#f0efed] last:border-0">
+                <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-[#f0efed] last:border-0">
                   <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                     <span className="text-[#4e4e4e]">{item.label}</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -209,20 +392,22 @@ export function LeadFunnelProgress({
   const total = funnel.new + funnel.contacted + funnel.qualified + funnel.closed;
 
   const stages = [
-    { label: 'New Leads', count: funnel.new, color: 'bg-[#60a5fa]', textColor: 'text-[#2563eb]' },
-    { label: 'Contacted', count: funnel.contacted, color: 'bg-[#fbbf24]', textColor: 'text-[#d97706]' },
-    { label: 'Qualified', count: funnel.qualified, color: 'bg-[#34d399]', textColor: 'text-[#059669]' },
-    { label: 'Closed / Won', count: funnel.closed, color: 'bg-[#818cf8]', textColor: 'text-[#4f46e5]' },
+    { label: 'New Leads', count: funnel.new, color: 'bg-[#0c0a09]', textColor: 'text-[#0c0a09]' },
+    { label: 'Contacted', count: funnel.contacted, color: 'bg-[#777169]', textColor: 'text-[#777169]' },
+    { label: 'Qualified', count: funnel.qualified, color: 'bg-[#16a34a]', textColor: 'text-[#16a34a]' },
+    { label: 'Closed / Won', count: funnel.closed, color: 'bg-[#2563eb]', textColor: 'text-[#2563eb]' },
   ];
 
   return (
-    <div className="el-card p-6 bg-white flex flex-col justify-between">
+    <div className="bg-white border border-[#e7e5e4] rounded-2xl p-6 shadow-2xs flex flex-col justify-between transition-all">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-display-serif text-xl font-light text-[#0c0a09]">Lead Qualification Funnel</h3>
+          <h3 className="text-base md:text-lg font-medium text-[#0c0a09] tracking-tight">Lead Qualification Funnel</h3>
           <p className="text-xs text-[#777169] mt-0.5">Pipeline stage conversion breakdown</p>
         </div>
-        <span className="el-badge text-[10px]">{total} Leads Total</span>
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide bg-[#f0efed] text-[#0c0a09]">
+          {total} Leads Total
+        </span>
       </div>
 
       {total === 0 ? (
@@ -265,13 +450,15 @@ export function ToolUsageList({
   const total = tools.reduce((acc, t) => acc + t.count, 0);
 
   return (
-    <div className="el-card p-6 bg-white flex flex-col justify-between">
+    <div className="bg-white border border-[#e7e5e4] rounded-2xl p-6 shadow-2xs flex flex-col justify-between transition-all">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="font-display-serif text-xl font-light text-[#0c0a09]">AI Tool Executions</h3>
+          <h3 className="text-base md:text-lg font-medium text-[#0c0a09] tracking-tight">AI Tool Executions</h3>
           <p className="text-xs text-[#777169] mt-0.5">Autonomous actions triggered during voice calls</p>
         </div>
-        <span className="el-badge text-[10px]">{total} Executions</span>
+        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide bg-[#f0efed] text-[#0c0a09]">
+          {total} Executions
+        </span>
       </div>
 
       {tools.length === 0 ? (
@@ -286,7 +473,7 @@ export function ToolUsageList({
               <div key={tool.toolName} className="p-3 bg-[#fafafa] rounded-xl border border-[#f0efed] space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-mono text-[11px] font-medium text-[#0c0a09]">{tool.toolName}</span>
-                  <span className="font-semibold text-[#16a34a]">{tool.count} times</span>
+                  <span className="font-semibold text-[#0c0a09]">{tool.count} times</span>
                 </div>
                 <div className="w-full bg-[#e7e5e4] h-1.5 rounded-full overflow-hidden">
                   <div className="bg-[#0c0a09] h-full rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />

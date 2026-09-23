@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { CallSession } from '../../types';
 import { TranscriptViewer } from './TranscriptViewer';
+import { formatPhoneNumber } from '@/utils/formatPhoneNumber';
 
 interface CallDetailsDrawerProps {
   call: CallSession | null;
@@ -52,12 +54,12 @@ export function CallDetailsDrawer({
 
   const toolsList = Array.isArray(call.toolsUsed) ? call.toolsUsed : [];
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 overflow-hidden">
       {/* Backdrop */}
       <div
         onClick={onClose}
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity"
       />
 
       {/* Drawer Panel */}
@@ -81,13 +83,16 @@ export function CallDetailsDrawer({
             </div>
 
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-display-serif text-2xl font-light text-[#0c0a09]">
-                  {call.callerNumber || 'Anonymous Caller'}
+              <div className='flex items-center gap-1'>
+                <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
+                <h2 className="font-display-serif text-xl font-light text-[#0c0a09]">
+                  {formatPhoneNumber(call.callerNumber) || 'Anonymous Caller'}
                 </h2>
-                <p className="text-xs text-[#777169] mt-0.5">
+                {/* <p className="text-xs text-[#777169] mt-0.5">
                   Agent: <span className="font-medium text-[#0c0a09]">{call.agent?.name || 'Voice Assistant'}</span> · {call.direction}
-                </p>
+                </p> */}
               </div>
 
               {call.callerNumber && (
@@ -102,16 +107,24 @@ export function CallDetailsDrawer({
 
             {/* Quick Metrics Bar */}
             <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-[#f0efed] text-xs">
-              <div>
-                <span className="text-[#777169] block text-[10px] uppercase font-semibold">Duration</span>
+              <div className='flex items-center gap-1'>
+                <svg className="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span className="text-[#777169] block text-[11px] uppercase font-semibold">Duration : </span>
                 <span className="font-medium text-[#0c0a09]">{formatDuration(call.durationSeconds)}</span>
               </div>
-              <div>
-                <span className="text-[#777169] block text-[10px] uppercase font-semibold">Language</span>
-                <span className="font-medium text-[#0c0a09]">{call.primaryLanguage || 'en-IN'}</span>
-              </div>
-              <div>
-                <span className="text-[#777169] block text-[10px] uppercase font-semibold">Started</span>
+              {/* <div>
+                  <span className="text-[#777169] block text-[10px] uppercase font-semibold">Language</span>
+                  <span className="font-medium text-[#0c0a09]">{call.primaryLanguage || 'en-IN'}</span>
+                </div> */}
+              <div className='flex items-center gap-1'>
+                <svg className="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span className="text-[#777169] block text-[11px] uppercase font-semibold">Started : </span>
                 <span className="font-medium text-[#0c0a09]">
                   {new Date(call.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
@@ -120,24 +133,22 @@ export function CallDetailsDrawer({
           </div>
 
           {/* Navigation Tabs */}
-          <div className="px-6 border-b border-[#f0efed] flex items-center gap-6 text-xs font-medium bg-white">
+          {/* <div className="px-6 border-b border-[#f0efed] flex items-center gap-6 text-xs font-medium bg-white">
             <button
               onClick={() => setActiveTab('transcript')}
-              className={`py-3 border-b-2 transition-colors ${
-                activeTab === 'transcript'
-                  ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
-                  : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
-              }`}
+              className={`py-3 border-b-2 transition-colors ${activeTab === 'transcript'
+                ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
+                : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
+                }`}
             >
               Transcript
             </button>
             <button
               onClick={() => setActiveTab('tools')}
-              className={`py-3 border-b-2 transition-colors flex items-center gap-1.5 ${
-                activeTab === 'tools'
-                  ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
-                  : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
-              }`}
+              className={`py-3 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'tools'
+                ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
+                : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
+                }`}
             >
               Tools Used
               {toolsList.length > 0 && (
@@ -148,25 +159,23 @@ export function CallDetailsDrawer({
             </button>
             <button
               onClick={() => setActiveTab('performance')}
-              className={`py-3 border-b-2 transition-colors ${
-                activeTab === 'performance'
-                  ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
-                  : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
-              }`}
+              className={`py-3 border-b-2 transition-colors ${activeTab === 'performance'
+                ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
+                : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
+                }`}
             >
               Latency Metrics
             </button>
             <button
               onClick={() => setActiveTab('overview')}
-              className={`py-3 border-b-2 transition-colors ${
-                activeTab === 'overview'
-                  ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
-                  : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
-              }`}
+              className={`py-3 border-b-2 transition-colors ${activeTab === 'overview'
+                ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
+                : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
+                }`}
             >
               Details
             </button>
-          </div>
+          </div> */}
 
           {/* Tab Content */}
           <div className="p-6 overflow-y-auto flex-1 bg-[#fafafa]">
@@ -179,7 +188,7 @@ export function CallDetailsDrawer({
               />
             )}
 
-            {activeTab === 'tools' && (
+            {/* {activeTab === 'tools' && (
               <div className="space-y-3">
                 {toolsList.length === 0 ? (
                   <div className="py-12 text-center text-xs text-[#777169] bg-white rounded-xl border border-dashed border-[#e7e5e4]">
@@ -289,7 +298,7 @@ export function CallDetailsDrawer({
                   </div>
                 </dl>
               </div>
-            )}
+            )} */}
           </div>
 
           {/* Footer Actions */}
@@ -301,7 +310,7 @@ export function CallDetailsDrawer({
               Close
             </button>
 
-            {onOpenWhatsApp && (
+            {/* {onOpenWhatsApp && (
               <button
                 onClick={() => {
                   onClose();
@@ -314,10 +323,11 @@ export function CallDetailsDrawer({
                 </svg>
                 Follow up on WhatsApp
               </button>
-            )}
+            )} */}
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

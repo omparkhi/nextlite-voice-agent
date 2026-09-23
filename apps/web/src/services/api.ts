@@ -173,7 +173,7 @@ export const api = {
       body: JSON.stringify(data),
     }),
   
-  updateClient: (id: string, data: { name?: string; email?: string; status?: string; businessName?: string }) =>
+  updateClient: (id: string, data: { name?: string; ownerName?: string; contactName?: string; doctorName?: string; email?: string; status?: string; businessName?: string }) =>
     request<any>(`/api/admin/clients/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

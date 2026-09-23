@@ -13,6 +13,9 @@ export function ClientDetail() {
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetNotice, setResetNotice] = useState<string | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [ownerNameInput, setOwnerNameInput] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -127,6 +130,67 @@ export function ClientDetail() {
             Client Details
           </h2>
           <dl className="space-y-3 text-sm">
+            <div className="flex items-center justify-between py-2 border-b border-[#f0efed]">
+              <dt className="text-[#777169]">Contact / Owner Name</dt>
+              {isEditingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={ownerNameInput}
+                    onChange={(e) => setOwnerNameInput(e.target.value)}
+                    placeholder="e.g. Dr. Shadab Mulla"
+                    className="px-2.5 py-1 text-xs border border-[#d6d3d1] rounded-lg focus:outline-none focus:border-[#0c0a09]"
+                    autoFocus
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!id || !ownerNameInput.trim()) return;
+                      setSavingName(true);
+                      try {
+                        await api.updateClient(id, {
+                          name: ownerNameInput.trim(),
+                          ownerName: ownerNameInput.trim(),
+                          contactName: ownerNameInput.trim(),
+                          doctorName: ownerNameInput.trim(),
+                          businessName: client.name,
+                        });
+                        const updated = await api.getClient(id);
+                        setClient(updated);
+                        setIsEditingName(false);
+                      } catch (err: any) {
+                        alert(err?.message || 'Failed to update owner name');
+                      } finally {
+                        setSavingName(false);
+                      }
+                    }}
+                    disabled={savingName || !ownerNameInput.trim()}
+                    className="px-2.5 py-1 bg-[#0c0a09] text-white rounded-lg text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                  >
+                    {savingName ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setIsEditingName(false)}
+                    className="px-2 py-1 border border-[#e7e5e4] text-[#777169] rounded-lg text-xs hover:bg-[#fafafa]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <dd className="font-medium text-[#0c0a09] flex items-center gap-2">
+                  <span>{user?.name || '-'}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOwnerNameInput(user?.name || '');
+                      setIsEditingName(true);
+                    }}
+                    className="text-[11px] text-[#2563eb] hover:underline font-medium ml-1"
+                  >
+                    {user?.name ? 'Edit' : '+ Set Name'}
+                  </button>
+                </dd>
+              )}
+            </div>
             <div className="flex justify-between py-1 border-b border-[#f0efed]">
               <dt className="text-[#777169]">Primary Contact Email</dt>
               <dd className="font-medium text-[#0c0a09]">{user?.email || '-'}</dd>

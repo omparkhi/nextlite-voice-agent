@@ -1,6 +1,8 @@
 interface CrmTopbarProps {
   title?: string;
   onOpenMobileNav: () => void;
+  onToggleCollapse?: () => void;
+  isCollapsed?: boolean;
   onRefresh?: () => void;
   isRefreshing?: boolean;
   lastUpdated?: Date | null;
@@ -9,6 +11,8 @@ interface CrmTopbarProps {
 export function CrmTopbar({
   title,
   onOpenMobileNav,
+  onToggleCollapse,
+  isCollapsed = false,
   onRefresh,
   isRefreshing,
   lastUpdated,
@@ -19,8 +23,9 @@ export function CrmTopbar({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-[#f5f5f5]/90 backdrop-blur-md border-b border-[#e7e5e4] h-16 px-6 flex items-center justify-between">
-      <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-30 bg-[#ffffff] backdrop-blur-md border-b border-[#e7e5e4] h-16 px-6 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {/* Mobile Nav Toggle */}
         <button
           onClick={onOpenMobileNav}
           className="lg:hidden p-1.5 rounded-lg border border-[#e7e5e4] bg-white text-[#777169] hover:text-[#0c0a09]"
@@ -30,6 +35,8 @@ export function CrmTopbar({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
+
+
 
         {title && (
           <h2 className="font-display-serif text-lg font-light text-[#0c0a09] truncate hidden sm:block">
