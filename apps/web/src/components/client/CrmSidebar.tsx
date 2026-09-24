@@ -105,16 +105,16 @@ export function CrmSidebar({
         </svg>
       ),
     },
-    {
-      name: 'WhatsApp CRM',
-      path: '/dashboard/follow-ups',
-      // badge: 'WhatsApp',
-      icon: (
-        <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-        </svg>
-      ),
-    },
+    // {
+    //   name: 'WhatsApp CRM',
+    //   path: '/dashboard/follow-ups',
+    //   // badge: 'WhatsApp',
+    //   icon: (
+    //     <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    //       <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    //     </svg>
+    //   ),
+    // },
     {
       name: 'Agent Analytics',
       path: '/dashboard/analytics',
@@ -302,11 +302,21 @@ export function CrmSidebar({
 
               {/* Full Email Address */}
               {user?.email && (
-                <div className="pt-2 pb-1.5 px-3 border-t border-[#f0efed] mt-1">
-                  <span className="text-[10px] text-[#a8a29e] uppercase tracking-wider block font-semibold">
-                    Signed in as
-                  </span>
-                  <p className="text-xs text-[#4e4e4e] font-medium truncate mt-0.5" title={user.email}>
+                <div className="pt-2 pb-1.5 px-3 border-t border-[#f0efed] mt-1 flex items-center gap-2.5">
+                  <svg
+                    className="w-4 h-4 text-[#777169] shrink-0"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M7 6a9 9 0 1 1 0 12" />
+                    <polyline points="11 8 15 12 11 16" />
+                    <line x1="15" y1="12" x2="3" y2="12" />
+                  </svg>
+                  <p className="text-sm text-[#4e4e4e] font-medium truncate" title={user.email}>
                     {user.email}
                   </p>
                 </div>
