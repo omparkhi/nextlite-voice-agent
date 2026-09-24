@@ -71,9 +71,10 @@ jobs:
       - name: Execute Remote Deployment via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.AZURE_VM_HOST }}
-          username: ${{ secrets.AZURE_VM_USERNAME }}
+          host: ${{ secrets.AZURE_VM_HOST || '172.198.153.14' }}
+          username: ${{ secrets.AZURE_VM_USERNAME || 'azureuser' }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          passphrase: ${{ secrets.AZURE_VM_PASSPHRASE || '' }}
           script: |
             set -e
             echo "[Deploy] Pulling latest code and configuration for ${{ github.ref_name }}..."
