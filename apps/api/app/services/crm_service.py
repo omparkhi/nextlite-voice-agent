@@ -444,29 +444,32 @@ class CRMService:
         norm_age = normalize_indic_age(age)
         clean_title = sanitize_service_title(title, default_service="General Consultation")
 
-        # Temporal validation: Reject slots in the past
-        if is_past_slot(booking_date, norm_booking_time, time_zone="Asia/Kolkata", buffer_minutes=0):
+        is_human_booking = (booked_by != "VOICE_AGENT") or walk_in
+
+        # Temporal validation: Reject past slots for voice agent, allow human receptionist same-day logging
+        if not is_human_booking and is_past_slot(booking_date, norm_booking_time, time_zone="Asia/Kolkata", buffer_minutes=0):
             raise ValueError(
                 f"Cannot book appointment for past time slot '{norm_booking_time}' on {booking_date}."
             )
 
-        # Shift validation: Reject bookings outside operational shifts / during break
-        if not business_hours:
-            biz_hours_query = await self.session.execute(
-                select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
-                .where(Agent.tenantId == tenant_id)
-                .order_by(AgentVersion.versionNumber.desc())
-                .limit(1)
-            )
-            cfg_json = biz_hours_query.scalar_one_or_none()
-            if cfg_json and isinstance(cfg_json, dict):
-                b_h, _ = extract_business_schedule_from_version(cfg_json)
-                business_hours = b_h
+        # Shift validation: Enforce business hours strictly for AI voice agent, never restrict human desk staff or walk-ins
+        if not is_human_booking:
+            if not business_hours:
+                biz_hours_query = await self.session.execute(
+                    select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+                    .where(Agent.tenantId == tenant_id)
+                    .order_by(AgentVersion.versionNumber.desc())
+                    .limit(1)
+                )
+                cfg_json = biz_hours_query.scalar_one_or_none()
+                if cfg_json and isinstance(cfg_json, dict):
+                    b_h, _ = extract_business_schedule_from_version(cfg_json)
+                    business_hours = b_h
 
-        if business_hours and not is_time_within_shifts(norm_booking_time, business_hours):
-            raise ValueError(
-                f"Requested slot '{norm_booking_time}' falls during closed/break hours in configured schedule: {business_hours}."
-            )
+            if business_hours and not is_time_within_shifts(norm_booking_time, business_hours):
+                raise ValueError(
+                    f"Requested slot '{norm_booking_time}' falls during closed/break hours in configured schedule: {business_hours}."
+                )
 
         # Slot Conflict Check: Prevent duplicate booking if slot is already occupied on the given date
         def _norm_time(t: str) -> str:

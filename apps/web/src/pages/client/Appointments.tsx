@@ -8,13 +8,7 @@ import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDet
 import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
 import { formatDateDDMMYYYY } from '../../utils/dateFormatters';
 
-const STANDARD_TIME_SLOTS = [
-  '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
-  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM',
-  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM',
-  '04:00 PM', '04:30 PM', '05:00 PM', '05:30 PM',
-  '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM'
-];
+import { TimeSlotInput } from '../../components/client/TimeSlotInput';
 
 export function ClientAppointments() {
   const { isViewer } = useOutletContext<{ isViewer: boolean }>();
@@ -599,15 +593,10 @@ export function ClientAppointments() {
                   <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
                     Time Slot *
                   </label>
-                  <select
+                  <TimeSlotInput
                     value={newBookingTime}
-                    onChange={(e) => setNewBookingTime(e.target.value)}
-                    className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
-                  >
-                    {STANDARD_TIME_SLOTS.map((slot) => (
-                      <option key={slot} value={slot}>{slot}</option>
-                    ))}
-                  </select>
+                    onChange={setNewBookingTime}
+                  />
                 </div>
               </div>
 

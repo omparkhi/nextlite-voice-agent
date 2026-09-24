@@ -198,7 +198,7 @@ export function ClientReceptionists() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
               </svg>
-              <span>+ Add Receptionist Staff</span>
+              <span>Add Receptionist Staff</span>
             </button>
           )}
         </div>
@@ -492,11 +492,10 @@ export function ClientReceptionists() {
             <form onSubmit={handleResetPassword} className="mt-4 space-y-4">
               {resetMsg && (
                 <div
-                  className={`p-3 rounded-xl text-xs border ${
-                    resetMsg.isError
+                  className={`p-3 rounded-xl text-xs border ${resetMsg.isError
                       ? 'bg-[#fef2f2] border-[#fecaca] text-[#b91c1c]'
                       : 'bg-[#f0fdf4] border-[#bbf7d0] text-[#15803d]'
-                  }`}
+                    }`}
                 >
                   {resetMsg.text}
                 </div>
