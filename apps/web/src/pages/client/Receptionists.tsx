@@ -165,27 +165,27 @@ export function ClientReceptionists() {
   const activeCount = receptionists.filter((r) => r.isActive).length;
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-5 sm:space-y-6 font-sans w-full min-w-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="font-display-serif text-3xl font-light text-[#0c0a09]">
+          <h1 className="font-display-serif text-lg sm:text-2xl md:text-3xl font-light text-[#0c0a09] tracking-tight leading-tight">
             Receptionist Staff &amp; Desk Credentials
           </h1>
-          <p className="text-xs text-[#777169] mt-0.5">
+          <p className="text-[11px] sm:text-xs text-[#777169] mt-0.5 leading-normal">
             Create and manage login accounts for your clinic&apos;s human receptionists. Walk-in appointments booked at the desk will sync with your CRM and AI Phone Agent.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0">
           <Link
             to={portalUrl}
             target="_blank"
             rel="noreferrer"
-            className="el-btn-outline flex items-center gap-1.5 px-3.5 py-1.5 text-xs bg-white text-[#0c0a09] border border-[#e7e5e4] rounded-xl hover:bg-[#fafafa] transition-colors"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 text-xs bg-white text-[#0c0a09] border border-[#e7e5e4] rounded-xl hover:bg-[#fafafa] transition-colors shadow-2xs leading-none"
           >
             <span>Launch Desk Portal</span>
-            <svg className="w-3.5 h-3.5 text-[#777169]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5 text-[#777169] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </Link>
@@ -193,42 +193,42 @@ export function ClientReceptionists() {
           {!isViewer && (
             <button
               onClick={handleOpenAddModal}
-              className="el-btn-primary flex items-center gap-1.5 px-3.5 py-1.5 text-xs bg-[#0c0a09] text-white rounded-xl hover:bg-[#292524] transition-colors shadow-sm cursor-pointer"
+              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 text-xs bg-[#0c0a09] text-white rounded-xl hover:bg-[#292524] transition-colors shadow-2xs cursor-pointer leading-none"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
               </svg>
-              <span>Add Receptionist Staff</span>
+              <span>+ Add Receptionist Staff</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Info Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="el-card p-4 bg-white border border-[#e7e5e4] rounded-2xl">
-          <span className="text-[11px] font-semibold uppercase text-[#777169] block mb-1">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="p-4 bg-white border border-[#e7e5e4] rounded-2xl shadow-2xs">
+          <span className="text-[10px] sm:text-[11px] font-semibold uppercase text-[#777169] block mb-1">
             Total Staff Accounts
           </span>
-          <div className="text-2xl font-display-serif font-light text-[#0c0a09]">
+          <div className="text-xl sm:text-2xl font-display-serif font-light text-[#0c0a09] leading-tight">
             {receptionists.length}
           </div>
           <p className="text-[11px] text-[#a8a29e] mt-1">Configured for your clinic</p>
         </div>
 
-        <div className="el-card p-4 bg-white border border-[#e7e5e4] rounded-2xl">
-          <span className="text-[11px] font-semibold uppercase text-[#777169] block mb-1">
+        <div className="p-4 bg-white border border-[#e7e5e4] rounded-2xl shadow-2xs">
+          <span className="text-[10px] sm:text-[11px] font-semibold uppercase text-[#777169] block mb-1">
             Active Desk Logins
           </span>
-          <div className="text-2xl font-display-serif font-light text-[#15803d]">
+          <div className="text-xl sm:text-2xl font-display-serif font-light text-[#15803d] leading-tight">
             {activeCount}
           </div>
           <p className="text-[11px] text-[#a8a29e] mt-1">Authorized to enter walk-ins</p>
         </div>
 
-        <div className="el-card p-4 bg-white border border-[#e7e5e4] rounded-2xl flex flex-col justify-between">
+        <div className="p-4 bg-white border border-[#e7e5e4] rounded-2xl flex flex-col justify-between shadow-2xs">
           <div>
-            <span className="text-[11px] font-semibold uppercase text-[#777169] block mb-1">
+            <span className="text-[10px] sm:text-[11px] font-semibold uppercase text-[#777169] block mb-1">
               Receptionist Portal URL
             </span>
             <div className="text-xs font-mono font-medium text-[#4f46e5] truncate">
@@ -257,17 +257,17 @@ export function ClientReceptionists() {
           description="Click '+ Add Receptionist Staff' above to create login credentials (email and password) for your front-desk receptionist."
         />
       ) : (
-        <div className="el-card bg-white overflow-hidden border border-[#e7e5e4] shadow-sm rounded-2xl">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[#f0efed] text-left">
-              <thead className="bg-[#fafafa] text-[#777169] text-[10px] font-semibold uppercase tracking-wider">
+        <div className="bg-white overflow-hidden border border-[#e7e5e4] shadow-2xs rounded-2xl">
+          <div className="overflow-x-auto w-full scrollbar-thin">
+            <table className="w-full min-w-[720px] divide-y divide-[#f0efed] text-left">
+              <thead className="bg-[#fafafa] text-[#777169] text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap">
                 <tr>
-                  <th className="px-6 py-3.5">Staff Name</th>
-                  <th className="px-6 py-3.5">Login Email</th>
-                  <th className="px-4 py-3.5">Role</th>
-                  <th className="px-4 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Created Date</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
+                  <th className="px-4 sm:px-6 py-3">Staff Name</th>
+                  <th className="px-4 sm:px-6 py-3">Login Email</th>
+                  <th className="px-3 sm:px-4 py-3">Role</th>
+                  <th className="px-3 sm:px-4 py-3">Status</th>
+                  <th className="px-4 sm:px-6 py-3">Created Date</th>
+                  <th className="px-4 sm:px-6 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f0efed] text-xs">

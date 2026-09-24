@@ -39,13 +39,13 @@ export function ClientPhoneAgents() {
   }, [loadData]);
 
   return (
-    <div className="space-y-8 font-sans animate-in fade-in duration-300">
+    <div className="space-y-5 sm:space-y-6 md:space-y-8 font-sans animate-in fade-in duration-300 w-full min-w-0">
       {/* Header */}
       <div>
-        <h1 className="font-display-serif text-3xl md:text-4xl font-light text-[#0c0a09]">
-          Phone Numbers & AI Agents
+        <h1 className="font-display-serif text-lg sm:text-2xl md:text-3xl font-light text-[#0c0a09] tracking-tight leading-tight">
+          Phone Numbers &amp; AI Agents
         </h1>
-        <p className="text-xs text-[#777169] mt-1">
+        <p className="text-[11px] sm:text-xs text-[#777169] mt-0.5 leading-normal">
           Active telephony numbers, SIP trunk routing, and provisioned AI employee agents for this workspace.
         </p>
       </div>
@@ -55,15 +55,15 @@ export function ClientPhoneAgents() {
       ) : (
         <>
           {/* Assigned Phone Numbers Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="space-y-3.5 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="font-display-serif text-xl font-light text-[#0c0a09]">
+                <h3 className="font-display-serif text-base sm:text-xl font-light text-[#0c0a09] leading-snug">
                   Assigned Inbound Phone Numbers
                 </h3>
-                <p className="text-xs text-[#777169]">Dedicated telephony lines routed to your voice agents</p>
+                <p className="text-[11px] sm:text-xs text-[#777169]">Dedicated telephony lines routed to your voice agents</p>
               </div>
-              <span className="el-badge text-[10px]">{phoneNumbers.length} Assigned</span>
+              <span className="el-badge text-[10px] self-start sm:self-auto">{phoneNumbers.length} Assigned</span>
             </div>
 
             {phoneNumbers.length === 0 ? (
@@ -72,8 +72,9 @@ export function ClientPhoneAgents() {
                 description="Assigned numbers will appear here once provisioned by your system administrator."
               />
             ) : (
-              <div className="el-card bg-white overflow-hidden border border-[#e7e5e4] shadow-sm">
-                <table className="min-w-full divide-y divide-[#f0efed] text-left">
+              <div className="bg-white overflow-hidden border border-[#e7e5e4] shadow-2xs rounded-2xl">
+                <div className="overflow-x-auto w-full scrollbar-thin">
+                  <table className="w-full min-w-[650px] divide-y divide-[#f0efed] text-left">
                   <thead className="bg-[#fafafa] text-[#777169] text-[10px] font-semibold uppercase tracking-wider">
                     <tr>
                       <th className="px-6 py-3.5">Telephony Number</th>
@@ -110,6 +111,7 @@ export function ClientPhoneAgents() {
                   </tbody>
                 </table>
               </div>
+            </div>
             )}
           </div>
 

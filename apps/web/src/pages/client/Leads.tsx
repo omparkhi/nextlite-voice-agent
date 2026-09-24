@@ -99,14 +99,14 @@ export function ClientLeads() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-5 sm:space-y-6 font-sans w-full min-w-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="font-display-serif text-2xl md:text-3xl font-light text-[#0c0a09]">
-            Leads & Inquiries CRM
+          <h1 className="font-display-serif text-lg sm:text-2xl md:text-3xl font-light text-[#0c0a09] tracking-tight leading-tight">
+            Leads &amp; Inquiries CRM
           </h1>
-          <p className="text-xs text-[#777169] mt-0.5">
+          <p className="text-[11px] sm:text-xs text-[#777169] mt-0.5 leading-normal">
             Prospective customers and callbacks autonomously captured during voice calls.
           </p>
         </div>
@@ -117,7 +117,7 @@ export function ClientLeads() {
       </div>
 
       {/* Filter Bar */}
-      <div className="el-card p-4 bg-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="p-3.5 sm:p-4 bg-white border border-[#e7e5e4] rounded-2xl shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
         <div className="flex-1 relative">
           <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#777169]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -156,9 +156,9 @@ export function ClientLeads() {
           description={searchQuery ? 'No leads matched your search query.' : 'Leads will automatically populate as your AI assistant collects customer contact information.'}
         />
       ) : (
-        <div className="el-card bg-white overflow-hidden border border-[#e7e5e4] shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[#f0efed] text-left">
+        <div className="bg-white overflow-hidden border border-[#e7e5e4] shadow-2xs rounded-2xl">
+          <div className="overflow-x-auto w-full scrollbar-thin">
+            <table className="w-full min-w-[700px] divide-y divide-[#f0efed] text-left">
               <thead className="bg-[#fafafa] text-[#777169] text-[10px] font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-6 py-3.5 text-center">Lead Customer</th>

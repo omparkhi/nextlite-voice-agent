@@ -51,13 +51,13 @@ export function ClientAnalytics() {
     : 0;
 
   return (
-    <div className="space-y-8 font-sans animate-in fade-in duration-300">
+    <div className="space-y-5 sm:space-y-6 md:space-y-8 font-sans animate-in fade-in duration-300 w-full min-w-0">
       {/* Header */}
       <div>
-        <h1 className="font-display-serif text-3xl md:text-4xl font-light text-[#0c0a09]">
-          Operational & AI Intelligence Analytics
+        <h1 className="font-display-serif text-lg sm:text-2xl md:text-3xl font-light text-[#0c0a09] tracking-tight leading-tight">
+          Operational &amp; AI Intelligence Analytics
         </h1>
-        <p className="text-xs text-[#777169] mt-1">
+        <p className="text-[11px] sm:text-xs text-[#777169] mt-0.5 leading-normal">
           Comprehensive performance metrics, latency benchmarks, customer conversion rates, and tool telemetry.
         </p>
       </div>

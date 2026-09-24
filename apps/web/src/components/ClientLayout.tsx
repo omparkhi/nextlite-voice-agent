@@ -72,7 +72,7 @@ export function ClientLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#ffffff] text-[#0c0a09] font-sans flex">
+    <div className="min-h-screen bg-[#ffffff] text-[#0c0a09] font-sans flex w-full overflow-x-hidden">
       {/* Sidebar */}
       <CrmSidebar
         businessName={profile?.tenant?.name}
@@ -84,7 +84,7 @@ export function ClientLayout() {
       />
 
       {/* Main Content Area */}
-      <div className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-300 ease-in-out ${isCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
+      <div className={`flex-1 flex flex-col min-w-0 w-full transition-[padding] duration-300 ease-in-out ${isCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         <CrmTopbar
           title={getPageTitle(location.pathname)}
           onOpenMobileNav={() => setMobileNavOpen(true)}
@@ -95,7 +95,7 @@ export function ClientLayout() {
           lastUpdated={lastUpdated}
         />
 
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto space-y-8">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 max-w-7xl w-full mx-auto space-y-5 sm:space-y-6 md:space-y-8 min-w-0">
           <Outlet context={{ profile, onRefresh: handleManualRefresh, isViewer: user?.role === 'CLIENT_VIEWER' }} />
         </main>
       </div>

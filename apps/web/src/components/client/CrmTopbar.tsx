@@ -21,12 +21,12 @@ export function CrmTopbar({
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-[#ffffff] backdrop-blur-md border-b border-[#e7e5e4] h-16 px-6 flex items-center justify-between">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 bg-[#ffffff] backdrop-blur-md border-b border-[#e7e5e4] h-14 sm:h-16 px-3.5 sm:px-6 flex items-center justify-between w-full">
+      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
         {/* Mobile Nav Toggle */}
         <button
           onClick={onOpenMobileNav}
-          className="lg:hidden p-1.5 rounded-lg border border-[#e7e5e4] bg-white text-[#777169] hover:text-[#0c0a09]"
+          className="lg:hidden p-1.5 rounded-xl border border-[#e7e5e4] bg-white text-[#0c0a09] hover:bg-[#fafafa] shadow-2xs shrink-0"
           aria-label="Toggle navigation"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -34,16 +34,14 @@ export function CrmTopbar({
           </svg>
         </button>
 
-
-
         {title && (
-          <h2 className="font-display-serif text-lg font-light text-[#0c0a09] truncate hidden sm:block">
+          <h2 className="font-display-serif text-sm sm:text-base md:text-lg font-medium text-[#0c0a09] truncate">
             {title}
           </h2>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Live sync pulse indicator */}
         <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-white border border-[#e7e5e4] rounded-full text-[11px] text-[#777169]">
           <span className="w-2 h-2 rounded-full bg-[#16a34a] animate-pulse" />
@@ -55,7 +53,7 @@ export function CrmTopbar({
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="el-btn-outline h-8 px-3 text-xs flex items-center gap-1.5 bg-white hover:bg-[#fafafa]"
+            className="h-8 px-2.5 sm:px-3 text-xs flex items-center gap-1.5 bg-white hover:bg-[#fafafa] border border-[#e7e5e4] rounded-full text-[#0c0a09] shadow-2xs transition"
             title="Refresh CRM Data"
           >
             <svg

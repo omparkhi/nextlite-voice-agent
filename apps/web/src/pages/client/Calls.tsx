@@ -104,14 +104,14 @@ export function ClientCalls() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className="space-y-6 font-sans">
+    <div className="space-y-5 sm:space-y-6 font-sans w-full min-w-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-light text-[#0c0a09]">
+          <h1 className="text-lg sm:text-2xl md:text-3xl font-light text-[#0c0a09] tracking-tight leading-tight">
             Voice Calls CRM
           </h1>
-          <p className="text-xs text-[#777169] mt-0.5">
+          <p className="text-[11px] sm:text-xs text-[#777169] mt-0.5 leading-normal">
             Complete logs of incoming phone inquiries, web audio sessions, transcripts, and AI execution.
           </p>
         </div>
@@ -122,7 +122,7 @@ export function ClientCalls() {
       </div>
 
       {/* Filters Bar */}
-      <div className="el-card p-4 bg-white flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+      <div className="p-3.5 sm:p-4 bg-white border border-[#e7e5e4] rounded-2xl shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 sm:gap-3">
         <div className="flex-1 relative">
           <svg className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#777169]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -136,7 +136,7 @@ export function ClientCalls() {
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Status Filter */}
           <select
             value={statusFilter}
@@ -144,7 +144,7 @@ export function ClientCalls() {
               setStatusFilter(e.target.value);
               setPage(0);
             }}
-            className="bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs font-medium text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
+            className="flex-1 sm:flex-none bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-2.5 sm:px-3 py-2 text-xs font-medium text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
           >
             <option value="ALL">All Statuses</option>
             <option value="COMPLETED">Completed</option>
@@ -176,9 +176,9 @@ export function ClientCalls() {
           description={searchQuery ? 'No calls matched your filter criteria. Try resetting search.' : 'Voice conversations handled by your AI assistant will appear here automatically.'}
         />
       ) : (
-        <div className="el-card bg-white overflow-hidden border border-[#e7e5e4] shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[#f0efed] text-left">
+        <div className="bg-white overflow-hidden border border-[#e7e5e4] shadow-2xs rounded-2xl">
+          <div className="overflow-x-auto w-full scrollbar-thin">
+            <table className="w-full min-w-[700px] divide-y divide-[#f0efed] text-left">
               <thead className="bg-[#fafafa] text-[#777169] text-[11px] font-semibold uppercase tracking-wider">
                 <tr>
                   <th className="px-6 py-3.5 text-center">Caller / Number</th>

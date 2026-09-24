@@ -117,22 +117,22 @@ export function ClientDashboard() {
   const tenantName = profile?.tenant?.name || 'Workspace';
 
   return (
-    <div className="space-y-8 font-sans animate-in fade-in duration-300">
+    <div className="space-y-5 sm:space-y-6 md:space-y-8 font-sans animate-in fade-in duration-300 w-full min-w-0">
       {/* Header Greeting */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-light text-[#0c0a09]">
+          <h1 className="text-lg sm:text-2xl md:text-3xl font-light text-[#0c0a09] tracking-tight leading-tight">
             {getGreetingTime()}, {tenantName}
           </h1>
-          <p className="text-xs text-[#777169] mt-1">
+          <p className="text-[11px] sm:text-xs text-[#777169] mt-0.5 leading-normal">
             Here's what's happening across your AI voice operations and customer pipeline.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button
             onClick={() => navigate('/dashboard/calls')}
-            className="bg-black text-white rounded-full font-light h-9 px-4 text-sm"
+            className="bg-black text-white rounded-full font-light h-8 sm:h-9 px-3.5 sm:px-4 text-xs sm:text-sm shadow-2xs hover:opacity-90 transition leading-none cursor-pointer"
           >
             + View Recent Calls
           </button>
@@ -143,7 +143,7 @@ export function ClientDashboard() {
       {loading ? (
         <CardSkeleton count={6} />
       ) : (
-        <div className="grid  grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
           <MetricCard
             label="Total Calls"
             value={analytics?.totalCalls ?? 0}
