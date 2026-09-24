@@ -20,7 +20,7 @@ import sys
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 from openai import AsyncOpenAI
