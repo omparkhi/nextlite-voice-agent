@@ -65,7 +65,6 @@ jobs:
   deploy-vm:
     name: Deploy to Azure VM
     needs: build-and-push
-    if: ${{ secrets.AZURE_VM_SSH_KEY != '' }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -92,10 +91,10 @@ jobs:
             echo "[Deploy] Building frontend assets..."
             if [ -d "apps/web" ]; then
               cd apps/web
-              if command -v pnpm &> /dev/null; then
+              if command -v pnpm > /dev/null 2>&1; then
                 pnpm install --frozen-lockfile || pnpm install
                 pnpm build
-              elif command -v npm &> /dev/null; then
+              elif command -v npm > /dev/null 2>&1; then
                 npm install
                 npm run build
               fi
