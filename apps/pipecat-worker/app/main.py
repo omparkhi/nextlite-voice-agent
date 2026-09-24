@@ -523,7 +523,7 @@ APPOINTMENT_INTENT_ACK_PHRASES: Dict[str, str] = {
 }
 
 BOOKING_SLOT_COLLECTION_RESPONSES: Dict[str, str] = {
-    "mr-IN": "हो नक्की, appointment book करून देतो. तुमचं नाव आणि age काय आहे?",
+    "mr-IN": "हो नक्की, अपॉइंटमेंटची नोंद करून देतो. तुमचं नाव आणि वय काय आहे?",
     "hi-IN": "जी बिल्कुल, मैं आपकी अपॉइंटमेंट बुक कर देता हूँ। आपका नाम और उम्र क्या है?",
     "en-IN": "Sure, I'll help you book an appointment. May I know your name and age?",
     "gu-IN": "હા ચોક્કસ, હું તમારી એપોઇન્ટમેન્ટ બુક કરી આપું છું. તમારું નામ અને ઉંમર જણાવશો?",
@@ -534,7 +534,7 @@ BOOKING_SLOT_COLLECTION_RESPONSES: Dict[str, str] = {
 }
 
 BOOKING_SLOT_COLLECTION_PURE_RESPONSES: Dict[str, str] = {
-    "mr-IN": "हो नक्की, अपॉइंटमेंट बुक करून देतो. तुमचं नाव आणि वय काय आहे?",
+    "mr-IN": "हो नक्की, अपॉइंटमेंटची नोंद करून देतो. तुमचं नाव आणि वय काय आहे?",
     "hi-IN": "जी बिल्कुल, मैं आपकी अपॉइंटमेंट बुक कर देता हूँ। आपका नाम और उम्र क्या है?",
     "en-IN": "Sure, I'll help you book an appointment. May I know your name and age?",
     "gu-IN": "હા ચોક્કસ, હું તમારી એપોઇન્ટમેન્ટ બુક કરી આપું છું. તમારું નામ અને ઉંમર જણાવશો?",
@@ -576,20 +576,23 @@ def is_appointment_booking_intent(text: str) -> bool:
 
 
 def is_farewell_or_terminal_intent(text: str) -> bool:
-    """Checks whether the user utterance expresses a farewell, stop, or termination intent."""
+    """Checks whether the user utterance expresses a farewell, thank you closing, stop, or termination intent."""
     if not text:
         return False
     t = text.strip().lower()
     terminal_words = {
         "bye", "goodbye", "बाय", "अलविदा", "बंद करा", "ठेवतो", "रुक", "थांब",
-        "stop", "disconnect", "hang up", "cut the call", "call disconnect"
+        "stop", "disconnect", "hang up", "cut the call", "call disconnect",
+        "thanks", "thankyou", "thank", "धन्यवाद", "थँक्यू", "shukriya", "शुक्रिया"
     }
     words = t.split()
-    if len(words) <= 3 and any(w in terminal_words for w in words):
+    if len(words) <= 5 and any(w in terminal_words for w in words):
         return True
     return any(
         kw in t for kw in [
-            "call cut", "bye bye", "बाय बाय", "फोन ठेवतो", "फोन कट करा", "रुकिए", "रहने दो"
+            "call cut", "bye bye", "बाय बाय", "फोन ठेवतो", "फोन कट करा", "रुकिए", "रहने दो",
+            "thank you", "thanks", "धन्यवाद", "थँक यु", "थँक्यू", "माझं काम झालं", "झाली मदत",
+            "काही नको", "काही नाही", "nahi thank you", "no thank you", "nothing else", "that is all"
         ]
     )
 
@@ -659,11 +662,26 @@ class InstrumentedAsyncStream:
             if delta:
                 if getattr(delta, "tool_calls", None):
                     self._collected_tokens.clear()
+                    tool_calls_list = delta.tool_calls
+                    is_end_call_chunk = False
+                    if tool_calls_list and len(tool_calls_list) > 0:
+                        fn = getattr(tool_calls_list[0], "function", None)
+                        if fn and getattr(fn, "name", None) == "end_call":
+                            is_end_call_chunk = True
+
+                    user_text = getattr(self._timing_tracker, "last_user_transcript", None) or ""
+                    is_farewell = is_farewell_or_terminal_intent(user_text)
+
                     if not self._in_tool_call:
                         self._in_tool_call = True
                         if self._timing_tracker:
                             self._timing_tracker.record_tool_call_delta(now)
-                        if self._early_ack_callback and not self._early_ack_triggered:
+                        if (
+                            self._early_ack_callback
+                            and not self._early_ack_triggered
+                            and not is_end_call_chunk
+                            and not is_farewell
+                        ):
                             self._early_ack_triggered = True
                             try:
                                 res = self._early_ack_callback()
@@ -859,39 +877,59 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         if self._runtime_config and not getattr(self._runtime_config.runtime, "enable_early_tool_ack", True):
             return
 
+        user_text = getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or ""
+        if user_text and is_farewell_or_terminal_intent(user_text):
+            logger.info(f"[EarlyToolAck] Suppressed early tool ack for farewell user utterance: '{user_text}'")
+            return
+
         current_turn_id = self._nextlite_timing_tracker.active_turn_id if self._nextlite_timing_tracker else None
         if current_turn_id and self._early_tool_ack_sent_turn_id == current_turn_id:
             return
         self._early_tool_ack_sent_turn_id = current_turn_id
 
-        # Resolve active language
-        active_lang = "en-IN"
+        # Resolve active language prioritizing primary agent language
+        primary_lang = (
+            self._runtime_config.language.primary
+            if self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary
+            else "mr-IN"
+        )
+        active_lang = primary_lang
         if self._language_manager and getattr(self._language_manager, "current_language", None):
             active_lang = self._language_manager.current_language
-        elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
-            active_lang = self._runtime_config.language.primary
 
-        # Fallback check against current user transcript if active_lang is still English
-        if (active_lang.startswith("en") or active_lang == "en-IN") and self._language_manager:
+        # Accurate user text matching
+        if self._language_manager:
             user_text = getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or ""
             if user_text:
                 from app.language_manager import (
                     DEVANAGARI_REGEX,
                     HINDI_LATIN_MARKERS_REGEX,
                     MARATHI_LATIN_MARKERS_REGEX,
+                    MARATHI_MARKERS_REGEX,
                     match_supported_language,
                 )
                 supported = self._language_manager.supported_languages
-                if any(l.startswith("hi") for l in supported) and (DEVANAGARI_REGEX.search(user_text) or HINDI_LATIN_MARKERS_REGEX.search(user_text)):
-                    active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
-                elif any(l.startswith("mr") for l in supported) and MARATHI_LATIN_MARKERS_REGEX.search(user_text):
+                if any(l.startswith("mr") for l in supported) and (
+                    MARATHI_MARKERS_REGEX.search(user_text) or MARATHI_LATIN_MARKERS_REGEX.search(user_text)
+                ):
                     active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
+                elif any(l.startswith("hi") for l in supported) and (
+                    HINDI_LATIN_MARKERS_REGEX.search(user_text)
+                ):
+                    active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
+                elif any(l.startswith("mr") for l in supported) and DEVANAGARI_REGEX.search(user_text) and primary_lang.startswith("mr"):
+                    active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
+                elif any(l.startswith("hi") for l in supported) and DEVANAGARI_REGEX.search(user_text):
+                    active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
 
         base_code = active_lang.split("-")[0]
         filler_phrase = (
             DEFAULT_EARLY_TOOL_ACK_PHRASES.get(active_lang)
             or DEFAULT_EARLY_TOOL_ACK_PHRASES.get(base_code)
-            or DEFAULT_EARLY_TOOL_ACK_PHRASES["en-IN"]
+            or DEFAULT_EARLY_TOOL_ACK_PHRASES.get(primary_lang)
+            or DEFAULT_EARLY_TOOL_ACK_PHRASES.get(primary_lang.split("-")[0])
+            or DEFAULT_EARLY_TOOL_ACK_PHRASES.get("mr-IN")
+            or "एक मिनिट, मी लगेच तपासतो."
         )
 
         now = time.perf_counter()
@@ -1104,61 +1142,6 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             )
             await self._dispatch_appointment_intent_ack(last_user_message)
 
-            # Turn-1 Booking Intent Fast-Path:
-            # If user explicitly requests booking without having given their details (e.g. "मला अपॉइंटमेंट बुक करायची आहे"):
-            # Return the slot collection question in < 1ms, skipping LLM GPU prefill completely.
-            user_msg_clean = last_user_message.strip().lower()
-            if (
-                self._appointment_tool_is_available()
-                and is_appointment_booking_intent(user_msg_clean)
-                and not re.search(r"\b(?:\d{1,2}|years?|वय|वर्षे|नाव|name)\b", user_msg_clean, re.IGNORECASE)
-            ):
-                active_lang = "en-IN"
-                if self._language_manager and getattr(self._language_manager, "current_language", None):
-                    active_lang = self._language_manager.current_language
-                elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
-                    active_lang = self._runtime_config.language.primary
-
-                is_pure_style = False
-                if self._language_manager and getattr(self._language_manager, "language_style", None) == "pure":
-                    is_pure_style = True
-                elif self._runtime_config and self._runtime_config.language and getattr(self._runtime_config.language, "language_style", None) == "pure":
-                    is_pure_style = True
-
-                resp_dict = BOOKING_SLOT_COLLECTION_PURE_RESPONSES if is_pure_style else BOOKING_SLOT_COLLECTION_RESPONSES
-                fast_reply = (
-                    resp_dict.get(active_lang)
-                    or resp_dict.get(active_lang.split("-")[0])
-                    or resp_dict["en-IN"]
-                )
-                logger.info(f"[FastPath Intent] Instant Turn-1 Slot Collection matched: '{fast_reply}' (lang={active_lang})")
-
-                from openai.types.chat import ChatCompletionChunk
-                from openai.types.chat.chat_completion_chunk import Choice, ChoiceDelta
-
-                async def _instant_booking_stream():
-                    yield ChatCompletionChunk(
-                        id="fast-turn1-intent",
-                        choices=[Choice(delta=ChoiceDelta(content=fast_reply), index=0, finish_reason="stop")],
-                        created=int(time.time()),
-                        model=self._settings.model,
-                        object="chat.completion.chunk",
-                    )
-
-                now_fast = time.perf_counter()
-                if self._nextlite_timing_tracker:
-                    self._nextlite_timing_tracker.record_llm_request_created(now_fast)
-                    self._nextlite_timing_tracker.record_llm_request(now_fast)
-                    self._nextlite_timing_tracker.record_llm_first_provider_response(now_fast)
-
-                return InstrumentedAsyncStream(
-                    _instant_booking_stream(),
-                    timing_tracker=self._nextlite_timing_tracker,
-                    transcript_collector=self._transcript_collector,
-                    active_language=active_lang,
-                    is_call_terminating_fn=self._is_call_terminating_fn,
-                )
-
         t0 = time.perf_counter()
         if self._nextlite_timing_tracker:
             self._nextlite_timing_tracker.record_llm_request_created(t0)
@@ -1215,6 +1198,9 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
         greeting_cache_key: Optional[str] = None,
         startup_gate: Optional[Any] = None,
         is_call_terminating_fn: Optional[Any] = None,
+        on_assistant_speech_stopped_fn: Optional[Callable[[], Any]] = None,
+        on_end_call_check_fn: Optional[Callable[[], bool]] = None,
+        on_terminate_fn: Optional[Callable[[], Any]] = None,
     ):
         super().__init__()
         self._timing_tracker = timing_tracker if timing_tracker is not None else {}
@@ -1225,10 +1211,15 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
         self._greeting_cache_key = greeting_cache_key
         self._startup_gate = startup_gate
         self._is_call_terminating_fn = is_call_terminating_fn
+        self._on_assistant_speech_stopped_fn = on_assistant_speech_stopped_fn
+        self._on_end_call_check_fn = on_end_call_check_fn
+        self._on_terminate_fn = on_terminate_fn
         self._greeting_audio_collector: List[bytes] = []
         self._greeting_sample_rate: Optional[int] = None
         self._greeting_num_channels: Optional[int] = None
         self._assistant_chunks: List[str] = []
+        self._llm_in_flight: bool = False
+        self._tts_in_flight_count: int = 0
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         if self._is_call_terminating_fn and self._is_call_terminating_fn():
@@ -1297,6 +1288,10 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                         detected_language=getattr(frame, "language", None),
                     )
 
+        elif isinstance(frame, LLMFullResponseStartFrame):
+            self._llm_in_flight = True
+            logger.debug("[TimingMonitor] LLM response stream started")
+
         elif isinstance(frame, LLMContextFrame):
             if self._turn_tracker:
                 self._turn_tracker.record_llm_context_frame()
@@ -1335,6 +1330,7 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                     logger.info(f"[Trace K - LLM First Output Frame]{ttft_str}")
 
         elif isinstance(frame, TTSStartedFrame):
+            self._tts_in_flight_count += 1
             tts_start_time = time.perf_counter()
             is_greeting = (
                 (self._turn_tracker and self._turn_tracker.turn_type == "greeting")
@@ -1349,7 +1345,7 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                     self._turn_tracker.record_tts_start(tts_start_time)
             self._timing_tracker["last_tts_trigger_time"] = tts_start_time
             self._timing_tracker["first_tts_audio_time"] = None
-            logger.info(f"[Trace L - TTS Started] Synthesis started (context_id={getattr(frame, 'context_id', 'unknown')})")
+            logger.info(f"[Trace L - TTS Started] Synthesis started (context_id={getattr(frame, 'context_id', 'unknown')}, in_flight={self._tts_in_flight_count})")
 
         elif isinstance(frame, TTSAudioRawFrame):
             first_audio_time = time.perf_counter()
@@ -1407,7 +1403,13 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                 logger.info(f"[Trace M - First TTS Audio Chunk]{ttfb_str}{e2e_str}")
 
         elif isinstance(frame, TTSStoppedFrame):
-            logger.info(f"[Trace N - TTS Stopped] Synthesis finished (context_id={getattr(frame, 'context_id', 'unknown')})")
+            self._tts_in_flight_count = max(0, self._tts_in_flight_count - 1)
+            is_llm_generating = (
+                self._turn_tracker.is_llm_generating
+                if (self._turn_tracker and (self._turn_tracker.llm_start is not None or self._turn_tracker.post_tool_llm_start is not None))
+                else self._llm_in_flight
+            )
+            logger.info(f"[Trace N - TTS Stopped] Synthesis chunk finished (context_id={getattr(frame, 'context_id', 'unknown')}, remaining_in_flight={self._tts_in_flight_count}, is_llm_generating={is_llm_generating})")
             self._timing_tracker["first_llm_token_time"] = None
 
             is_greeting = False
@@ -1461,7 +1463,10 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                 and self._turn_tracker.first_post_tool_llm_output is None
             )
 
-            if not is_early_filler_stop:
+            # Turn is truly complete ONLY when LLM is done streaming AND all TTS chunks are done synthesizing
+            is_turn_speech_complete = (not is_llm_generating) and (self._tts_in_flight_count == 0)
+
+            if not is_early_filler_stop and is_turn_speech_complete:
                 if self._turn_tracker:
                     self._turn_tracker.record_tts_stop()
                     if self._turn_tracker.record_turn_complete_once():
@@ -1481,25 +1486,58 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                         )
                     self._assistant_chunks = []
 
+                if self._on_assistant_speech_stopped_fn:
+                    try:
+                        self._on_assistant_speech_stopped_fn()
+                    except Exception as e:
+                        logger.debug(f"[TimingMonitor] on_assistant_speech_stopped notice: {e}")
+
+                if self._on_end_call_check_fn and self._on_end_call_check_fn():
+                    logger.info("[EndCall] Final closing turn audio completed. Initiating graceful terminal disconnect...")
+                    if self._on_terminate_fn:
+                        try:
+                            import inspect
+                            if inspect.iscoroutinefunction(self._on_terminate_fn):
+                                asyncio.create_task(self._on_terminate_fn())
+                            else:
+                                self._on_terminate_fn()
+                        except Exception as e:
+                            logger.debug(f"[EndCall] Terminal disconnect notice: {e}")
+
         elif isinstance(frame, (FunctionCallsStartedFrame, FunctionCallInProgressFrame, FunctionCallResultFrame)):
             if self._turn_tracker:
                 self._turn_tracker.record_tool_call_delta()
 
         elif isinstance(frame, LLMFullResponseEndFrame):
+            self._llm_in_flight = False
             # Guard: If turn involves tool activity, completion occurs ONLY after post-tool TTS finishes
             has_tool_activity = bool(
                 self._turn_tracker
                 and self._turn_tracker.has_pending_tool_activity()
             )
+            # Silent turn case ONLY (where no TTS was ever started for this turn)
             if (
                 self._turn_tracker
                 and not self._turn_tracker.tts_start
                 and self._turn_tracker.turn_type != "greeting"
                 and not has_tool_activity
+                and self._tts_in_flight_count == 0
             ):
                 if self._turn_tracker.record_turn_complete_once():
                     self._turn_tracker.emit_turn_metrics_log()
                     self._turn_tracker.start_new_turn()
+
+                if self._on_end_call_check_fn and self._on_end_call_check_fn():
+                    logger.info("[EndCall] LLM response completed with no TTS chunks. Initiating graceful terminal disconnect...")
+                    if self._on_terminate_fn:
+                        try:
+                            import inspect
+                            if inspect.iscoroutinefunction(self._on_terminate_fn):
+                                asyncio.create_task(self._on_terminate_fn())
+                            else:
+                                self._on_terminate_fn()
+                        except Exception as e:
+                            logger.debug(f"[EndCall] Terminal disconnect notice: {e}")
 
         elif isinstance(frame, InterruptionFrame):
             # Suppress interruptions during tool execution & confirmation audio release so the appointment confirmation plays completely without breaking mid-sentence
@@ -1714,6 +1752,7 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
         self._is_call_terminating_fn = is_call_terminating_fn
         self._on_hangup_fn = on_hangup_fn
         self.last_inbound_audio_time = time.perf_counter()
+        self.estimated_outbound_speech_end = time.perf_counter()
 
         # Dynamic Telephony Jitter Buffer Monitoring & Adaptive Pacing
         self._last_inbound_ts: Optional[float] = None
@@ -1816,10 +1855,12 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
         return await super().deserialize(data)
 
     async def serialize(self, frame: Frame) -> str | bytes | None:
-        if self._is_call_terminating_fn and self._is_call_terminating_fn():
+        if self._is_call_terminating_fn and self._is_call_terminating_fn() and not isinstance(frame, AudioRawFrame):
             return None
 
         if isinstance(frame, InterruptionFrame):
+            # User interrupted — clear acoustic playout estimate immediately
+            self.estimated_outbound_speech_end = time.perf_counter()
             if self._turn_tracker and self._turn_tracker.has_pending_tool_activity():
                 logger.info("[PlivoSerializer] Suppressed InterruptionFrame clearAudio during active tool execution & post-tool confirmation audio release.")
                 return None
@@ -1828,6 +1869,15 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
         try:
             if payload and isinstance(frame, AudioRawFrame):
                 now = time.perf_counter()
+
+                # Calculate duration of PCM audio bytes (16-bit PCM = 2 bytes per sample)
+                raw_bytes = getattr(frame, "audio", b"")
+                sr = getattr(frame, "sample_rate", 8000) or 8000
+                ch = getattr(frame, "num_channels", 1) or 1
+                if raw_bytes and sr > 0 and ch > 0:
+                    chunk_duration = len(raw_bytes) / float(sr * ch * 2)
+                    self.estimated_outbound_speech_end = max(self.estimated_outbound_speech_end, now) + chunk_duration
+
                 if self._turn_tracker:
                     self._turn_tracker.record_audio_sent_to_plivo(now)
                 if self._startup_tracker:
@@ -1955,7 +2005,12 @@ async def websocket_plivo_endpoint(
             # Sync with conversation_context to guarantee complete, verbatim multi-turn transcript
             if conversation_context:
                 msgs = conversation_context.get_messages()
-                chat_msgs = [m for m in msgs if m.get("role") in ("user", "assistant") and m.get("content")]
+                chat_msgs = [
+                    m for m in msgs
+                    if m.get("role") in ("user", "assistant")
+                    and m.get("content")
+                    and not str(m.get("content", "")).startswith("[SYSTEM/")
+                ]
                 collector_user_turns = [t for t in turns if t.get("user") is not None]
                 context_user_msgs = [m for m in chat_msgs if m.get("role") == "user"]
                 if len(context_user_msgs) > len(collector_user_turns) or len(turns) <= 1:
@@ -1963,7 +2018,7 @@ async def websocket_plivo_endpoint(
                     for msg in chat_msgs:
                         role = msg.get("role")
                         content = msg.get("content", "")
-                        if role == "user" and content:
+                        if role == "user" and content and not str(content).startswith("[SYSTEM/"):
                             fresh_collector.record_user_turn(
                                 transcript=content,
                                 detected_language=runtime_config.language.primary or "en-IN",
@@ -2404,11 +2459,39 @@ async def websocket_plivo_endpoint(
             plivo_sample_rate=stream_sample_rate,
         )
         runner_ref: Dict[str, Any] = {"runner": None}
+        serializer_holder: List[Any] = [None]
 
         async def _on_plivo_terminal_hangup():
+            # Allow final synthesized audio chunks to finish playing out through Plivo RTP buffer
+            ser = serializer_holder[0]
+            if ser:
+                now_mono = time.perf_counter()
+                est_end = getattr(ser, "estimated_outbound_speech_end", now_mono)
+                remaining = est_end - now_mono
+                if remaining > 0:
+                    wait_time = min(remaining + 0.8, 8.0)
+                    logger.info(f"[Plivo Hangup] Waiting {wait_time:.2f}s for outbound audio buffer playout before disconnect")
+                    await asyncio.sleep(wait_time)
+                else:
+                    await asyncio.sleep(0.8)
+
             nonlocal is_call_terminating
             is_call_terminating = True
-            logger.info(f"[Plivo Hangup] Terminal hangup detected for stream_id={stream_id} — cancelling pipeline runner")
+
+            # If Plivo REST API credentials and call_id are present, send REST hangup for telecom line drop
+            if settings.PLIVO_AUTH_ID and settings.PLIVO_AUTH_TOKEN and call_id:
+                try:
+                    import base64
+                    endpoint = f"https://api.plivo.com/v1/Account/{settings.PLIVO_AUTH_ID}/Call/{call_id}/"
+                    auth_bytes = f"{settings.PLIVO_AUTH_ID}:{settings.PLIVO_AUTH_TOKEN}".encode("utf-8")
+                    auth_header = f"Basic {base64.b64encode(auth_bytes).decode('utf-8')}"
+                    async with httpx.AsyncClient(timeout=5.0) as plivo_client:
+                        resp = await plivo_client.delete(endpoint, headers={"Authorization": auth_header})
+                        logger.info(f"[Plivo Hangup] REST API hangup executed for call_id={call_id} (status={resp.status_code})")
+                except Exception as hangup_err:
+                    logger.warning(f"[Plivo Hangup] REST API hangup notice for call_id={call_id}: {hangup_err}")
+
+            logger.info(f"[Plivo Hangup] Terminal hangup proceeding for stream_id={stream_id} — cancelling pipeline runner")
             r = runner_ref.get("runner")
             if r:
                 try:
@@ -2433,6 +2516,7 @@ async def websocket_plivo_endpoint(
             is_call_terminating_fn=is_terminating,
             on_hangup_fn=_on_plivo_terminal_hangup,
         )
+        serializer_holder[0] = serializer
 
         # A cache hit is already validated by a tenant/deployment/voice/language
         # content-addressed key.  Send it directly to Plivo now, rather than
@@ -2607,6 +2691,16 @@ async def websocket_plivo_endpoint(
             or None
         )
 
+        is_end_call_pending = [False]
+        last_assistant_speech_end = [time.perf_counter()]
+
+        async def _on_trigger_end_call(reason: Optional[str] = None):
+            logger.info(f"[EndCall] Tool triggered: marking call as pending termination (reason={reason or 'none'})")
+            is_end_call_pending[0] = True
+
+        def _on_assistant_speech_stopped():
+            last_assistant_speech_end[0] = time.perf_counter()
+
         tool_context = ToolRuntimeContext(
             deployment_id=resolved_deployment_id,
             call_session_id=call_session_id,
@@ -2621,12 +2715,35 @@ async def websocket_plivo_endpoint(
             transcript_collector=transcript_collector,
             timing_tracker=turn_tracker,
             _call_session_task=call_session_task,
+            trigger_end_call=_on_trigger_end_call,
         )
         resolved_tools = tool_registry.resolve_tools(
             runtime_config=runtime_config,
             context=tool_context,
             http_client=shared_http_client,
         )
+
+        # Telephony Platform Safety: Ensure end_call tool is always registered for live calls
+        if runtime_config and runtime_config.tools and runtime_config.tools.enabled:
+            if not any(t.name == "end_call" for t in resolved_tools):
+                end_call_factory = tool_registry.get("end_call")
+                if end_call_factory:
+                    try:
+                        raw_schema = end_call_factory.create(
+                            context=tool_context,
+                            tool_config=None,
+                            runtime_config=runtime_config,
+                            http_client=shared_http_client,
+                        )
+                        inst_schema = tool_registry._instrument_function_schema(
+                            raw_schema=raw_schema,
+                            llm_name="end_call",
+                            context=tool_context,
+                        )
+                        resolved_tools.append(inst_schema)
+                    except Exception as e:
+                        logger.debug(f"[ToolRegistry] Error adding fallback end_call: {e}")
+
         startup_tracker.record_stage("tool_registry_resolved")
         if resolved_tools:
             logger.info(
@@ -2641,6 +2758,18 @@ async def websocket_plivo_endpoint(
             base_system_prompt_with_temporal = f"{compiled_system_prompt}\n\n{temporal_instructions}"
         else:
             base_system_prompt_with_temporal = compiled_system_prompt
+
+        # Universal Telephony Call Termination Boundary Grounding
+        if any(t.name == "end_call" for t in resolved_tools):
+            call_end_instructions = (
+                "\n\n=== CALL TERMINATION & HANGUP POLICY ===\n"
+                "- MANDATORY CALL ENDING RULE: When the user says goodbye, expresses that they are done, thanks you, or states they will call later "
+                "(for example: 'बाय', 'bye', 'goodbye', 'थँक्यू नंतर कॉल करेन', 'बाद में बात करेंगे', 'धन्यवाद', 'माझं काम झालं', 'nothing else', 'that is all', 'नाही काही नाही'):\n"
+                "  1. Speak one short, context-appropriate closing farewell in the active language (in Marathi use authentic phrasing like 'धन्यवाद, काळजी घ्या!' or 'नक्की, धन्यवाद, नमस्कार!'. FORBIDDEN: NEVER use literal translations like 'तुमचा दिवस चांगला जावो').\n"
+                "  2. You MUST invoke the `end_call` tool in that exact turn to hang up the phone call.\n"
+                "  3. NEVER ask any follow-up question or offer additional help when the user is saying goodbye or trying to leave."
+            )
+            base_system_prompt_with_temporal = f"{base_system_prompt_with_temporal}{call_end_instructions}"
 
         initial_system_prompt = build_full_instructions(
             base_system_prompt_with_temporal,
@@ -2673,11 +2802,13 @@ async def websocket_plivo_endpoint(
         @user_aggregator.event_handler("on_user_turn_started")
         async def on_user_turn_started(aggregator, strategy):
             turn_tracker.record_speech_start()
+            last_assistant_speech_end[0] = time.perf_counter()
             logger.info(f"[Trace D - UserStartedSpeakingFrame] User turn started via strategy={strategy.__class__.__name__}")
 
         @user_aggregator.event_handler("on_user_turn_stopped")
         async def on_user_turn_stopped(aggregator, strategy, message=None):
             turn_tracker.record_speech_stop()
+            last_assistant_speech_end[0] = time.perf_counter()
             content = getattr(message, "content", "") if message else ""
             content_str = f" | content='{content}'" if content else ""
             logger.info(f"[UserTurn] User turn stopped via strategy={strategy.__class__.__name__}{content_str}")
@@ -2789,6 +2920,9 @@ async def websocket_plivo_endpoint(
             greeting_cache_key=greeting_cache_key,
             startup_gate=pre_stt_processor,
             is_call_terminating_fn=is_terminating,
+            on_assistant_speech_stopped_fn=_on_assistant_speech_stopped,
+            on_end_call_check_fn=lambda: is_end_call_pending[0],
+            on_terminate_fn=_on_plivo_terminal_hangup,
         )
 
         # 13. Compose Pipecat Native Voice Pipeline
@@ -2992,9 +3126,8 @@ async def websocket_plivo_endpoint(
         nudge_task: Optional[asyncio.Task] = None
         nudge_cfg = getattr(runtime_config.runtime, "nudges", None)
         nudge_enabled = bool(nudge_cfg.enabled) if nudge_cfg and hasattr(nudge_cfg, "enabled") else True
-        nudge_delay = int(nudge_cfg.delay_seconds) if nudge_cfg and hasattr(nudge_cfg, "delay_seconds") else 5
+        nudge_delay = max(8, int(nudge_cfg.delay_seconds)) if nudge_cfg and hasattr(nudge_cfg, "delay_seconds") and nudge_cfg.delay_seconds else 8
         max_nudges = int(nudge_cfg.max_unanswered_nudges) if nudge_cfg and hasattr(nudge_cfg, "max_unanswered_nudges") else 2
-        nudge_msgs = list(nudge_cfg.messages) if nudge_cfg and hasattr(nudge_cfg, "messages") and nudge_cfg.messages else []
 
         if nudge_enabled:
             async def _quiet_caller_nudge_loop():
@@ -3003,73 +3136,71 @@ async def websocket_plivo_endpoint(
                     nudge_count = 0
                     last_nudge_time = 0.0
 
-                    while not is_terminating():
-                        await asyncio.sleep(1.0)
+                    while not is_terminating() and not is_end_call_pending[0]:
+                        await asyncio.sleep(0.5)
                         now_mono = time.perf_counter()
 
-                        # Inbound audio silence calculation
-                        inbound_silence = (
-                            now_mono - serializer.last_inbound_audio_time
-                            if hasattr(serializer, "last_inbound_audio_time") and serializer.last_inbound_audio_time
-                            else 0.0
-                        )
+                        # 1. Check if outbound audio is still playing out acoustically to the caller
+                        estimated_speech_end = getattr(serializer, "estimated_outbound_speech_end", 0.0)
+                        if now_mono < estimated_speech_end:
+                            last_assistant_speech_end[0] = estimated_speech_end
+                            nudge_count = 0
+                            continue
 
-                        # User speaking status
+                        # 2. User speaking status
                         user_speaking = bool(
                             turn_tracker and turn_tracker.speech_start is not None and turn_tracker.speech_stop is None
                         )
+
+                        # 3. Check if an active turn is in-flight (speech, LLM generation, or TTS before completion)
+                        turn_in_flight = bool(turn_tracker and turn_tracker.is_turn_in_flight)
+
+                        # 4. Check if assistant is currently speaking or in active tool execution
+                        assistant_speaking = bool(turn_tracker and turn_tracker.is_assistant_speaking)
                         has_active_tool = bool(turn_tracker and turn_tracker.has_pending_tool_activity())
-                        is_user_turn = bool(
+
+                        # If user is speaking, turn is in-flight, assistant is speaking, or tool is active:
+                        # Keep the silence anchor continuously updated to NOW and reset nudge count.
+                        if user_speaking or turn_in_flight or assistant_speaking or has_active_tool:
+                            last_assistant_speech_end[0] = now_mono
+                            nudge_count = 0
+                            continue
+
+                        # Ready state: greeting completed and idle waiting for user
+                        is_ready = bool(
                             turn_tracker and (turn_tracker.turn_type == "user_turn" or turn_tracker.greeting_completed is not None)
                         )
 
-                        # Reset nudge count if user spoke recently (inbound audio within 3 seconds)
-                        if inbound_silence < 3.0:
-                            nudge_count = 0
-
-                        last_activity = max(
-                            getattr(serializer, "last_inbound_audio_time", now_mono),
-                            turn_tracker.last_audio_sent_time or 0.0,
-                            last_nudge_time,
-                        )
-                        silence_duration = now_mono - last_activity
+                        # Silence duration strictly measured from when assistant audio finished playing out or last nudge
+                        last_anchor = max(last_assistant_speech_end[0], estimated_speech_end, last_nudge_time)
+                        silence_duration = now_mono - last_anchor
 
                         if (
-                            is_user_turn
-                            and not user_speaking
-                            and not has_active_tool
+                            is_ready
+                            and not is_end_call_pending[0]
                             and silence_duration >= nudge_delay
                             and nudge_count < max_nudges
                         ):
                             nudge_count += 1
                             last_nudge_time = now_mono
+                            last_assistant_speech_end[0] = now_mono
 
-                            lang = (language_manager.current_language or "en-IN").lower()
-                            if lang.startswith("mr"):
-                                nudge_text = "तुम्ही आहात का? मला सांगा मी काही मदत करू का."
-                            elif lang.startswith("hi"):
-                                nudge_text = "क्या आप हैं? बताइए मैं आपकी क्या मदद कर सकता हूँ।"
-                            elif lang.startswith("gu"):
-                                nudge_text = "તમે છો? મને જણાવો જો હું કોઈ મદદ કરી શકું."
-                            else:
-                                nudge_text = "Are you there? Let me know if you need any help."
-
-                            if nudge_msgs and len(nudge_msgs) > 0 and nudge_msgs[0]:
-                                configured_msg = nudge_msgs[(nudge_count - 1) % len(nudge_msgs)]
-                                if configured_msg and configured_msg.strip():
-                                    from app.indic_sanitizer import sanitize_indic_tts_text
-                                    nudge_text = sanitize_indic_tts_text(configured_msg.strip(), language_manager.current_language)
-
-                            logger.info(
-                                f"[QuietCallerNudge] Dispatched gentle silence reminder #{nudge_count}/{max_nudges} "
-                                f"after {silence_duration:.1f}s silence: '{nudge_text}' (lang={language_manager.current_language})"
+                            silence_seconds_int = int(silence_duration)
+                            system_nudge_prompt = (
+                                f"[SYSTEM/RUNTIME EVENT]\n"
+                                f"The caller has been silent for {silence_seconds_int} seconds after you spoke. "
+                                f"Ask a short, natural check-in in the active language (e.g. 'तुम्ही ऐकताय का?', 'काही अडचण आहे का?', 'Are you still with me?'). "
+                                f"CRITICAL: Do NOT say 'नमस्कार', 'नमस्ते', 'hello', or repeat greetings. Do NOT re-introduce yourself or summarize prior statements. Keep it to one single short sentence."
                             )
 
-                            from pipecat.frames.frames import TTSSpeakFrame
-                            if 'task' in locals() and task:
-                                await task.queue_frame(TTSSpeakFrame(text=nudge_text))
-                            elif 'runner' in locals() and runner:
-                                await runner.queue_frame(TTSSpeakFrame(text=nudge_text))
+                            logger.info(
+                                f"[QuietCallerNudge] Dispatched dynamic LLM silence event #{nudge_count}/{max_nudges} "
+                                f"after {silence_duration:.1f}s silence"
+                            )
+
+                            if conversation_context and llm_service:
+                                conversation_context.add_message({"role": "system", "content": system_nudge_prompt})
+                                await llm_service.queue_frame(LLMContextFrame(context=conversation_context))
                 except asyncio.CancelledError:
                     pass
                 except Exception as e:
@@ -3095,6 +3226,8 @@ async def websocket_plivo_endpoint(
         await finalize_call_session("FAILED")
     finally:
         is_call_terminating = True
+        if 'nudge_task' in locals() and nudge_task and not nudge_task.done():
+            nudge_task.cancel()
         if 'duration_task' in locals() and duration_task and not duration_task.done():
             duration_task.cancel()
         if 'greeting_task' in locals() and greeting_task and not greeting_task.done():

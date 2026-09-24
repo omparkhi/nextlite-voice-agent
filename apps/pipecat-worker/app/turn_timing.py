@@ -250,6 +250,21 @@ class TurnTimingTracker:
         """True if assistant audio/synthesis is currently active."""
         return (self.tts_start is not None or self.first_tts_audio is not None) and self.tts_stop is None
 
+    @property
+    def is_turn_in_flight(self) -> bool:
+        """True if a turn is actively processing (speech start, LLM generation, or TTS synthesis before completion)."""
+        if self.turn_complete is not None:
+            return False
+        if (
+            self.speech_start is not None
+            or self.llm_start is not None
+            or self.llm_request_created is not None
+            or self.tts_start is not None
+            or self.first_tts_audio is not None
+        ):
+            return True
+        return False
+
     def record_greeting_start(self, ts: Optional[float] = None):
         now = ts if ts is not None else time.perf_counter()
         self.greeting_start = now
@@ -571,6 +586,15 @@ class TurnTimingTracker:
         now = ts if ts is not None else time.perf_counter()
         self.turn_complete = now
         self.record_event("turn_completed", now)
+
+    @property
+    def is_llm_generating(self) -> bool:
+        """Returns True if LLM is currently generating initial or post-tool tokens."""
+        if self.post_tool_llm_start is not None:
+            return self.post_tool_llm_response_complete is None
+        if self.llm_start is not None:
+            return self.llm_response_complete is None
+        return False
 
     def has_pending_tool_activity(self) -> bool:
         """Returns True if the active turn involves tool calling or post-tool TTS playback that has not completed."""

@@ -20,6 +20,7 @@ CANONICAL_PLATFORM_TOOLS = (
     "book_appointment",
     "check_available_slots",
     "reschedule_appointment",
+    "end_call",
 )
 
 CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
@@ -65,6 +66,15 @@ CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
     "reschedule appointment": "reschedule_appointment",
     "reschedule": "reschedule_appointment",
     "reschedule booking": "reschedule_appointment",
+    # Call Termination
+    "end_call": "end_call",
+    "end call": "end_call",
+    "hangup": "end_call",
+    "hang_up": "end_call",
+    "hang up": "end_call",
+    "terminate_call": "end_call",
+    "disconnect_call": "end_call",
+    "disconnect": "end_call",
 }
 
 PROTECTED_CONTEXT_KEYS = {
@@ -304,6 +314,34 @@ CANONICAL_TOOL_REGISTRY: Dict[str, ToolDefinition] = {
         is_platform_default=True,
         confirmation_supported=True
     ),
+    "end_call": ToolDefinition(
+        id="end_call",
+        name="end_call",
+        display_name="End Call",
+        description="Politely terminate and disconnect the PSTN phone call when the conversation is finished, the caller says goodbye, thanks you, or states they will call later. You MUST invoke this tool whenever delivering your final closing farewell to hang up the phone call.",
+        category="Telephony",
+        parameters={
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Optional reason for concluding the call (e.g. 'objective_completed', 'caller_said_bye', 'appointment_booked')"
+                }
+            },
+            "required": []
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "success": {"type": "boolean"},
+                "action": {"type": "string"},
+                "message": {"type": "string"}
+            },
+            "required": ["success"]
+        },
+        is_platform_default=True,
+        confirmation_supported=False
+    ),
 }
 
 
@@ -499,6 +537,23 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
                             )
                         )
                         seen_ids.add(norm_id)
+
+        # Telephony platform fallback: end_call platform tool is included if tools are enabled and not explicitly disabled
+        if "end_call" not in seen_ids:
+            is_end_call_disabled = any(
+                isinstance(t, dict)
+                and (normalize_tool_id(t.get("toolId") or t.get("tool_id") or t.get("name")) == "end_call")
+                and not t.get("enabled", True)
+                for t in raw_tools
+            )
+            if not is_end_call_disabled:
+                end_call_canonical = get_canonical_tool("end_call")
+                if end_call_canonical:
+                    resolved_tools.append(
+                        end_call_canonical.to_runtime_tool_definition(enabled=True)
+                    )
+                    seen_ids.add("end_call")
+
         return resolved_tools
 
     # Legacy default fallback when bindings field is absent

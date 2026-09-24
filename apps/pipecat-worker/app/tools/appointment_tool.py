@@ -89,7 +89,7 @@ def create_book_appointment_tool_factory(
             return None
         language = (direct_response_language or "en-IN").lower()
         if language.startswith("mr"):
-            return "तुमची अपॉइंटमेंट बुक झाली आहे. काही अडचण असल्यास नक्की सांगा!"
+            return "आपली भेट यशस्वीरीत्या नोंदवली गेली आहे. काही अडचण असल्यास नक्की सांगा!"
         if language.startswith("hi"):
             return "आपकी अपॉइंटमेंट बुक हो गई है। कोई और सहायता चाहिए तो बताइए!"
         if language.startswith("gu"):

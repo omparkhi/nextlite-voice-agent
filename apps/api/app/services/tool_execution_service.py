@@ -63,6 +63,15 @@ class ToolExecutionService:
                 tenant_id=trusted_tenant_id,
                 agent_id=trusted_agent_id
             )
+        elif canonical_name == "end_call":
+            reason = safe_args.get("reason", "Conversation completed")
+            logger.info(f"Tool end_call executed for tenant {trusted_tenant_id} (reason: {reason})")
+            return {
+                "success": True,
+                "action": "HANGUP",
+                "message": "Call termination initiated.",
+                "reason": reason
+            }
         else:
             raise ValueError(f"Tool {canonical_name} is not implemented in internal registry")
 

@@ -64,10 +64,10 @@ export function ClientLeads() {
     }
   };
 
-  const handleOpenWhatsApp = (lead: Lead) => {
-    setWhatsAppTargetLead(lead);
-    setComposerOpen(true);
-  };
+  // const handleOpenWhatsApp = (lead: Lead) => {
+  //   setWhatsAppTargetLead(lead);
+  //   setComposerOpen(true);
+  // };
 
   const handleLeadUpdated = (updated: Lead) => {
     setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)));
@@ -106,7 +106,7 @@ export function ClientLeads() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="font-display-serif text-3xl font-light text-[#0c0a09]">
+          <h1 className="font-display-serif text-2xl md:text-3xl font-light text-[#0c0a09]">
             Leads & Inquiries CRM
           </h1>
           <p className="text-xs text-[#777169] mt-0.5">
@@ -164,12 +164,12 @@ export function ClientLeads() {
             <table className="min-w-full divide-y divide-[#f0efed] text-left">
               <thead className="bg-[#fafafa] text-[#777169] text-[10px] font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-3.5">Lead Customer</th>
-                  <th className="px-6 py-3.5">Phone Number</th>
-                  <th className="px-6 py-3.5">Interest / Category</th>
-                  <th className="px-6 py-3.5">Stage</th>
-                  <th className="px-6 py-3.5">Created Date</th>
-                  <th className="px-6 py-3.5 text-right">Action</th>
+                  <th className="px-6 py-3.5 text-center">Lead Customer</th>
+                  <th className="px-6 py-3.5 text-center">Phone Number</th>
+                  <th className="px-6 py-3.5 text-center">Interest / Category</th>
+                  <th className="px-6 py-3.5 text-center">Stage</th>
+                  <th className="px-6 py-3.5 text-center">Created Date</th>
+                  <th className="px-6 py-3.5 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#f0efed] text-xs">
@@ -179,7 +179,7 @@ export function ClientLeads() {
                     onClick={() => handleRowClick(lead)}
                     className="hover:bg-[#fafafa] cursor-pointer transition-colors group"
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className="font-semibold text-[#0c0a09] block">{lead.customerName}</span>
                       {lead.customerEmail && (
                         <span className="text-[11px] text-[#777169] block truncate max-w-[200px]">
@@ -188,23 +188,23 @@ export function ClientLeads() {
                       )}
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-[#4e4e4e] font-mono text-[11px]">
+                    <td className="px-6 py-4 whitespace-nowrap text-[#4e4e4e] font-mono text-[11px] text-center">
                       {lead.customerPhone}
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#f0efed] text-[#0c0a09]">
                         {lead.interestCategory || 'General Inquiry'}
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${getStatusBadge(lead.status)}`}>
                         {lead.status}
                       </span>
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-[#777169] text-[11px]">
+                    <td className="px-6 py-4 whitespace-nowrap text-[#777169] text-[11px] text-center">
                       {new Date(lead.createdAt).toLocaleDateString(undefined, {
                         month: 'short',
                         day: 'numeric',
@@ -212,15 +212,15 @@ export function ClientLeads() {
                       })}
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-6 py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center">
                         <button
                           onClick={() => handleRowClick(lead)}
                           className="el-btn-outline h-7 px-2.5 text-[11px] bg-white group-hover:border-[#0c0a09]"
                         >
                           Manage
                         </button>
-                        <button
+                        {/* <button
                           onClick={() => handleOpenWhatsApp(lead)}
                           className="el-btn-outline h-7 px-2.5 text-[11px] bg-white text-[#15803d] hover:bg-[#f0fdf4] flex items-center gap-1"
                           title="Send WhatsApp Follow-up"
@@ -229,7 +229,7 @@ export function ClientLeads() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                           </svg>
                           <span>WhatsApp</span>
-                        </button>
+                        </button> */}
                       </div>
                     </td>
                   </tr>
@@ -274,19 +274,19 @@ export function ClientLeads() {
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onUpdated={handleLeadUpdated}
-        onOpenWhatsApp={handleOpenWhatsApp}
+        // onOpenWhatsApp={handleOpenWhatsApp}
         isReadOnly={isViewer}
       />
 
       {/* WhatsApp Composer */}
-      <WhatsAppComposer
+      {/* <WhatsAppComposer
         isOpen={composerOpen}
         onClose={() => setComposerOpen(false)}
         initialLead={whatsAppTargetLead}
         initialPhone={whatsAppTargetLead?.customerPhone || ''}
         initialCustomerName={whatsAppTargetLead?.customerName || ''}
         onSuccess={loadLeads}
-      />
+      /> */}
     </div>
   );
 }

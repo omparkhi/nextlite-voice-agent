@@ -36,6 +36,10 @@ from app.tools.slot_tool import (
     CHECK_SLOTS_TOOL_NAME,
     create_check_slots_tool_factory,
 )
+from app.tools.end_call_tool import (
+    END_CALL_TOOL_NAME,
+    create_end_call_tool_factory,
+)
 
 if TYPE_CHECKING:
     from app.call_lifecycle import CallTranscriptCollector, TrustedCallContext
@@ -61,6 +65,7 @@ class ToolRuntimeContext:
     transcript_collector: Optional["CallTranscriptCollector"] = None
     timing_tracker: Optional[Any] = None
     _call_session_task: Optional[Any] = None
+    trigger_end_call: Optional[Callable[..., None]] = None
 
     async def ensure_call_session_id(self) -> Optional[str]:
         """Ensures that the background CallSession creation task has completed before tool execution."""
@@ -104,6 +109,7 @@ CANONICAL_PLATFORM_TOOLS = (
     "book_appointment",
     "check_available_slots",
     "reschedule_appointment",
+    "end_call",
 )
 
 CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
@@ -143,6 +149,15 @@ CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
     "reschedule_appointment": "reschedule_appointment",
     "reschedule appointment": "reschedule_appointment",
     "reschedule": "reschedule_appointment",
+    # Call Termination
+    "end_call": "end_call",
+    "end call": "end_call",
+    "hangup": "end_call",
+    "hang_up": "end_call",
+    "hang up": "end_call",
+    "terminate_call": "end_call",
+    "disconnect_call": "end_call",
+    "disconnect": "end_call",
 }
 
 
@@ -294,6 +309,24 @@ class RescheduleToolFactory:
         )
 
 
+class EndCallToolFactory:
+    tool_id = END_CALL_TOOL_NAME
+
+    def create(
+        self,
+        context: ToolRuntimeContext,
+        tool_config: Optional[RuntimeToolDefinition] = None,
+        runtime_config: Optional[RuntimeAgentConfig] = None,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> FunctionSchema:
+        desc = tool_config.description if tool_config and tool_config.description else None
+        return create_end_call_tool_factory(
+            context=context,
+            description_override=desc,
+            http_client=http_client,
+        )
+
+
 class ToolRegistry:
     """NextLite Voice Tool Registry for Pipecat Worker.
     
@@ -308,6 +341,7 @@ class ToolRegistry:
         self.register(AppointmentToolFactory())
         self.register(SlotToolFactory())
         self.register(RescheduleToolFactory())
+        self.register(EndCallToolFactory())
 
     def register(self, factory: ToolFactory) -> "ToolRegistry":
         """Register a tool factory with the registry."""

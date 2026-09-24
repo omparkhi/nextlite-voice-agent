@@ -12,9 +12,18 @@ from app.tools.lead_tool import (
     CREATE_CALLBACK_LEAD_TOOL_NAME,
     create_callback_lead_tool_factory,
 )
+from app.tools.slot_tool import (
+    CHECK_SLOTS_TOOL_NAME,
+    create_check_slots_tool_factory,
+)
+from app.tools.end_call_tool import (
+    END_CALL_TOOL_NAME,
+    create_end_call_tool_factory,
+)
 from app.tools.tool_registry import (
     CANONICAL_PLATFORM_TOOLS,
     AppointmentToolFactory,
+    EndCallToolFactory,
     KnowledgeToolFactory,
     LeadToolFactory,
     ToolFactory,
@@ -29,14 +38,17 @@ __all__ = [
     "BOOK_APPOINTMENT_TOOL_NAME",
     "CANONICAL_PLATFORM_TOOLS",
     "CREATE_CALLBACK_LEAD_TOOL_NAME",
+    "END_CALL_TOOL_NAME",
     "QUERY_KNOWLEDGE_BASE_TOOL_NAME",
     "AppointmentToolFactory",
+    "EndCallToolFactory",
     "KnowledgeToolFactory",
     "LeadToolFactory",
     "ToolFactory",
     "ToolRegistry",
     "ToolRuntimeContext",
     "create_book_appointment_tool_factory",
+    "create_end_call_tool_factory",
     "create_knowledge_tool_factory",
     "create_callback_lead_tool_factory",
     "is_valid_tool_name",
