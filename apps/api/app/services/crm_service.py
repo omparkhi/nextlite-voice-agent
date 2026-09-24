@@ -665,24 +665,30 @@ class CRMService:
         available_slots = [s for s in candidate_slots if _norm_time(s) not in booked_slots]
 
         slot_available = True
+        is_occupied = False
+        is_outside_shift = False
+        is_past = False
+
         normalized_pref = _norm_time(preferred_time) if preferred_time else None
         if normalized_pref:
-            # Check 1: Is preferred time within tenant's open shifts?
-            if business_hours and not is_time_within_shifts(preferred_time, business_hours):
+            # Check 1: Is preferred time already booked in database?
+            matched_booked = any(
+                _norm_time(b) == normalized_pref
+                or _norm_time(b).replace(":00", "") == normalized_pref.replace(":00", "")
+                or _norm_time(b).lstrip("0") == normalized_pref.lstrip("0")
+                for b in booked_slots
+            )
+            if matched_booked:
+                is_occupied = True
                 slot_available = False
             # Check 2: Has preferred time already passed for today?
             elif is_past_slot(booking_date, preferred_time, time_zone=timezone or "Asia/Kolkata", buffer_minutes=0):
+                is_past = True
                 slot_available = False
-            # Check 3: Is preferred time already booked in database?
-            else:
-                matched_booked = any(
-                    _norm_time(b) == normalized_pref
-                    or _norm_time(b).replace(":00", "") == normalized_pref.replace(":00", "")
-                    or _norm_time(b).lstrip("0") == normalized_pref.lstrip("0")
-                    for b in booked_slots
-                )
-                if matched_booked:
-                    slot_available = False
+            # Check 3: Is preferred time within tenant's open shifts?
+            elif business_hours and not is_time_within_shifts(preferred_time, business_hours):
+                is_outside_shift = True
+                slot_available = False
 
         existing_booking = None
         if phone:
@@ -717,6 +723,9 @@ class CRMService:
             "bookingDate": booking_date,
             "preferredTime": preferred_time,
             "slotAvailable": slot_available,
+            "isOccupied": is_occupied,
+            "isOutsideShift": is_outside_shift,
+            "isPast": is_past,
             "bookedSlots": list(booked_slots),
             "availableSlots": available_slots[:8],
             "totalAvailable": len(available_slots),

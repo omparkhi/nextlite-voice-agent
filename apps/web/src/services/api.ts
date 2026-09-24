@@ -315,6 +315,9 @@ export const api = {
       bookingDate: string;
       preferredTime?: string;
       slotAvailable: boolean;
+      isOccupied?: boolean;
+      isPast?: boolean;
+      isOutsideShift?: boolean;
       bookedSlots: string[];
       availableSlots: string[];
       totalAvailable: number;

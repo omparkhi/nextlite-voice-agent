@@ -60,7 +60,12 @@ export function ClientAppointments() {
 
   // Live Slot Availability Check inside Modal
   const [slotChecking, setSlotChecking] = useState(false);
-  const [slotAvailable, setSlotAvailable] = useState<boolean | null>(null);
+  const [slotDetails, setSlotDetails] = useState<{
+    slotAvailable: boolean;
+    isOccupied?: boolean;
+    isPast?: boolean;
+    isOutsideShift?: boolean;
+  } | null>(null);
   const [existingBookingInfo, setExistingBookingInfo] = useState<any>(null);
 
   const loadAppointments = useCallback(async (silent = false) => {
@@ -110,12 +115,17 @@ export function ClientAppointments() {
       try {
         const res = await api.checkClientAppointmentSlots(newBookingDate, newCustomerPhone, newBookingTime);
         if (!cancelled) {
-          setSlotAvailable(res.slotAvailable);
+          setSlotDetails({
+            slotAvailable: res.slotAvailable,
+            isOccupied: res.isOccupied,
+            isPast: res.isPast,
+            isOutsideShift: res.isOutsideShift,
+          });
           setExistingBookingInfo(res.hasExistingBooking ? res.existingBooking : null);
         }
       } catch (e) {
         if (!cancelled) {
-          setSlotAvailable(null);
+          setSlotDetails(null);
         }
       } finally {
         if (!cancelled) setSlotChecking(false);
@@ -620,11 +630,19 @@ export function ClientAppointments() {
                 <span className="text-[#777169]">Slot Status:</span>
                 {slotChecking ? (
                   <span className="text-[#777169] animate-pulse">Checking availability...</span>
-                ) : slotAvailable === false ? (
+                ) : slotDetails?.isOccupied ? (
                   <span className="text-[#b91c1c] font-semibold flex items-center gap-1">
-                    ⚠️ Slot Occupied (Conflict!)
+                    ⚠️ Slot Already Booked (Conflict!)
                   </span>
-                ) : slotAvailable === true ? (
+                ) : slotDetails?.isPast ? (
+                  <span className="text-[#d97706] font-semibold flex items-center gap-1">
+                    ⚠️ Time Slot Has Passed Today
+                  </span>
+                ) : slotDetails?.isOutsideShift ? (
+                  <span className="text-[#059669] font-medium flex items-center gap-1">
+                    ✓ Custom Desk Slot Available (Off-Shift)
+                  </span>
+                ) : slotDetails ? (
                   <span className="text-[#15803d] font-semibold flex items-center gap-1">
                     ✓ Slot Open & Available
                   </span>
@@ -689,7 +707,7 @@ export function ClientAppointments() {
                 </button>
                 <button
                   type="submit"
-                  disabled={bookingSubmitting || slotAvailable === false}
+                  disabled={bookingSubmitting || slotDetails?.isOccupied === true}
                   className="el-btn-primary px-5 py-2 text-xs bg-[#0c0a09] text-white rounded-xl hover:bg-[#292524] disabled:opacity-50"
                 >
                   {bookingSubmitting ? 'Saving...' : 'Save Walk-in Appointment'}

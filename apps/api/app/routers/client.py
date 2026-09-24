@@ -191,6 +191,19 @@ async def list_appointments(
     agent_uuid = uuid.UUID(agent_id) if agent_id else None
     return await service.list_appointments(tenant_id, limit, offset, agent_uuid, status_filter, booking_date, booked_by)
 
+@router.get("/appointments/slots")
+async def check_appointment_slots(
+    booking_date: str = Query(..., alias="bookingDate"),
+    phone: Optional[str] = Query(None),
+    preferred_time: Optional[str] = Query(None, alias="preferredTime"),
+    tenant_id_param: Optional[str] = Query(None, alias="tenantId"),
+    payload: Dict[str, Any] = Depends(get_current_user_payload),
+    session: AsyncSession = Depends(get_db)
+):
+    tenant_id = resolve_tenant_id(payload, tenant_id_param)
+    service = CRMService(session)
+    return await service.check_slots(tenant_id, booking_date, phone, preferred_time)
+
 @router.get("/appointments/{appointment_id}")
 async def get_appointment(
     appointment_id: str,
@@ -198,9 +211,13 @@ async def get_appointment(
     payload: Dict[str, Any] = Depends(get_current_user_payload),
     session: AsyncSession = Depends(get_db)
 ):
+    try:
+        appt_uuid = uuid.UUID(appointment_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid appointment ID")
     tenant_id = resolve_tenant_id(payload, tenant_id_param)
     service = CRMService(session)
-    appt = await service.get_appointment(uuid.UUID(appointment_id), tenant_id)
+    appt = await service.get_appointment(appt_uuid, tenant_id)
     if not appt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     return appt
@@ -214,26 +231,17 @@ async def update_appointment(
     session: AsyncSession = Depends(get_db)
 ):
     require_mutation_role(payload)
+    try:
+        appt_uuid = uuid.UUID(appointment_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid appointment ID")
     tenant_id = resolve_tenant_id(payload, tenant_id_param)
     service = CRMService(session)
-    updated = await service.update_appointment(uuid.UUID(appointment_id), tenant_id, body)
+    updated = await service.update_appointment(appt_uuid, tenant_id, body)
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
     await invalidate_worker_cache()
     return updated
-
-@router.get("/appointments/slots")
-async def check_appointment_slots(
-    booking_date: str = Query(..., alias="bookingDate"),
-    phone: Optional[str] = Query(None),
-    preferred_time: Optional[str] = Query(None, alias="preferredTime"),
-    tenant_id_param: Optional[str] = Query(None, alias="tenantId"),
-    payload: Dict[str, Any] = Depends(get_current_user_payload),
-    session: AsyncSession = Depends(get_db)
-):
-    tenant_id = resolve_tenant_id(payload, tenant_id_param)
-    service = CRMService(session)
-    return await service.check_slots(tenant_id, booking_date, phone, preferred_time)
 
 @router.post("/appointments/book", status_code=status.HTTP_201_CREATED)
 async def create_client_appointment(
