@@ -27,15 +27,8 @@ git pull origin $Branch
 
 echo '[3/5] Building frontend (apps/web)...'
 if [ -d 'apps/web' ]; then
-    cd apps/web
-    if command -v pnpm > /dev/null 2>&1; then
-        pnpm install --frozen-lockfile || pnpm install
-        pnpm build
-    elif command -v npm > /dev/null 2>&1; then
-        npm install
-        npm run build
-    fi
-    cd /opt/nextlite
+    docker run --rm -v /opt/nextlite/apps/web:/app -w /app node:20-alpine sh -c "npm install && npm run build"
+    sudo chown -R `$USER:`$USER /opt/nextlite/apps/web/dist || true
 fi
 
 echo '[4/5] Rebuilding and restarting containers...'

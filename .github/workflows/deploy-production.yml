@@ -88,17 +88,10 @@ jobs:
             git checkout ${{ github.ref_name }}
             git pull origin ${{ github.ref_name }}
 
-            echo "[Deploy] Building frontend assets..."
+            echo "[Deploy] Building frontend assets (apps/web)..."
             if [ -d "apps/web" ]; then
-              cd apps/web
-              if command -v pnpm > /dev/null 2>&1; then
-                pnpm install --frozen-lockfile || pnpm install
-                pnpm build
-              elif command -v npm > /dev/null 2>&1; then
-                npm install
-                npm run build
-              fi
-              cd /opt/nextlite
+              docker run --rm -v /opt/nextlite/apps/web:/app -w /app node:20-alpine sh -c "npm install && npm run build"
+              sudo chown -R $USER:$USER /opt/nextlite/apps/web/dist || true
             fi
 
             echo "[Deploy] Authenticating with GitHub Container Registry..."
