@@ -8,10 +8,19 @@ import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDet
 import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
 import { formatDateDDMMYYYY } from '../../utils/dateFormatters';
 
+import { useAuth } from '../../contexts/AuthContext';
 import { TimeSlotInput } from '../../components/client/TimeSlotInput';
 
 export function ClientAppointments() {
-  const { isViewer } = useOutletContext<{ isViewer: boolean }>();
+  const { isViewer, profile } = useOutletContext<{ isViewer: boolean; profile?: any }>() || {};
+  const { user } = useAuth();
+
+  const resolvedDoctorName =
+    profile?.doctorName?.trim() ||
+    profile?.user?.name?.trim() ||
+    user?.name?.trim() ||
+    '';
+
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -36,12 +45,18 @@ export function ClientAppointments() {
   const [newBookingDate, setNewBookingDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [newBookingTime, setNewBookingTime] = useState('10:00 AM');
   const [newTitle, setNewTitle] = useState('General Consultation');
-  const [newResourceName, setNewResourceName] = useState('Dr. Rajesh Sharma');
+  const [newResourceName, setNewResourceName] = useState(resolvedDoctorName);
   const [newNotes, setNewNotes] = useState('');
   const [newIsWalkIn, setNewIsWalkIn] = useState(true);
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingSuccess, setBookingSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (resolvedDoctorName && !newResourceName) {
+      setNewResourceName(resolvedDoctorName);
+    }
+  }, [resolvedDoctorName]);
 
   // Live Slot Availability Check inside Modal
   const [slotChecking, setSlotChecking] = useState(false);
@@ -644,7 +659,7 @@ export function ClientAppointments() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Dr. Rajesh Sharma"
+                    placeholder={resolvedDoctorName ? `e.g. ${resolvedDoctorName}` : "e.g. Doctor Name"}
                     value={newResourceName}
                     onChange={(e) => setNewResourceName(e.target.value)}
                     className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"
