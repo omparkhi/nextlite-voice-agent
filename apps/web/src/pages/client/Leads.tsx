@@ -5,7 +5,6 @@ import type { Lead } from '../../types';
 import { TableSkeleton } from '../../components/client/LoadingSkeleton';
 import { EmptyState } from '../../components/client/EmptyState';
 import { LeadDetailsDrawer } from '../../components/client/LeadDetailsDrawer';
-import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
 
 export function ClientLeads() {
   const { isViewer } = useOutletContext<{ isViewer: boolean }>();
@@ -20,8 +19,6 @@ export function ClientLeads() {
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [whatsAppTargetLead, setWhatsAppTargetLead] = useState<Lead | null>(null);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
