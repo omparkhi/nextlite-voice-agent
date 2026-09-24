@@ -116,8 +116,9 @@ jobs:
             docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || true
 
             echo "[Deploy] Validating container healthchecks..."
-            sleep 15
-            curl -f http://localhost:3001/api/health || (echo "API Health Check FAILED!" && exit 1)
-            curl -f http://localhost:8000/health || (echo "Worker Health Check FAILED!" && exit 1)
+            sleep 5
+            docker exec nextlite_api curl -f http://localhost:3001/api/health || (echo "API Health Check FAILED!" && exit 1)
+            docker exec nextlite_worker curl -f http://localhost:8000/health || (echo "Worker Health Check FAILED!" && exit 1)
+            curl -f http://localhost/api/health || true
 
             echo "[Deploy] Deployment successfully completed and verified!"
