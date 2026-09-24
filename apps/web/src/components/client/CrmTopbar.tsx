@@ -11,8 +11,6 @@ interface CrmTopbarProps {
 export function CrmTopbar({
   title,
   onOpenMobileNav,
-  onToggleCollapse,
-  isCollapsed = false,
   onRefresh,
   isRefreshing,
   lastUpdated,

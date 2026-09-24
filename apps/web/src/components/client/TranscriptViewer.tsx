@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { formatPhoneNumber } from '@/utils/formatPhoneNumber';
 
 interface Turn {
@@ -21,7 +20,7 @@ export function TranscriptViewer({
   agentName = 'AI Assistant',
   callerNumber = 'Caller',
 }: TranscriptViewerProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const searchQuery = '';
 
   const parsedTurns: Turn[] = Array.isArray(turnsJson) && turnsJson.length > 0
     ? turnsJson.flatMap((t: any) => {
