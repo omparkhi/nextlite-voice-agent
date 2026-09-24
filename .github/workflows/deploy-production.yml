@@ -82,7 +82,8 @@ jobs:
           passphrase: ${{ secrets.AZURE_VM_PASSPHRASE || '' }}
           script: |
             set -e
-            echo "[Deploy] Pulling latest code and configuration for ${{ github.ref_name }}..."
+            echo "[Deploy] Navigating to /opt/nextlite and fixing permissions..."
+            sudo chown -R $USER:$USER /opt/nextlite || true
             cd /opt/nextlite
             git fetch origin
             git checkout ${{ github.ref_name }}

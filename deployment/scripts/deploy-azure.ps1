@@ -16,7 +16,8 @@ Write-Host "=========================================" -ForegroundColor Cyan
 
 $REMOTE_COMMANDS = @"
 set -e
-echo '[1/5] Navigating to /opt/nextlite...'
+echo '[1/5] Navigating to /opt/nextlite and fixing permissions...'
+sudo chown -R `$USER:`$USER /opt/nextlite || true
 cd /opt/nextlite
 
 echo '[2/5] Fetching and checking out branch $Branch...'
@@ -27,10 +28,10 @@ git pull origin $Branch
 echo '[3/5] Building frontend (apps/web)...'
 if [ -d 'apps/web' ]; then
     cd apps/web
-    if command -v pnpm &> /dev/null; then
+    if command -v pnpm > /dev/null 2>&1; then
         pnpm install --frozen-lockfile || pnpm install
         pnpm build
-    elif command -v npm &> /dev/null; then
+    elif command -v npm > /dev/null 2>&1; then
         npm install
         npm run build
     fi
@@ -50,10 +51,12 @@ docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || true
 echo 'Deployment complete!'
 "@
 
+$CLEAN_COMMANDS = $REMOTE_COMMANDS.Replace("`r`n", "`n").Replace("`r", "`n")
+
 Write-Host "`nExecuting remote update on Azure VM ($AzureUser@$AzureHost)...`n" -ForegroundColor Yellow
 
 if ($SshKeyPath -ne "") {
-    ssh -i "$SshKeyPath" "$AzureUser@$AzureHost" "$REMOTE_COMMANDS"
+    $CLEAN_COMMANDS | ssh -i "$SshKeyPath" "$AzureUser@$AzureHost" "bash -s"
 } else {
-    ssh "$AzureUser@$AzureHost" "$REMOTE_COMMANDS"
+    $CLEAN_COMMANDS | ssh "$AzureUser@$AzureHost" "bash -s"
 }
