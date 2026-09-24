@@ -2,7 +2,7 @@ name: Deploy Production (Azure VM + GHCR)
 
 on:
   push:
-    branches: [main]
+    branches: [main, migration/node-to-python]
     paths:
       - 'apps/**'
       - 'deployment/**'
@@ -76,9 +76,24 @@ jobs:
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
             set -e
-            echo "[Deploy] Pulling latest code and configuration..."
+            echo "[Deploy] Pulling latest code and configuration for ${{ github.ref_name }}..."
             cd /opt/nextlite
-            git pull origin main
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git pull origin ${{ github.ref_name }}
+
+            echo "[Deploy] Building frontend assets..."
+            if [ -d "apps/web" ]; then
+              cd apps/web
+              if command -v pnpm &> /dev/null; then
+                pnpm install --frozen-lockfile || pnpm install
+                pnpm build
+              elif command -v npm &> /dev/null; then
+                npm install
+                npm run build
+              fi
+              cd /opt/nextlite
+            fi
 
             echo "[Deploy] Authenticating with GitHub Container Registry..."
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -90,6 +105,9 @@ jobs:
             echo "[Deploy] Restarting NextLite stack with zero downtime..."
             cd /opt/nextlite/deployment
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo "[Deploy] Reloading Nginx..."
+            docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || true
 
             echo "[Deploy] Validating container healthchecks..."
             sleep 15
