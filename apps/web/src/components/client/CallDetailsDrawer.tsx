@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { CallSession } from '../../types';
 import { TranscriptViewer } from './TranscriptViewer';
 import { formatPhoneNumber } from '@/utils/formatPhoneNumber';
+import { formatDateTimeDDMMYYYY } from '@/utils/dateFormatters';
 
 interface CallDetailsDrawerProps {
   call: CallSession | null;
@@ -117,7 +118,7 @@ export function CallDetailsDrawer({
                 </svg>
                 <span className="text-[#777169] text-[11px] uppercase font-semibold">Started:</span>
                 <span className="font-medium text-[#0c0a09]">
-                  {new Date(call.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {formatDateTimeDDMMYYYY(call.startedAt || call.createdAt)}
                 </span>
               </div>
             </div>

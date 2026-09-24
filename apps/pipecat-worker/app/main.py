@@ -457,29 +457,6 @@ async def plivo_inbound_xml(
     return PlainResponse(content=xml_content, media_type="application/xml")
 
 
-@app.api_route("/api/v1/telephony/plivo/hangup", methods=["GET", "POST"])
-@app.api_route("/plivo/hangup", methods=["GET", "POST"])
-@app.api_route("/telephony/hangup", methods=["GET", "POST"])
-@app.api_route("/telephony/plivo/hangup", methods=["GET", "POST"])
-async def plivo_hangup_xml(request: Request):
-    """Clean Carrier Hangup Webhook Endpoint for Plivo Telephony.
-    
-    Acknowledges Plivo CDR / Hangup event with empty XML response so Plivo cleanly
-    closes out the call session without lingering state.
-    """
-    call_uuid = request.query_params.get("CallUUID") or request.query_params.get("callId")
-    hangup_cause = request.query_params.get("HangupCause") or "Normal"
-    if request.method == "POST":
-        try:
-            form = await request.form()
-            call_uuid = form.get("CallUUID") or form.get("callId") or call_uuid
-            hangup_cause = form.get("HangupCause") or hangup_cause
-        except Exception:
-            pass
-    logger.info(f"[Plivo Hangup Webhook] Received hangup event for call_uuid={call_uuid} | cause='{hangup_cause}'")
-    return PlainResponse(content="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response></Response>", media_type="application/xml")
-
-
 class DeterministicTestEchoProcessor(FrameProcessor):
     """Deterministic frame processor for unit testing echo behavior."""
 
@@ -2786,11 +2763,11 @@ async def websocket_plivo_endpoint(
         if any(t.name == "end_call" for t in resolved_tools):
             call_end_instructions = (
                 "\n\n=== CALL TERMINATION & HANGUP POLICY ===\n"
-                "- MANDATORY CALL ENDING RULE: When the appointment booking is confirmed, questions are answered, or when the user acknowledges or says goodbye "
-                "(for example: 'बाय', 'bye', 'goodbye', 'ओके', 'ok', 'okay', 'ठीक आहे', 'हो चालतंय', 'थँक्यू', 'धन्यवाद', 'माझं काम झालं', 'nothing else', 'that is all', 'नाही काही नाही'):\n"
-                "  1. Deliver a short, polite closing farewell in the active language (in Marathi: 'धन्यवाद, काळजी घ्या!' or 'नक्की, धन्यवाद, नमस्कार!'. FORBIDDEN: NEVER use literal translations like 'तुमचा दिवस चांगला जावो').\n"
-                "  2. You MUST invoke the `end_call` tool in that exact turn to cleanly disconnect the phone call.\n"
-                "  3. NEVER ask follow-up questions or offer unwanted help when the appointment is confirmed or when the user is saying goodbye/acknowledging."
+                "- MANDATORY CALL ENDING RULE: When the user says goodbye, expresses that they are done, thanks you, or states they will call later "
+                "(for example: 'बाय', 'bye', 'goodbye', 'थँक्यू नंतर कॉल करेन', 'बाद में बात करेंगे', 'धन्यवाद', 'माझं काम झालं', 'nothing else', 'that is all', 'नाही काही नाही'):\n"
+                "  1. Speak one short, context-appropriate closing farewell in the active language (in Marathi use authentic phrasing like 'धन्यवाद, काळजी घ्या!' or 'नक्की, धन्यवाद, नमस्कार!'. FORBIDDEN: NEVER use literal translations like 'तुमचा दिवस चांगला जावो').\n"
+                "  2. You MUST invoke the `end_call` tool in that exact turn to hang up the phone call.\n"
+                "  3. NEVER ask any follow-up question or offer additional help when the user is saying goodbye or trying to leave."
             )
             base_system_prompt_with_temporal = f"{base_system_prompt_with_temporal}{call_end_instructions}"
 
@@ -3224,37 +3201,6 @@ async def websocket_plivo_endpoint(
                             if conversation_context and llm_service:
                                 conversation_context.add_message({"role": "system", "content": system_nudge_prompt})
                                 await llm_service.queue_frame(LLMContextFrame(context=conversation_context))
-
-                        elif (
-                            is_ready
-                            and not is_end_call_pending[0]
-                            and nudge_count >= max_nudges
-                            and silence_duration >= 6.0
-                        ):
-                            logger.info(
-                                f"[QuietCallerNudge] Max nudges ({max_nudges}) exceeded with {silence_duration:.1f}s silence. "
-                                "Emitting polite closing farewell and initiating graceful disconnect."
-                            )
-                            is_end_call_pending[0] = True
-                            act_lang = getattr(language_manager, "current_language", "mr-IN") or "mr-IN"
-                            if str(act_lang).startswith("mr"):
-                                auto_closing = "तुम्ही उत्तर देत नसल्यामुळे आम्ही कॉल समाप्त करत आहोत. धन्यवाद, नमस्कार!"
-                            elif str(act_lang).startswith("hi"):
-                                auto_closing = "आपकी ओर से कोई आवाज़ नहीं आने के कारण हम कॉल समाप्त कर रहे हैं। धन्यवाद!"
-                            else:
-                                auto_closing = "Since we have not heard back from you, we are concluding this call. Thank you and goodbye!"
-
-                            if transcript_collector:
-                                transcript_collector.record_agent_message(
-                                    response=auto_closing,
-                                    active_language=act_lang,
-                                )
-
-                            if 'worker' in locals() and worker is not None:
-                                await worker.queue_frame(TTSSpeakFrame(text=auto_closing))
-                            else:
-                                await _on_plivo_terminal_hangup()
-                            break
                 except asyncio.CancelledError:
                     pass
                 except Exception as e:

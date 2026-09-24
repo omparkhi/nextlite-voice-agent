@@ -5,6 +5,7 @@ import type { Lead } from '../../types';
 import { TableSkeleton } from '../../components/client/LoadingSkeleton';
 import { EmptyState } from '../../components/client/EmptyState';
 import { LeadDetailsDrawer } from '../../components/client/LeadDetailsDrawer';
+import { formatDateDDMMYYYY } from '@/utils/dateFormatters';
 
 export function ClientLeads() {
   const { isViewer } = useOutletContext<{ isViewer: boolean }>();
@@ -202,11 +203,7 @@ export function ClientLeads() {
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap text-[#777169] text-[11px] text-center">
-                      {new Date(lead.createdAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
+                      {formatDateDDMMYYYY(lead.createdAt)}
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>

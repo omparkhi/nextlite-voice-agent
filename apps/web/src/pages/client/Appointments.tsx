@@ -5,7 +5,7 @@ import type { Appointment } from '../../types';
 import { TableSkeleton } from '../../components/client/LoadingSkeleton';
 import { EmptyState } from '../../components/client/EmptyState';
 import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
-import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
+// import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
 import { formatDateDDMMYYYY } from '../../utils/dateFormatters';
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -33,8 +33,9 @@ export function ClientAppointments() {
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [whatsAppTargetAppt, setWhatsAppTargetAppt] = useState<Appointment | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  // const [composerOpen, setComposerOpen] = useState(false);
+  // const [whatsAppTargetAppt, setWhatsAppTargetAppt] = useState<Appointment | null>(null);
 
   // Quick Book Modal
   const [bookModalOpen, setBookModalOpen] = useState(false);
@@ -150,14 +151,17 @@ export function ClientAppointments() {
     }
   };
 
-  const handleOpenWhatsApp = (appt: Appointment) => {
-    setWhatsAppTargetAppt(appt);
-    setComposerOpen(true);
-  };
+  // const handleOpenWhatsApp = (appt: Appointment) => {
+  //   setWhatsAppTargetAppt(appt);
+  //   setComposerOpen(true);
+  // };
 
   const handleAppointmentUpdated = (updated: Appointment) => {
     setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
-    setSelectedAppointment(updated);
+    setSelectedAppointment(null);
+    setDrawerOpen(false);
+    setSuccessToast(`Appointment ${updated.appointmentNumber || ''} for ${updated.customerName} updated successfully.`);
+    setTimeout(() => setSuccessToast(null), 4000);
   };
 
   const handleMarkAsDone = async (appt: Appointment, e: React.MouseEvent) => {
@@ -168,6 +172,8 @@ export function ClientAppointments() {
       if (selectedAppointment?.id === appt.id) {
         setSelectedAppointment((prev) => (prev ? { ...prev, status: 'COMPLETED' } : null));
       }
+      setSuccessToast(`Appointment ${appt.appointmentNumber || ''} for ${appt.customerName} marked as completed.`);
+      setTimeout(() => setSuccessToast(null), 4000);
     } catch (err) {
       console.error('Failed to mark appointment as done:', err);
     }
@@ -300,6 +306,27 @@ export function ClientAppointments() {
 
   return (
     <div className="space-y-5 sm:space-y-6 font-sans w-full min-w-0">
+      {/* Floating Success Toast Notification */}
+      {successToast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-auto">
+          <div className="bg-[#15803d] text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-[#16a34a] text-xs sm:text-sm font-medium">
+            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <span>{successToast}</span>
+            <button
+              type="button"
+              onClick={() => setSuccessToast(null)}
+              className="ml-2 text-white/70 hover:text-white cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
@@ -468,9 +495,13 @@ export function ClientAppointments() {
                           )}
                           <button
                             onClick={() => handleRowClick(appt)}
-                            className="el-btn-outline h-7 px-2.5 text-[11px] bg-white group-hover:border-[#0c0a09]"
+                            className="el-btn-outline h-7 px-2.5 text-[11px] bg-white group-hover:border-[#0c0a09] flex items-center gap-1 font-medium"
+                            title="Edit Appointment Details"
                           >
-                            Manage
+                            <svg className="w-3 h-3 text-[#777169] group-hover:text-[#0c0a09]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                            <span>Edit</span>
                           </button>
                         </div>
                       </td>
@@ -724,19 +755,19 @@ export function ClientAppointments() {
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onUpdated={handleAppointmentUpdated}
-        onOpenWhatsApp={handleOpenWhatsApp}
+        // onOpenWhatsApp={handleOpenWhatsApp}
         isReadOnly={isViewer}
       />
 
       {/* WhatsApp Composer */}
-      <WhatsAppComposer
+      {/* <WhatsAppComposer
         isOpen={composerOpen}
         onClose={() => setComposerOpen(false)}
         initialAppointment={whatsAppTargetAppt}
         initialPhone={whatsAppTargetAppt?.customerPhone || ''}
         initialCustomerName={whatsAppTargetAppt?.customerName || ''}
         onSuccess={loadAppointments}
-      />
+      /> */}
     </div>
   );
 }

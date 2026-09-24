@@ -1,4 +1,5 @@
 import { formatPhoneNumber } from '@/utils/formatPhoneNumber';
+import { parseUtcDate } from '@/utils/dateFormatters';
 
 interface Turn {
   speaker: 'AI' | 'Caller' | 'Agent' | string;
@@ -76,8 +77,8 @@ export function TranscriptViewer({
       const secs = seconds % 60;
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
-    const d = new Date(ts);
-    if (!isNaN(d.getTime())) {
+    const d = parseUtcDate(ts);
+    if (d && !isNaN(d.getTime())) {
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     return String(ts);

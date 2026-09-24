@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { parseUtcDate } from '@/utils/dateFormatters';
 
 export interface ActivityItem {
   id: string;
@@ -53,7 +54,9 @@ export function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
 
   const getRelativeTime = (timeStr: string) => {
     try {
-      const diffMs = Date.now() - new Date(timeStr).getTime();
+      const parsed = parseUtcDate(timeStr);
+      if (!parsed) return timeStr;
+      const diffMs = Math.max(0, Date.now() - parsed.getTime());
       const mins = Math.floor(diffMs / 60000);
       if (mins < 1) return 'Just now';
       if (mins < 60) return `${mins}m ago`;

@@ -6,6 +6,7 @@ import type { Appointment } from '../../types';
 
 import { TimeSlotInput } from '../../components/client/TimeSlotInput';
 import { generateTimeSlots, getNearestUpcomingSlot } from '../../utils/timeSlots';
+import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
 
 function formatSlugToName(slug?: string): string {
   if (!slug) return 'Clinic';
@@ -29,6 +30,8 @@ export function ReceptionistDashboard() {
 
   // Appointments State
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
@@ -810,7 +813,11 @@ export function ReceptionistDashboard() {
                         return (
                           <tr
                             key={appt.id}
-                            className={`hover:bg-[#fafafa] transition-colors whitespace-nowrap ${
+                            onClick={() => {
+                              setSelectedAppointment(appt);
+                              setIsDetailsOpen(true);
+                            }}
+                            className={`hover:bg-[#fafafa] transition-colors whitespace-nowrap cursor-pointer ${
                               isCompleted
                                 ? 'bg-[#fafafa] text-[#777169]'
                                 : isCancelled
@@ -887,36 +894,63 @@ export function ReceptionistDashboard() {
                             </td>
 
                             {/* Quick Actions */}
-                            <td className="py-3 px-3 text-center align-middle space-x-1.5 whitespace-nowrap leading-normal">
-                              {!isCompleted && !isCancelled && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateStatus(appt.id, 'COMPLETED')}
-                                    title="Mark as Completed"
-                                    className="inline-flex items-center justify-center px-2.5 py-1 rounded-full bg-white hover:bg-[#f0fdf4] text-[#15803d] font-medium text-[11px] border border-[#bbf7d0] transition cursor-pointer shadow-2xs whitespace-nowrap leading-none"
-                                  >
-                                    ✓ Done
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateStatus(appt.id, 'CANCELLED')}
-                                    title="Cancel Appointment"
-                                    className="inline-flex items-center justify-center px-2.5 py-1 rounded-full bg-white hover:bg-[#fef2f2] text-[#dc2626] font-medium text-[11px] border border-[#fecaca] transition cursor-pointer shadow-2xs whitespace-nowrap leading-none"
-                                  >
-                                    ✕ Cancel
-                                  </button>
-                                </>
-                              )}
-                              {isCancelled && (
+                            <td className="py-3 px-3 text-center align-middle whitespace-nowrap leading-normal" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => handleUpdateStatus(appt.id, 'SCHEDULED')}
-                                  className="inline-flex items-center justify-center px-2.5 py-1 rounded-full bg-[#f0efed] hover:bg-[#e7e5e4] text-[#0c0a09] text-[11px] transition cursor-pointer whitespace-nowrap leading-none"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedAppointment(appt);
+                                    setIsDetailsOpen(true);
+                                  }}
+                                  title="Edit Appointment Details"
+                                  className="inline-flex items-center justify-center px-2 py-1 rounded-md bg-white hover:bg-[#fafafa] text-[#0c0a09] font-medium text-[11px] border border-[#d6d3d1] transition cursor-pointer shadow-2xs gap-1 leading-none"
                                 >
-                                  Restore
+                                  <svg className="w-3 h-3 text-[#777169]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                  </svg>
+                                  <span>Edit</span>
                                 </button>
-                              )}
+
+                                {!isCompleted && !isCancelled && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleUpdateStatus(appt.id, 'COMPLETED');
+                                      }}
+                                      title="Mark as Done"
+                                      className="inline-flex items-center justify-center px-2 py-1 rounded-md bg-white hover:bg-[#f0fdf4] text-[#15803d] font-medium text-[11px] border border-[#bbf7d0] transition cursor-pointer shadow-2xs whitespace-nowrap leading-none"
+                                    >
+                                      ✓ Done
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleUpdateStatus(appt.id, 'CANCELLED');
+                                      }}
+                                      title="Cancel Appointment"
+                                      className="inline-flex items-center justify-center px-2 py-1 rounded-md bg-white hover:bg-[#fef2f2] text-[#dc2626] font-medium text-[11px] border border-[#fecaca] transition cursor-pointer shadow-2xs whitespace-nowrap leading-none"
+                                    >
+                                      ✕ Cancel
+                                    </button>
+                                  </>
+                                )}
+                                {isCancelled && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUpdateStatus(appt.id, 'SCHEDULED');
+                                    }}
+                                    className="inline-flex items-center justify-center px-2 py-1 rounded-md bg-[#f0efed] hover:bg-[#e7e5e4] text-[#0c0a09] text-[11px] transition cursor-pointer whitespace-nowrap leading-none"
+                                  >
+                                    Restore
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -929,6 +963,23 @@ export function ReceptionistDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Appointment Details & Edit Drawer */}
+      <AppointmentDetailsDrawer
+        appointment={selectedAppointment}
+        isOpen={isDetailsOpen}
+        onClose={() => {
+          setIsDetailsOpen(false);
+          setSelectedAppointment(null);
+        }}
+        onUpdated={async (updated) => {
+          setIsDetailsOpen(false);
+          setSelectedAppointment(null);
+          setSuccessToast(`Appointment ${updated.appointmentNumber || ''} for ${updated.customerName} updated successfully.`);
+          setTimeout(() => setSuccessToast(null), 4000);
+          await loadAppointments(true);
+        }}
+      />
 
       {/* Footer */}
       <footer className="bg-white border-t border-[#f0efed] py-4 text-center text-xs text-[#777169] px-4">

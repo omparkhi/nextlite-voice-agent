@@ -5,6 +5,7 @@ import { TableSkeleton } from '../../components/client/LoadingSkeleton';
 import { EmptyState } from '../../components/client/EmptyState';
 import { CallDetailsDrawer } from '../../components/client/CallDetailsDrawer';
 import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
+import { formatDateTimeDDMMYYYY } from '@/utils/dateFormatters';
 
 export function ClientCalls() {
   const [calls, setCalls] = useState<CallSession[]>([]);
@@ -233,12 +234,7 @@ export function ClientCalls() {
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap text-[#777169] text-[11px] text-center">
-                      {new Date(call.createdAt).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatDateTimeDDMMYYYY(call.startedAt || call.createdAt)}
                     </td>
 
                     <td className="px-6 py-3 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>

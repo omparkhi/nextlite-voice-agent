@@ -6,6 +6,7 @@ import { TableSkeleton } from '../../components/client/LoadingSkeleton';
 import { EmptyState } from '../../components/client/EmptyState';
 import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
 import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
+import { formatDateTimeDDMMYYYY } from '@/utils/dateFormatters';
 
 export function ClientFollowUps() {
   const { isViewer } = useOutletContext<{ isViewer: boolean }>();
@@ -535,12 +536,7 @@ export function ClientFollowUps() {
                         </td>
 
                         <td className="px-6 py-4 whitespace-nowrap text-right text-[11px] text-[#777169]">
-                          {new Date(item.sentAt).toLocaleString(undefined, {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {formatDateTimeDDMMYYYY(item.sentAt)}
                         </td>
                       </tr>
                     ))}

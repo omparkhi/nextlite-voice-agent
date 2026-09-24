@@ -26,6 +26,14 @@ from ..domain.dynamic_schedule_engine import (
     extract_business_schedule_from_version,
 )
 
+def to_utc_iso(dt: Optional[datetime]) -> Optional[str]:
+    if not dt:
+        return None
+    iso = dt.isoformat()
+    if not iso.endswith("Z") and not ("+" in iso or (len(iso) > 10 and "-" in iso[10:])):
+        return iso + "Z"
+    return iso
+
 class CRMService:
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -77,7 +85,7 @@ class CRMService:
                 "id": str(tenant.id),
                 "name": tenant.name,
                 "status": tenant.status,
-                "createdAt": tenant.createdAt.isoformat() if tenant.createdAt else None,
+                "createdAt": to_utc_iso(tenant.createdAt),
             },
             "user": {
                 "id": str(user.id),
@@ -85,14 +93,14 @@ class CRMService:
                 "email": user.email,
                 "role": user.role.value if hasattr(user.role, "value") else str(user.role),
                 "emailVerified": user.emailVerified,
-                "createdAt": user.createdAt.isoformat() if user.createdAt else None,
+                "createdAt": to_utc_iso(user.createdAt),
             } if user else None,
             "doctorName": doctor_name,
             "subscription": {
                 "id": str(sub.id),
                 "status": sub.status.value if hasattr(sub.status, "value") else str(sub.status),
                 "planName": sub.planName,
-                "currentPeriodEnd": sub.currentPeriodEnd.isoformat() if sub.currentPeriodEnd else None,
+                "currentPeriodEnd": to_utc_iso(sub.currentPeriodEnd),
             } if sub else None,
         }
 
@@ -141,9 +149,9 @@ class CRMService:
                 "turnsJson": s.turnsJson or [],
                 "toolsUsed": s.toolsUsed or [],
                 "metricsJson": s.metricsJson or {},
-                "startedAt": s.startedAt.isoformat() if s.startedAt else None,
-                "endedAt": s.endedAt.isoformat() if s.endedAt else None,
-                "createdAt": s.createdAt.isoformat() if s.createdAt else None,
+                "startedAt": to_utc_iso(s.startedAt),
+                "endedAt": to_utc_iso(s.endedAt),
+                "createdAt": to_utc_iso(s.createdAt),
             }
             for s in sessions
         ]
@@ -180,9 +188,9 @@ class CRMService:
             "turnsJson": s.turnsJson or [],
             "toolsUsed": s.toolsUsed or [],
             "metricsJson": s.metricsJson or {},
-            "startedAt": s.startedAt.isoformat() if s.startedAt else None,
-            "endedAt": s.endedAt.isoformat() if s.endedAt else None,
-            "createdAt": s.createdAt.isoformat() if s.createdAt else None,
+            "startedAt": to_utc_iso(s.startedAt),
+            "endedAt": to_utc_iso(s.endedAt),
+            "createdAt": to_utc_iso(s.createdAt),
         }
 
     # Leads
@@ -220,7 +228,7 @@ class CRMService:
                     "status": l.status.value if hasattr(l.status, "value") else str(l.status),
                     "priority": l.priority.value if hasattr(l.priority, "value") else str(l.priority),
                     "notes": l.notes,
-                    "createdAt": l.createdAt.isoformat() if l.createdAt else None,
+                    "createdAt": to_utc_iso(l.createdAt),
                 }
                 for l in leads_list
             ],
@@ -248,7 +256,7 @@ class CRMService:
             "status": l.status.value if hasattr(l.status, "value") else str(l.status),
             "priority": l.priority.value if hasattr(l.priority, "value") else str(l.priority),
             "notes": l.notes,
-            "createdAt": l.createdAt.isoformat() if l.createdAt else None,
+            "createdAt": to_utc_iso(l.createdAt),
         }
 
     async def update_lead(self, lead_id: uuid.UUID, tenant_id: uuid.UUID, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -329,7 +337,7 @@ class CRMService:
                     "walkIn": bool(a.walkIn),
                     "notes": a.notes,
                     "metadata": a.metadataJson or {},
-                    "createdAt": a.createdAt.isoformat() if a.createdAt else None,
+                    "createdAt": to_utc_iso(a.createdAt),
                 }
                 for a in appts
             ],
@@ -370,7 +378,7 @@ class CRMService:
             "walkIn": bool(a.walkIn),
             "notes": a.notes,
             "metadata": a.metadataJson or {},
-            "createdAt": a.createdAt.isoformat() if a.createdAt else None,
+            "createdAt": to_utc_iso(a.createdAt),
         }
 
     async def update_appointment(self, appt_id: uuid.UUID, tenant_id: uuid.UUID, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -381,18 +389,39 @@ class CRMService:
         if not a:
             return None
 
-        if "customerName" in data and data["customerName"]:
-            a.customerName = data["customerName"]
-        if "customerPhone" in data and data["customerPhone"]:
-            a.customerPhone = data["customerPhone"]
-        if "serviceType" in data and data["serviceType"]:
-            a.title = data["serviceType"]
-        if "appointmentDate" in data and data["appointmentDate"]:
-            a.bookingDate = data["appointmentDate"]
-        if "appointmentTime" in data and data["appointmentTime"]:
-            a.bookingTime = data["appointmentTime"]
-        if "status" in data and data["status"]:
-            a.status = AppointmentStatus(data["status"])
+        # Name
+        name_val = data.get("customerName") or data.get("patientName") or data.get("name")
+        if name_val:
+            a.customerName = str(name_val).strip()
+
+        # Phone
+        phone_val = data.get("customerPhone") or data.get("patientPhone") or data.get("phone")
+        if phone_val:
+            a.customerPhone = str(phone_val).strip()
+
+        # Service / Title / Reason
+        service_val = data.get("serviceType") or data.get("title") or data.get("reason")
+        if service_val:
+            a.title = str(service_val).strip()
+
+        # Date
+        date_val = data.get("appointmentDate") or data.get("bookingDate") or data.get("date")
+        if date_val:
+            a.bookingDate = str(date_val).strip()
+
+        # Time
+        time_val = data.get("appointmentTime") or data.get("bookingTime") or data.get("time")
+        if time_val:
+            a.bookingTime = str(time_val).strip()
+
+        # Status
+        status_val = data.get("status")
+        if status_val:
+            try:
+                a.status = AppointmentStatus(status_val) if isinstance(status_val, str) else status_val
+            except Exception:
+                pass
+
         if "bookedBy" in data and data["bookedBy"]:
             a.bookedBy = data["bookedBy"]
         if "bookedByName" in data and data["bookedByName"]:
@@ -400,22 +429,38 @@ class CRMService:
         if "walkIn" in data:
             a.walkIn = bool(data["walkIn"])
         if "notes" in data:
-            a.notes = data["notes"]
-        if "age" in data and data["age"]:
-            a.age = str(data["age"]).strip()
+            a.notes = str(data["notes"]).strip() if data["notes"] is not None else None
+
+        # Age
+        if "age" in data:
+            age_str = str(data["age"]).strip() if data["age"] is not None else ""
+            a.age = age_str or None
             current_meta = dict(a.metadataJson or {})
-            current_meta["age"] = str(data["age"]).strip()
+            if age_str:
+                current_meta["age"] = age_str
+            else:
+                current_meta.pop("age", None)
             a.metadataJson = current_meta
-        if "place" in data and data["place"]:
-            a.place = str(data["place"]).strip()
+
+        # Place / Location
+        place_val = data.get("place") or data.get("location")
+        if "place" in data or "location" in data:
+            place_str = str(place_val).strip() if place_val is not None else ""
+            a.place = place_str or None
             current_meta = dict(a.metadataJson or {})
-            current_meta["place"] = str(data["place"]).strip()
-            current_meta["location"] = str(data["place"]).strip()
+            if place_str:
+                current_meta["place"] = place_str
+                current_meta["location"] = place_str
+            else:
+                current_meta.pop("place", None)
+                current_meta.pop("location", None)
             a.metadataJson = current_meta
+
         if "metadata" in data and isinstance(data["metadata"], dict):
             current_meta = dict(a.metadataJson or {})
             current_meta.update(data["metadata"])
             a.metadataJson = current_meta
+
         a.updatedAt = datetime.utcnow()
 
         await self.session.commit()
@@ -829,9 +874,9 @@ class CRMService:
                     "channel": f.channel,
                     "messageContent": f.messageText,
                     "status": f.status.value if hasattr(f.status, "value") else str(f.status),
-                    "sentAt": f.sentAt.isoformat() if f.sentAt else None,
-                    "deliveredAt": f.deliveredAt.isoformat() if f.deliveredAt else None,
-                    "createdAt": f.createdAt.isoformat() if f.createdAt else None,
+                    "sentAt": to_utc_iso(f.sentAt),
+                    "deliveredAt": to_utc_iso(f.deliveredAt),
+                    "createdAt": to_utc_iso(f.createdAt),
                 }
                 for f in items
             ],
@@ -856,9 +901,9 @@ class CRMService:
             "channel": f.channel,
             "messageContent": f.messageText,
             "status": f.status.value if hasattr(f.status, "value") else str(f.status),
-            "sentAt": f.sentAt.isoformat() if f.sentAt else None,
-            "deliveredAt": f.deliveredAt.isoformat() if f.deliveredAt else None,
-            "createdAt": f.createdAt.isoformat() if f.createdAt else None,
+            "sentAt": to_utc_iso(f.sentAt),
+            "deliveredAt": to_utc_iso(f.deliveredAt),
+            "createdAt": to_utc_iso(f.createdAt),
         }
 
     # WhatsApp Dispatch (Demo / Simulated)

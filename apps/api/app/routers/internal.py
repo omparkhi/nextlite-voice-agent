@@ -9,7 +9,7 @@ from ..db import get_db
 from ..auth import require_worker
 from ..schemas import RuntimeAgentConfig
 from ..services.runtime_config_service import RuntimeAgentConfigService
-from ..services.crm_service import CRMService
+from ..services.crm_service import CRMService, to_utc_iso
 from ..repositories import CallSessionRepository, AppointmentRepository, KnowledgeRepository
 from ..models import CallStatus, CallDirection, Appointment, Lead, AppointmentStatus, LeadStatus, LeadPriority, Deployment, Agent, AgentVersion
 from ..domain.indic_normalizers import (
@@ -111,13 +111,13 @@ async def create_call_session(
         "status": call.status.value if hasattr(call.status, "value") else str(call.status),
         "durationSeconds": call.durationSeconds or 0,
         "primaryLanguage": call.primaryLanguage or "en-IN",
-        "startedAt": call.startedAt.isoformat() if call.startedAt else now.isoformat(),
-        "endedAt": call.endedAt.isoformat() if call.endedAt else None,
+        "startedAt": to_utc_iso(call.startedAt) or to_utc_iso(now),
+        "endedAt": to_utc_iso(call.endedAt),
         "transcriptText": call.transcriptText,
         "turnsJson": call.turnsJson or [],
         "toolsUsed": call.toolsUsed or [],
         "metricsJson": call.metricsJson or {},
-        "createdAt": call.createdAt.isoformat() if call.createdAt else now.isoformat(),
+        "createdAt": to_utc_iso(call.createdAt) or to_utc_iso(now),
     }
 
 @router.patch("/call-sessions/{call_id}")
@@ -238,13 +238,13 @@ async def finalize_call_session(
         "status": finalized.status.value if hasattr(finalized.status, "value") else str(finalized.status),
         "durationSeconds": finalized.durationSeconds or duration,
         "primaryLanguage": finalized.primaryLanguage or "en-IN",
-        "startedAt": finalized.startedAt.isoformat() if finalized.startedAt else now_iso,
-        "endedAt": finalized.endedAt.isoformat() if finalized.endedAt else now_iso,
+        "startedAt": to_utc_iso(finalized.startedAt) or now_iso,
+        "endedAt": to_utc_iso(finalized.endedAt) or now_iso,
         "transcriptText": finalized.transcriptText or transcript_text,
         "turnsJson": finalized.turnsJson or transcript,
         "toolsUsed": finalized.toolsUsed or tools_used,
         "metricsJson": finalized.metricsJson or metrics,
-        "createdAt": finalized.createdAt.isoformat() if finalized.createdAt else now_iso,
+        "createdAt": to_utc_iso(finalized.createdAt) or now_iso,
     }
 
 @router.post("/appointments", status_code=status.HTTP_201_CREATED)

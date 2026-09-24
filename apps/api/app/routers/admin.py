@@ -1062,7 +1062,6 @@ async def set_agent_inbound_number(
         try:
             stream_host = settings.PLIVO_STREAM_HOST or request.headers.get("host", "localhost:8000")
             target_answer_url = f"https://{stream_host}/api/v1/telephony/plivo/inbound"
-            target_hangup_url = f"https://{stream_host}/api/v1/telephony/plivo/hangup"
             auth = (settings.PLIVO_AUTH_ID, settings.PLIVO_AUTH_TOKEN)
             base_plivo = f"https://api.plivo.com/v1/Account/{settings.PLIVO_AUTH_ID}"
             clean_digits = re.sub(r"[^\d]", "", norm_phone)
@@ -1077,7 +1076,7 @@ async def set_agent_inbound_number(
                         await plivo_http.post(
                             f"{base_plivo}/Application/{app_id}/",
                             auth=auth,
-                            json={"answer_url": target_answer_url, "answer_method": "POST", "hangup_url": target_hangup_url, "hangup_method": "POST"}
+                            json={"answer_url": target_answer_url, "answer_method": "POST", "hangup_url": target_answer_url, "hangup_method": "POST"}
                         )
                         await plivo_http.post(
                             f"{base_plivo}/Number/{clean_digits}/",

@@ -294,6 +294,30 @@ async def book_receptionist_appointment(
         }
     }
 
+@router.patch("/{appointment_id}")
+@router.patch("/appointments/{appointment_id}")
+async def update_receptionist_appointment(
+    appointment_id: str,
+    body: Dict[str, Any],
+    session: AsyncSession = Depends(get_db)
+):
+    try:
+        appt_uuid = uuid.UUID(appointment_id)
+        res = await session.execute(select(Appointment).where(Appointment.id == appt_uuid))
+        appt = res.scalar_one_or_none()
+        if not appt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+        
+        crm = CRMService(session)
+        updated = await crm.update_appointment(appt_uuid, appt.tenantId, body)
+        return {
+            "success": True,
+            "message": "Appointment updated successfully",
+            "appointment": updated
+        }
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid appointment ID format")
+
 @router.post("/{appointment_id}/cancel")
 async def cancel_receptionist_appointment(
     appointment_id: str,
