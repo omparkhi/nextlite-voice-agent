@@ -65,6 +65,7 @@ jobs:
   deploy-vm:
     name: Deploy to Azure VM
     needs: build-and-push
+    if: ${{ secrets.AZURE_VM_SSH_KEY != '' }}
     runs-on: ubuntu-latest
 
     steps:
