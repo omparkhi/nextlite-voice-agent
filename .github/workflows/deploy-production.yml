@@ -68,6 +68,10 @@ jobs:
     if: ${{ secrets.AZURE_VM_SSH_KEY != '' }}
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: read
+
     steps:
       - name: Execute Remote Deployment via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -98,7 +102,7 @@ jobs:
             fi
 
             echo "[Deploy] Authenticating with GitHub Container Registry..."
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GHCR_PAT || secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
             echo "[Deploy] Pulling fresh container images..."
             docker pull ${{ env.IMAGE_API }}:latest
