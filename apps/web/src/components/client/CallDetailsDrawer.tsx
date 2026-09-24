@@ -60,18 +60,18 @@ export function CallDetailsDrawer({
       />
 
       {/* Drawer Panel */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-xl bg-white shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
+        <div className="w-screen max-w-xl bg-white shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-300">
           {/* Header */}
-          <div className="p-6 border-b border-[#f0efed] bg-[#fafafa]">
-            <div className="flex items-center justify-between mb-3">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider border ${getStatusBadge(call.status)}`}>
+          <div className="p-4 sm:p-6 border-b border-[#f0efed] bg-[#fafafa] shrink-0">
+            <div className="flex items-center justify-between mb-2 sm:mb-3">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider border ${getStatusBadge(call.status)}`}>
                 {call.status}
               </span>
 
               <button
                 onClick={onClose}
-                className="p-1 rounded-md text-[#777169] hover:text-[#0c0a09] hover:bg-[#f0efed]"
+                className="p-1.5 rounded-md text-[#777169] hover:text-[#0c0a09] hover:bg-[#f0efed] cursor-pointer"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -79,23 +79,20 @@ export function CallDetailsDrawer({
               </button>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className='flex items-center gap-1'>
-                <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <svg className="w-[18px] h-[18px] text-[#0c0a09] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                 </svg>
-                <h2 className="font-display-serif text-xl font-light text-[#0c0a09]">
+                <h2 className="font-display-serif text-lg sm:text-xl font-light text-[#0c0a09] truncate">
                   {formatPhoneNumber(call.callerNumber || undefined) || 'Anonymous Caller'}
                 </h2>
-                {/* <p className="text-xs text-[#777169] mt-0.5">
-                  Agent: <span className="font-medium text-[#0c0a09]">{call.agent?.name || 'Voice Assistant'}</span> · {call.direction}
-                </p> */}
               </div>
 
               {call.callerNumber && (
                 <button
                   onClick={handleCopyPhone}
-                  className="el-btn-outline h-8 px-3 text-xs bg-white"
+                  className="h-8 px-3 text-xs bg-white border border-[#e7e5e4] rounded-xl hover:bg-[#fafafa] transition text-[#0c0a09] shadow-2xs shrink-0 cursor-pointer"
                 >
                   {copied ? '✓ Copied' : 'Copy Number'}
                 </button>
@@ -103,25 +100,22 @@ export function CallDetailsDrawer({
             </div>
 
             {/* Quick Metrics Bar */}
-            <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-[#f0efed] text-xs">
-              <div className='flex items-center gap-1'>
-                <svg className="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-[#f0efed] text-xs">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <svg className="w-3.5 h-3.5 text-[#777169] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
-                <span className="text-[#777169] block text-[11px] uppercase font-semibold">Duration : </span>
+                <span className="text-[#777169] text-[11px] uppercase font-semibold">Duration:</span>
                 <span className="font-medium text-[#0c0a09]">{formatDuration(call.durationSeconds)}</span>
               </div>
-              {/* <div>
-                  <span className="text-[#777169] block text-[10px] uppercase font-semibold">Language</span>
-                  <span className="font-medium text-[#0c0a09]">{call.primaryLanguage || 'en-IN'}</span>
-                </div> */}
-              <div className='flex items-center gap-1'>
-                <svg className="w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <svg className="w-3.5 h-3.5 text-[#777169] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
-                <span className="text-[#777169] block text-[11px] uppercase font-semibold">Started : </span>
+                <span className="text-[#777169] text-[11px] uppercase font-semibold">Started:</span>
                 <span className="font-medium text-[#0c0a09]">
                   {new Date(call.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
@@ -129,53 +123,8 @@ export function CallDetailsDrawer({
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          {/* <div className="px-6 border-b border-[#f0efed] flex items-center gap-6 text-xs font-medium bg-white">
-            <button
-              onClick={() => setActiveTab('transcript')}
-              className={`py-3 border-b-2 transition-colors ${activeTab === 'transcript'
-                ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
-                : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
-                }`}
-            >
-              Transcript
-            </button>
-            <button
-              onClick={() => setActiveTab('tools')}
-              className={`py-3 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'tools'
-                ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
-                : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
-                }`}
-            >
-              Tools Used
-              {toolsList.length > 0 && (
-                <span className="w-4 h-4 rounded-full bg-[#f0efed] text-[#0c0a09] text-[10px] flex items-center justify-center font-bold">
-                  {toolsList.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('performance')}
-              className={`py-3 border-b-2 transition-colors ${activeTab === 'performance'
-                ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
-                : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
-                }`}
-            >
-              Latency Metrics
-            </button>
-            <button
-              onClick={() => setActiveTab('overview')}
-              className={`py-3 border-b-2 transition-colors ${activeTab === 'overview'
-                ? 'border-[#0c0a09] text-[#0c0a09] font-semibold'
-                : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
-                }`}
-            >
-              Details
-            </button>
-          </div> */}
-
           {/* Tab Content */}
-          <div className="p-6 overflow-y-auto flex-1 bg-[#fafafa]">
+          <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-[#fafafa] min-h-0 scrollbar-thin">
             {activeTab === 'transcript' && (
               <TranscriptViewer
                 transcriptText={call.transcriptText}
@@ -299,10 +248,10 @@ export function CallDetailsDrawer({
           </div>
 
           {/* Footer Actions */}
-          <div className="p-4 border-t border-[#f0efed] bg-white flex items-center justify-between gap-3">
+          <div className="p-4 border-t border-[#f0efed] bg-white flex items-center justify-between gap-3 shrink-0">
             <button
               onClick={onClose}
-              className="el-btn-outline h-9 px-4 text-xs"
+              className="h-9 px-4 text-xs font-medium border border-[#e7e5e4] rounded-xl bg-white hover:bg-[#fafafa] text-[#0c0a09] transition shadow-2xs cursor-pointer leading-none"
             >
               Close
             </button>

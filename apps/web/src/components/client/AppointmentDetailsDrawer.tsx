@@ -69,10 +69,10 @@ export function AppointmentDetailsDrawer({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
       />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-300">
+      <div className="fixed inset-y-0 right-0 max-w-full flex pl-0 sm:pl-10">
+        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-300">
           {/* Header */}
-          <div className="p-6 border-b border-[#f0efed] bg-[#fafafa]">
+          <div className="p-4 sm:p-6 border-b border-[#f0efed] bg-[#fafafa] shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-bold px-2.5 py-1 bg-[#0c0a09] text-white rounded-md tracking-wider">
@@ -111,7 +111,7 @@ export function AppointmentDetailsDrawer({
           </div>
 
           {/* Form Content */}
-          <div className="p-6 overflow-y-auto flex-1 space-y-6 bg-white">
+          <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-6 bg-white min-h-0 scrollbar-thin">
             {saveSuccess && (
               <div className="p-3 bg-[#f0fdf4] border border-[#bbf7d0] text-[#166534] rounded-xl text-xs flex items-center gap-2">
                 <svg className="w-4 h-4 text-[#16a34a] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -225,7 +225,7 @@ export function AppointmentDetailsDrawer({
           </div>
 
           {/* Footer Actions */}
-          <div className="p-4 border-t border-[#f0efed] bg-[#fafafa] flex items-center justify-between gap-3">
+          <div className="p-4 border-t border-[#f0efed] bg-[#fafafa] flex items-center justify-between gap-3 shrink-0">
             {onOpenWhatsApp ? (
               <button
                 onClick={() => {
