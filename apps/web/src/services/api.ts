@@ -246,7 +246,7 @@ export const api = {
     }),
 
   // Client - Appointments
-  getClientAppointments: (params?: { limit?: number; offset?: number; agentId?: string; status?: string; bookingDate?: string; bookedBy?: string; tenantId?: string }) => {
+  getClientAppointments: (params?: { limit?: number; offset?: number; agentId?: string; status?: string; bookingDate?: string; bookedBy?: string; search?: string; tenantId?: string }) => {
     const stringParams: Record<string, string> = {};
     if (params?.limit !== undefined) stringParams.limit = String(params.limit);
     if (params?.offset !== undefined) stringParams.offset = String(params.offset);
@@ -254,6 +254,7 @@ export const api = {
     if (params?.status) stringParams.status = params.status;
     if (params?.bookingDate) stringParams.bookingDate = params.bookingDate;
     if (params?.bookedBy) stringParams.bookedBy = params.bookedBy;
+    if (params?.search) stringParams.search = params.search;
     if (params?.tenantId) stringParams.tenantId = params.tenantId;
     return request<{
       appointments: Appointment[];

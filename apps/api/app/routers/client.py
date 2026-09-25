@@ -182,6 +182,7 @@ async def list_appointments(
     status_filter: Optional[str] = Query(None, alias="status"),
     booking_date: Optional[str] = Query(None, alias="bookingDate"),
     booked_by: Optional[str] = Query(None, alias="bookedBy"),
+    search: Optional[str] = Query(None, alias="search"),
     tenant_id_param: Optional[str] = Query(None, alias="tenantId"),
     payload: Dict[str, Any] = Depends(get_current_user_payload),
     session: AsyncSession = Depends(get_db)
@@ -189,7 +190,16 @@ async def list_appointments(
     tenant_id = resolve_tenant_id(payload, tenant_id_param)
     service = CRMService(session)
     agent_uuid = uuid.UUID(agent_id) if agent_id else None
-    return await service.list_appointments(tenant_id, limit, offset, agent_uuid, status_filter, booking_date, booked_by)
+    return await service.list_appointments(
+        tenant_id=tenant_id,
+        limit=limit,
+        offset=offset,
+        agent_id=agent_uuid,
+        status=status_filter,
+        booking_date=booking_date,
+        booked_by=booked_by,
+        search=search,
+    )
 
 @router.get("/appointments/slots")
 async def check_appointment_slots(

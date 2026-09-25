@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { Appointment } from '../../types';
@@ -28,8 +28,16 @@ export function ClientAppointments() {
   const limit = 15;
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [bookedByFilter, setBookedByFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const [loading, setLoading] = useState(true);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
@@ -79,6 +87,8 @@ export function ClientAppointments() {
         limit,
         offset: page * limit,
         status: statusFilter !== 'ALL' ? statusFilter : undefined,
+        bookedBy: bookedByFilter !== 'ALL' ? bookedByFilter : undefined,
+        search: debouncedSearch.trim() || undefined,
       });
       const incoming = res.appointments || [];
       const incomingTotal = res.total || 0;
@@ -91,7 +101,7 @@ export function ClientAppointments() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, statusFilter, limit]);
+  }, [page, statusFilter, bookedByFilter, debouncedSearch, limit]);
 
   useEffect(() => {
     loadAppointments();
@@ -227,31 +237,7 @@ export function ClientAppointments() {
     }
   };
 
-  const filteredAppointments = useMemo(() => {
-    return appointments.filter((a) => {
-      if (bookedByFilter !== 'ALL') {
-        const bBy = (a.bookedBy || 'AGENT').toUpperCase();
-        if (bookedByFilter === 'AGENT' && bBy !== 'AGENT') return false;
-        if (bookedByFilter === 'RECEPTIONIST' && bBy !== 'RECEPTIONIST' && !a.walkIn) return false;
-        if (bookedByFilter === 'WHATSAPP' && bBy !== 'WHATSAPP') return false;
-      }
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const numMatch = a.appointmentNumber?.toLowerCase().includes(q);
-        const nameMatch = a.customerName.toLowerCase().includes(q);
-        const phoneMatch = a.customerPhone?.toLowerCase().includes(q);
-        const titleMatch = a.title?.toLowerCase().includes(q);
-        const bookedByMatch = a.bookedByName?.toLowerCase().includes(q) || a.bookedBy?.toLowerCase().includes(q);
-        const ageVal = a.age || ((a.metadata as any)?.age != null ? String((a.metadata as any).age) : '');
-        const placeVal = a.place || ((a.metadata as any)?.place != null ? String((a.metadata as any).place) : '') || ((a.metadata as any)?.location != null ? String((a.metadata as any).location) : '');
-        const ageMatch = ageVal.toLowerCase().includes(q);
-        const placeMatch = placeVal.toLowerCase().includes(q);
-        return numMatch || nameMatch || phoneMatch || titleMatch || ageMatch || placeMatch || bookedByMatch;
-      }
-      return true;
-    });
-  }, [appointments, bookedByFilter, searchQuery]);
+  const filteredAppointments = appointments;
 
   const getStatusBadge = (status: Appointment['status']) => {
     switch (status) {
@@ -369,7 +355,10 @@ export function ClientAppointments() {
             type="text"
             placeholder="Search reference #, patient, age, or source..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(0);
+            }}
             className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl pl-10 pr-4 py-2 text-xs text-[#0c0a09] placeholder-[#a8a29e] focus:outline-none focus:border-[#0c0a09]"
           />
         </div>

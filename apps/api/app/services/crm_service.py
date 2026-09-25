@@ -3,7 +3,7 @@ import re
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func, desc, and_, delete
+from sqlalchemy import select, update, func, desc, and_, or_, delete
 from ..models import (
     Tenant, User, Subscription, Agent, AgentVersion, Deployment,
     CallSession, Lead, Appointment, FollowUp, PhoneNumber,
@@ -366,20 +366,46 @@ class CRMService:
     async def list_appointments(
         self, tenant_id: uuid.UUID, limit: int = 20, offset: int = 0,
         agent_id: Optional[uuid.UUID] = None, status: Optional[str] = None,
-        booking_date: Optional[str] = None, booked_by: Optional[str] = None
+        booking_date: Optional[str] = None, booked_by: Optional[str] = None,
+        search: Optional[str] = None,
     ) -> Dict[str, Any]:
         query = select(Appointment).where(Appointment.tenantId == tenant_id)
         if agent_id:
             query = query.where(Appointment.agentId == agent_id)
-        if status:
+        if status and status != "ALL":
             try:
                 query = query.where(Appointment.status == AppointmentStatus(status))
             except Exception:
                 pass
         if booking_date:
             query = query.where(Appointment.bookingDate == booking_date)
-        if booked_by:
-            query = query.where(Appointment.bookedBy == booked_by)
+        if booked_by and booked_by != "ALL":
+            b_upper = booked_by.upper()
+            if b_upper == "AGENT":
+                query = query.where(or_(Appointment.bookedBy.ilike("%AGENT%"), Appointment.bookedBy == "AGENT"))
+            elif b_upper == "RECEPTIONIST":
+                query = query.where(or_(Appointment.bookedBy.ilike("%RECEPTIONIST%"), Appointment.walkIn == True))
+            elif b_upper == "WHATSAPP":
+                query = query.where(Appointment.bookedBy.ilike("%WHATSAPP%"))
+            else:
+                query = query.where(Appointment.bookedBy == booked_by)
+
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            query = query.where(
+                or_(
+                    Appointment.customerName.ilike(term),
+                    Appointment.customerPhone.ilike(term),
+                    Appointment.appointmentNumber.ilike(term),
+                    Appointment.title.ilike(term),
+                    Appointment.resourceName.ilike(term),
+                    Appointment.bookedByName.ilike(term),
+                    Appointment.bookedBy.ilike(term),
+                    Appointment.age.ilike(term),
+                    Appointment.place.ilike(term),
+                    Appointment.notes.ilike(term),
+                )
+            )
 
         count_query = select(func.count()).select_from(query.subquery())
         total = (await self.session.execute(count_query)).scalar_one()
