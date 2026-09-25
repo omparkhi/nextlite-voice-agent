@@ -1519,17 +1519,17 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
                     except Exception as e:
                         logger.debug(f"[TimingMonitor] on_assistant_speech_stopped notice: {e}")
 
-                if self._on_end_call_check_fn and self._on_end_call_check_fn():
-                    logger.info("[EndCall] Final closing turn audio completed. Initiating graceful terminal disconnect...")
-                    if self._on_terminate_fn:
-                        try:
-                            import inspect
-                            if inspect.iscoroutinefunction(self._on_terminate_fn):
-                                asyncio.create_task(self._on_terminate_fn())
-                            else:
-                                self._on_terminate_fn()
-                        except Exception as e:
-                            logger.debug(f"[EndCall] Terminal disconnect notice: {e}")
+            if not is_early_filler_stop and not is_llm_generating and self._on_end_call_check_fn and self._on_end_call_check_fn():
+                logger.info("[EndCall] Final closing turn audio completed. Initiating graceful terminal disconnect...")
+                if self._on_terminate_fn:
+                    try:
+                        import inspect
+                        if inspect.iscoroutinefunction(self._on_terminate_fn):
+                            asyncio.create_task(self._on_terminate_fn())
+                        else:
+                            self._on_terminate_fn()
+                    except Exception as e:
+                        logger.debug(f"[EndCall] Terminal disconnect notice: {e}")
 
         elif isinstance(frame, (FunctionCallsStartedFrame, FunctionCallInProgressFrame, FunctionCallResultFrame)):
             if self._turn_tracker:
@@ -2519,6 +2519,7 @@ async def websocket_plivo_endpoint(
         serializer_holder: List[Any] = [None]
         is_transfer_pending = [False]
         is_end_call_pending = [False]
+        terminal_hangup_executed = [False]
         last_assistant_speech_end = [time.perf_counter()]
 
         async def _on_plivo_terminal_hangup():
@@ -2528,18 +2529,34 @@ async def websocket_plivo_endpoint(
                 logger.info(f"[Plivo Hangup] Transfer is active for call_id={call_id} — skipping REST DELETE hangup to preserve live telecom bridge")
                 return
 
-            # Allow final synthesized audio chunks to finish playing out through Plivo RTP buffer
+            if terminal_hangup_executed[0]:
+                return
+            terminal_hangup_executed[0] = True
+
+            # Dynamic Audio Drain: Wait until LLM has finished streaming, TTS synthesis completes,
+            # and all audio frames have fully played out through Plivo and the telecom network.
             ser = serializer_holder[0]
-            if ser:
+            max_hangup_wait = 15.0
+            start_hangup_wait = time.perf_counter()
+
+            while (time.perf_counter() - start_hangup_wait) < max_hangup_wait:
                 now_mono = time.perf_counter()
-                est_end = getattr(ser, "estimated_outbound_speech_end", now_mono)
-                remaining = est_end - now_mono
-                if remaining > 0:
-                    wait_time = min(remaining + 0.8, 8.0)
-                    logger.info(f"[Plivo Hangup] Waiting {wait_time:.2f}s for outbound audio buffer playout before disconnect")
-                    await asyncio.sleep(wait_time)
-                else:
-                    await asyncio.sleep(0.8)
+
+                # Check if LLM is still generating or TTS is still synthesizing audio
+                is_speaking = bool(
+                    turn_tracker
+                    and (turn_tracker.is_llm_generating or turn_tracker.is_turn_in_flight or turn_tracker.is_assistant_speaking)
+                )
+
+                est_end = getattr(ser, "estimated_outbound_speech_end", now_mono) if ser else now_mono
+                # Crisp 0.5s safety margin for carrier RTP network buffer playout to phone speaker
+                carrier_drain_time = est_end + 0.5
+
+                if not is_speaking and now_mono >= carrier_drain_time:
+                    logger.info(f"[Plivo Hangup] Final audio playout fully completed (waited {now_mono - start_hangup_wait:.2f}s). Proceeding with disconnect.")
+                    break
+
+                await asyncio.sleep(0.1)
 
             nonlocal is_call_terminating
             is_call_terminating = True
@@ -2774,12 +2791,26 @@ async def websocket_plivo_endpoint(
         from app.dynamic_schedule_engine import parse_patients_per_slot
         patients_per_slot_val = parse_patients_per_slot(raw_cap, default_capacity=1)
 
+        async def _execute_terminal_hangup_watchdog(reason: Optional[str] = None):
+            try:
+                # Give post-tool closing text and TTS synthesis time to produce audio chunks
+                for _ in range(25):
+                    await asyncio.sleep(0.1)
+                    ser = serializer_holder[0]
+                    if ser and ser.estimated_outbound_speech_end > time.perf_counter():
+                        break
+                # Execute terminal hangup (which calculates exact remaining audio buffer playout)
+                await _on_plivo_terminal_hangup()
+            except Exception as e:
+                logger.debug(f"[EndCallWatchdog] Notice: {e}")
+
         def _on_trigger_end_call(reason: Optional[str] = None):
             if is_transfer_pending[0]:
                 logger.info(f"[EndCall] Ignored end_call because call transfer is already active (reason={reason or 'none'})")
                 return
             logger.info(f"[EndCall] Tool triggered: marking call as pending termination (reason={reason or 'none'})")
             is_end_call_pending[0] = True
+            asyncio.create_task(_execute_terminal_hangup_watchdog(reason))
 
         async def _execute_plivo_transfer(dest_num: str, wait_delay: float):
             if wait_delay > 0:
