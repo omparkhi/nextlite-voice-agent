@@ -196,13 +196,24 @@ async def check_appointment_slots(
     booking_date: str = Query(..., alias="bookingDate"),
     phone: Optional[str] = Query(None),
     preferred_time: Optional[str] = Query(None, alias="preferredTime"),
+    business_hours: Optional[str] = Query(None, alias="businessHours"),
+    slot_duration: Optional[str] = Query(None, alias="slotDuration"),
+    patients_per_slot: Optional[int] = Query(None, alias="patientsPerSlot"),
     tenant_id_param: Optional[str] = Query(None, alias="tenantId"),
     payload: Dict[str, Any] = Depends(get_current_user_payload),
     session: AsyncSession = Depends(get_db)
 ):
     tenant_id = resolve_tenant_id(payload, tenant_id_param)
     service = CRMService(session)
-    return await service.check_slots(tenant_id, booking_date, phone, preferred_time)
+    return await service.check_slots(
+        tenant_id=tenant_id,
+        booking_date=booking_date,
+        phone=phone,
+        preferred_time=preferred_time,
+        business_hours=business_hours,
+        slot_duration=slot_duration,
+        patients_per_slot=patients_per_slot,
+    )
 
 @router.get("/appointments/{appointment_id}")
 async def get_appointment(
@@ -266,6 +277,9 @@ async def create_client_appointment(
     place = body.get("place") or body.get("location")
     walk_in = body.get("walkIn", True if booked_by == "RECEPTIONIST" else False)
     notes = body.get("notes") or body.get("reason")
+    raw_pps = body.get("patientsPerSlot") or body.get("patients_per_slot") or body.get("slotCapacity")
+    patients_per_slot = int(raw_pps) if raw_pps is not None and str(raw_pps).strip() else None
+    business_hours = body.get("businessHours") or body.get("business_hours")
 
     if not customer_name or not booking_date or not booking_time:
         raise HTTPException(
@@ -288,7 +302,9 @@ async def create_client_appointment(
             place=place,
             walk_in=walk_in,
             notes=notes,
-            metadata=body.get("metadata", {})
+            metadata=body.get("metadata", {}),
+            business_hours=business_hours,
+            patients_per_slot=patients_per_slot,
         )
         await invalidate_worker_cache()
         return {"success": True, "appointment": appt}
