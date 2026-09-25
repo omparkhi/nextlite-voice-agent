@@ -62,7 +62,7 @@ services:
     build:
       context: ../apps/api
       dockerfile: Dockerfile
-    image: ghcr.io/${GITHUB_REPOSITORY:-nextlite}/nextlite-api:latest
+    image: ghcr.io/${GITHUB_REPOSITORY:-omparkhi/nextlite-voice-agent}/nextlite-api:latest
     container_name: nextlite_api
     restart: unless-stopped
     environment:
@@ -112,7 +112,7 @@ services:
     build:
       context: ../apps/pipecat-worker
       dockerfile: Dockerfile
-    image: ghcr.io/${GITHUB_REPOSITORY:-nextlite}/nextlite-worker:latest
+    image: ghcr.io/${GITHUB_REPOSITORY:-omparkhi/nextlite-voice-agent}/nextlite-worker:latest
     container_name: nextlite_worker
     restart: unless-stopped
     environment:
