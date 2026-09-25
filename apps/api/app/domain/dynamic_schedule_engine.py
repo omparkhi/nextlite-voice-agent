@@ -274,30 +274,19 @@ def parse_patients_per_slot(capacity_val: Optional[Any], default_capacity: int =
 def extract_business_schedule_from_version(version_configuration: Optional[dict]) -> Tuple[Optional[str], Optional[str], int]:
     """Extracts businessHours, slotDuration, and patientsPerSlot safely from an AgentVersion configuration JSON dict.
     
-    Supports case-insensitive variations and aliases (e.g. slotduration, slotDuration, slot_duration,
-    businessHours, businesshours, workingHours, patientsPerSlot, slotCapacity, maxPatientsPerSlot).
+    Supports case-insensitive variations and nested sections (e.g. businessRules, appointmentRules,
+    customFacts, runtimeSettings, variables, inputVariables, runtimeContext).
     """
     if not version_configuration or not isinstance(version_configuration, dict):
         return None, None, 1
 
     biz_info = version_configuration.get("businessInformation") or {}
-    biz_hours = biz_info.get("hours") if isinstance(biz_info, dict) else None
-
-    vars_cfg = version_configuration.get("variables") or []
-    if isinstance(vars_cfg, dict):
-        input_vars = vars_cfg.get("inputVariables") or vars_cfg.get("input") or []
-    elif isinstance(vars_cfg, list):
-        input_vars = vars_cfg
-    else:
-        input_vars = []
-
-    if not isinstance(input_vars, list):
-        input_vars = []
+    biz_hours = biz_info.get("hours") or biz_info.get("businessHours") if isinstance(biz_info, dict) else None
 
     slot_duration = None
     patients_per_slot = 1
 
-    # Also check direct top-level keys
+    # 1. Check direct top-level keys
     for top_k, top_v in version_configuration.items():
         norm_top_k = re.sub(r"[_\-\s]", "", str(top_k)).lower()
         if norm_top_k in ("patientsperslot", "patientsperslots", "slotcapacity", "maxpatientsperslot", "maxpatients", "capacity"):
@@ -307,18 +296,61 @@ def extract_business_schedule_from_version(version_configuration: Optional[dict]
         elif norm_top_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):
             biz_hours = str(top_v)
 
-    for v in input_vars:
-        if isinstance(v, dict):
-            raw_k = str(v.get("key") or v.get("name") or v.get("id") or "").strip()
-            norm_k = re.sub(r"[_\-\s]", "", raw_k).lower()
-            val = v.get("defaultValue") if v.get("defaultValue") is not None else v.get("value")
-            if val is None or str(val).strip() == "":
-                continue
-            if norm_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):
-                biz_hours = str(val)
-            elif norm_k in ("slotduration", "slotinterval", "appointmentduration", "slotminutes", "duration"):
-                slot_duration = str(val)
-            elif norm_k in ("patientsperslot", "patientsperslots", "slotcapacity", "maxpatientsperslot", "maxpatients", "capacity"):
-                patients_per_slot = parse_patients_per_slot(val, default_capacity=1)
+    # 2. Check nested sections: businessRules, appointmentRules, customFacts, runtimeSettings
+    nested_dicts = [
+        biz_info,
+        biz_info.get("customFacts") if isinstance(biz_info, dict) else {},
+        version_configuration.get("businessRules") or {},
+        (version_configuration.get("businessRules") or {}).get("appointmentRules") if isinstance(version_configuration.get("businessRules"), dict) else {},
+        version_configuration.get("appointmentRules") or {},
+        version_configuration.get("runtimeSettings") or {},
+    ]
+    for section in nested_dicts:
+        if isinstance(section, dict):
+            for sec_k, sec_v in section.items():
+                norm_sec_k = re.sub(r"[_\-\s]", "", str(sec_k)).lower()
+                if norm_sec_k in ("patientsperslot", "patientsperslots", "slotcapacity", "maxpatientsperslot", "maxpatients", "capacity"):
+                    parsed_p = parse_patients_per_slot(sec_v, default_capacity=1)
+                    if parsed_p > 1 or patients_per_slot == 1:
+                        patients_per_slot = parsed_p
+                elif norm_sec_k in ("slotduration", "slotinterval", "appointmentduration", "slotminutes", "duration"):
+                    if not slot_duration and sec_v:
+                        slot_duration = str(sec_v)
+                elif norm_sec_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):
+                    if not biz_hours and sec_v:
+                        biz_hours = str(sec_v)
+
+    # 3. Check variables (inputVariables, input, runtimeContext)
+    vars_cfg = version_configuration.get("variables") or []
+    input_vars = []
+    if isinstance(vars_cfg, dict):
+        input_vars = vars_cfg.get("inputVariables") or vars_cfg.get("input") or []
+        rt_ctx = vars_cfg.get("runtimeContext") or {}
+        if isinstance(rt_ctx, dict):
+            for rk, rv in rt_ctx.items():
+                norm_rk = re.sub(r"[_\-\s]", "", str(rk)).lower()
+                if norm_rk in ("patientsperslot", "patientsperslots", "slotcapacity", "maxpatientsperslot", "maxpatients", "capacity"):
+                    patients_per_slot = parse_patients_per_slot(rv, default_capacity=1)
+                elif norm_rk in ("slotduration", "slotinterval", "appointmentduration", "slotminutes", "duration"):
+                    slot_duration = str(rv)
+                elif norm_rk in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):
+                    biz_hours = str(rv)
+    elif isinstance(vars_cfg, list):
+        input_vars = vars_cfg
+
+    if isinstance(input_vars, list):
+        for v in input_vars:
+            if isinstance(v, dict):
+                raw_k = str(v.get("key") or v.get("name") or v.get("id") or "").strip()
+                norm_k = re.sub(r"[_\-\s]", "", raw_k).lower()
+                val = v.get("defaultValue") if v.get("defaultValue") is not None else v.get("value")
+                if val is None or str(val).strip() == "":
+                    continue
+                if norm_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):
+                    biz_hours = str(val)
+                elif norm_k in ("slotduration", "slotinterval", "appointmentduration", "slotminutes", "duration"):
+                    slot_duration = str(val)
+                elif norm_k in ("patientsperslot", "patientsperslots", "slotcapacity", "maxpatientsperslot", "maxpatients", "capacity"):
+                    patients_per_slot = parse_patients_per_slot(val, default_capacity=1)
 
     return biz_hours, slot_duration, patients_per_slot

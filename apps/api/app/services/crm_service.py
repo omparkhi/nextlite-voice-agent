@@ -8,7 +8,7 @@ from ..models import (
     Tenant, User, Subscription, Agent, AgentVersion, Deployment,
     CallSession, Lead, Appointment, FollowUp, PhoneNumber,
     LeadStatus, AppointmentStatus, FollowUpStatus, CallStatus, CallDirection,
-    UserRole, TenantAppointmentCounter
+    UserRole, TenantAppointmentCounter, DeploymentStatus
 )
 from ..logging import logger
 from ..domain.indic_normalizers import (
@@ -37,6 +37,39 @@ def to_utc_iso(dt: Optional[datetime]) -> Optional[str]:
 class CRMService:
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def _resolve_tenant_schedule_config(self, tenant_id: uuid.UUID) -> Tuple[Optional[str], Optional[str], int]:
+        """Resolves businessHours, slotDuration, and patientsPerSlot for a tenant.
+        
+        Prioritizes active Deployment version snapshot, falling back to the latest AgentVersion.
+        """
+        # 1. Query active deployment version snapshot
+        dep_stmt = (
+            select(AgentVersion.configuration)
+            .join(Deployment, Deployment.versionId == AgentVersion.id)
+            .where(
+                Deployment.tenantId == tenant_id,
+                Deployment.status == DeploymentStatus.ACTIVE
+            )
+            .order_by(Deployment.createdAt.desc())
+            .limit(1)
+        )
+        dep_res = await self.session.execute(dep_stmt)
+        cfg_json = dep_res.scalar_one_or_none()
+
+        # 2. Fallback to latest agent version
+        if not cfg_json:
+            v_stmt = (
+                select(AgentVersion.configuration)
+                .join(Agent, Agent.id == AgentVersion.agentId)
+                .where(Agent.tenantId == tenant_id)
+                .order_by(AgentVersion.versionNumber.desc())
+                .limit(1)
+            )
+            v_res = await self.session.execute(v_stmt)
+            cfg_json = v_res.scalar_one_or_none()
+
+        return extract_business_schedule_from_version(cfg_json if isinstance(cfg_json, dict) else None)
 
     # Profile
     async def get_client_profile(self, tenant_id: uuid.UUID) -> Optional[Dict[str, Any]]:
@@ -311,14 +344,7 @@ class CRMService:
         appts = res.scalars().all()
 
         # Resolve tenant capacity and business schedule
-        biz_res = await self.session.execute(
-            select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
-            .where(Agent.tenantId == tenant_id)
-            .order_by(AgentVersion.versionNumber.desc())
-            .limit(1)
-        )
-        cfg_json = biz_res.scalar_one_or_none()
-        b_h, s_d, p_s = extract_business_schedule_from_version(cfg_json if isinstance(cfg_json, dict) else None)
+        b_h, s_d, p_s = await self._resolve_tenant_schedule_config(tenant_id)
         effective_capacity = max(1, int(p_s or 1))
 
         return {
@@ -513,21 +539,13 @@ class CRMService:
                 f"Cannot book appointment for past time slot '{norm_booking_time}' on {booking_date}."
             )
 
-        # Shift & Capacity resolution: Resolve from AgentVersion if not passed explicitly
+        # Shift & Capacity resolution: Resolve from active Deployment/AgentVersion if not passed explicitly
         if not business_hours or patients_per_slot is None:
-            biz_hours_query = await self.session.execute(
-                select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
-                .where(Agent.tenantId == tenant_id)
-                .order_by(AgentVersion.versionNumber.desc())
-                .limit(1)
-            )
-            cfg_json = biz_hours_query.scalar_one_or_none()
-            if cfg_json and isinstance(cfg_json, dict):
-                b_h, _, p_s = extract_business_schedule_from_version(cfg_json)
-                if not business_hours:
-                    business_hours = b_h
-                if patients_per_slot is None:
-                    patients_per_slot = p_s
+            b_h, _, p_s = await self._resolve_tenant_schedule_config(tenant_id)
+            if not business_hours:
+                business_hours = b_h
+            if patients_per_slot is None:
+                patients_per_slot = p_s
 
         effective_capacity = max(1, int(patients_per_slot or 1))
 
@@ -711,21 +729,13 @@ class CRMService:
         """
         # Resolve tenant business hours, slot duration & patientsPerSlot dynamically if not passed
         if not business_hours or not slot_duration or patients_per_slot is None:
-            biz_res = await self.session.execute(
-                select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
-                .where(Agent.tenantId == tenant_id)
-                .order_by(AgentVersion.versionNumber.desc())
-                .limit(1)
-            )
-            cfg_json = biz_res.scalar_one_or_none()
-            if cfg_json and isinstance(cfg_json, dict):
-                b_h, s_d, p_s = extract_business_schedule_from_version(cfg_json)
-                if not business_hours:
-                    business_hours = b_h
-                if not slot_duration:
-                    slot_duration = s_d
-                if patients_per_slot is None:
-                    patients_per_slot = p_s
+            b_h, s_d, p_s = await self._resolve_tenant_schedule_config(tenant_id)
+            if not business_hours:
+                business_hours = b_h
+            if not slot_duration:
+                slot_duration = s_d
+            if patients_per_slot is None:
+                patients_per_slot = p_s
 
         effective_capacity = max(1, int(patients_per_slot or 1))
 

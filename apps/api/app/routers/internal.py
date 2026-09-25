@@ -397,13 +397,26 @@ async def create_internal_appointment(
     # Resolve dynamic capacity for tenant
     patients_per_slot = payload.get("patientsPerSlot") or payload.get("patients_per_slot") or payload.get("slotCapacity")
     if patients_per_slot is None and effective_tenant_id:
-        biz_hours_query = await session.execute(
-            select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
-            .where(Agent.tenantId == effective_tenant_id)
-            .order_by(AgentVersion.versionNumber.desc())
+        dep_stmt = (
+            select(AgentVersion.configuration)
+            .join(Deployment, Deployment.versionId == AgentVersion.id)
+            .where(
+                Deployment.tenantId == effective_tenant_id,
+                Deployment.status == DeploymentStatus.ACTIVE
+            )
+            .order_by(Deployment.createdAt.desc())
             .limit(1)
         )
-        cfg_json = biz_hours_query.scalar_one_or_none()
+        dep_res = await session.execute(dep_stmt)
+        cfg_json = dep_res.scalar_one_or_none()
+        if not cfg_json:
+            biz_hours_query = await session.execute(
+                select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+                .where(Agent.tenantId == effective_tenant_id)
+                .order_by(AgentVersion.versionNumber.desc())
+                .limit(1)
+            )
+            cfg_json = biz_hours_query.scalar_one_or_none()
         if cfg_json and isinstance(cfg_json, dict):
             _, _, p_s = extract_business_schedule_from_version(cfg_json)
             patients_per_slot = p_s

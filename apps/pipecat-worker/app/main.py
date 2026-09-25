@@ -2734,13 +2734,20 @@ async def websocket_plivo_endpoint(
         # 9. Resolve Authoritative Runtime Tools & Instantiate Native Conversation Context
         startup_tracker.record_stage("tool_registry_start")
         var_map = {}
-        if runtime_config.variables and runtime_config.variables.input_variables:
-            for v in runtime_config.variables.input_variables:
-                raw_k = str(v.key or "").strip()
-                norm_k = re.sub(r"[_\-\s]", "", raw_k).lower()
-                val = v.default_value if v.default_value is not None else ""
-                var_map[raw_k] = val
-                var_map[norm_k] = val
+        if runtime_config.variables:
+            if runtime_config.variables.runtime_context and isinstance(runtime_config.variables.runtime_context, dict):
+                for rk, rv in runtime_config.variables.runtime_context.items():
+                    raw_k = str(rk or "").strip()
+                    norm_k = re.sub(r"[_\-\s]", "", raw_k).lower()
+                    var_map[raw_k] = rv
+                    var_map[norm_k] = rv
+            if runtime_config.variables.input_variables:
+                for v in runtime_config.variables.input_variables:
+                    raw_k = str(v.key or "").strip()
+                    norm_k = re.sub(r"[_\-\s]", "", raw_k).lower()
+                    val = v.default_value if v.default_value is not None else ""
+                    var_map[raw_k] = val
+                    var_map[norm_k] = val
 
         biz_hours_val = (
             var_map.get("businessHours")

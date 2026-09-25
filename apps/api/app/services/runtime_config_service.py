@@ -161,14 +161,110 @@ class RuntimeAgentConfigService:
             or cfg.get("greeting")
             or "Hello! How can I assist you today?"
         )
-        input_vars_list = vars_cfg.get("input", vars_cfg.get("inputVariables", [])) if isinstance(vars_cfg, dict) else []
-        runtime_ctx_map = vars_cfg.get("runtimeContext", {}) if isinstance(vars_cfg, dict) else {}
+        raw_vars = cfg.get("variables")
+        raw_input_vars = []
+        raw_output_vars = []
+        runtime_ctx_map = {}
+        if isinstance(raw_vars, dict):
+            raw_input_vars = raw_vars.get("input", raw_vars.get("inputVariables", []))
+            raw_output_vars = raw_vars.get("output", raw_vars.get("outputVariables", []))
+            runtime_ctx_map = dict(raw_vars.get("runtimeContext", {}) or {})
+        elif isinstance(raw_vars, list):
+            raw_input_vars = raw_vars
+
+        if not isinstance(raw_input_vars, list):
+            raw_input_vars = []
+        if not isinstance(raw_output_vars, list):
+            raw_output_vars = []
+        if not isinstance(runtime_ctx_map, dict):
+            runtime_ctx_map = {}
+
+        # Extract authoritative schedule & capacity variables
+        from ..domain.dynamic_schedule_engine import extract_business_schedule_from_version
+        b_h, s_d, p_s = extract_business_schedule_from_version(cfg)
+
+        normalized_input_vars: List[RuntimeVariableDefinition] = []
+        seen_keys = set()
+        for iv in raw_input_vars:
+            if isinstance(iv, dict):
+                k = iv.get("key") or iv.get("name") or iv.get("id")
+                if k:
+                    k_str = str(k).strip()
+                    norm_k = re.sub(r"[_\-\s]", "", k_str).lower()
+                    val = iv.get("defaultValue") if iv.get("defaultValue") is not None else iv.get("value")
+                    # Update with authoritative values if matched
+                    if norm_k in ("patientsperslot", "patientsperslots", "slotcapacity", "maxpatientsperslot", "maxpatients", "capacity") and p_s:
+                        val = p_s
+                    elif norm_k in ("slotduration", "slotinterval", "appointmentduration", "slotminutes", "duration") and s_d:
+                        val = s_d
+                    elif norm_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts") and b_h:
+                        val = b_h
+
+                    seen_keys.add(norm_k)
+                    normalized_input_vars.append(RuntimeVariableDefinition(
+                        key=k_str,
+                        label=iv.get("label"),
+                        type=str(iv.get("type", "string")),
+                        required=bool(iv.get("required", False)),
+                        default_value=val,
+                        scope=iv.get("scope", "CALL")
+                    ))
+
+        # Inject canonical schedule variables if missing
+        if p_s and "patientsperslot" not in seen_keys:
+            normalized_input_vars.append(RuntimeVariableDefinition(
+                key="patientsPerSlot",
+                label="Patients per Time Slot",
+                type="number",
+                default_value=p_s,
+                scope="SYSTEM"
+            ))
+            seen_keys.add("patientsperslot")
+        if s_d and "slotduration" not in seen_keys:
+            normalized_input_vars.append(RuntimeVariableDefinition(
+                key="slotDuration",
+                label="Appointment Duration",
+                type="text",
+                default_value=s_d,
+                scope="SYSTEM"
+            ))
+            seen_keys.add("slotduration")
+        if b_h and "businesshours" not in seen_keys:
+            normalized_input_vars.append(RuntimeVariableDefinition(
+                key="businessHours",
+                label="Clinic Hours",
+                type="text",
+                default_value=b_h,
+                scope="SYSTEM"
+            ))
+            seen_keys.add("businesshours")
+
+        if p_s and "patientsPerSlot" not in runtime_ctx_map:
+            runtime_ctx_map["patientsPerSlot"] = str(p_s)
+        if s_d and "slotDuration" not in runtime_ctx_map:
+            runtime_ctx_map["slotDuration"] = str(s_d)
+        if b_h and "businessHours" not in runtime_ctx_map:
+            runtime_ctx_map["businessHours"] = str(b_h)
+
+        normalized_output_vars: List[RuntimeVariableDefinition] = []
+        for ov in raw_output_vars:
+            if isinstance(ov, dict):
+                k = ov.get("key") or ov.get("name") or ov.get("id")
+                if k:
+                    normalized_output_vars.append(RuntimeVariableDefinition(
+                        key=str(k).strip(),
+                        label=ov.get("label"),
+                        type=str(ov.get("type", "string")),
+                        required=bool(ov.get("required", False)),
+                        default_value=ov.get("defaultValue", ov.get("value")),
+                        scope=ov.get("scope", "CALL")
+                    ))
 
         from ..domain.variable_resolver import resolve_prompt_variables
         from ..domain.greeting_localizer import localize_greeting
         resolved_greeting = resolve_prompt_variables(
             raw_greeting,
-            variables=input_vars_list,
+            variables=raw_input_vars,
             runtime_context=runtime_ctx_map,
             config=cfg
         )
@@ -271,8 +367,8 @@ class RuntimeAgentConfigService:
                 tools=resolved_tool_defs
             ),
             variables=RuntimeVariableConfig(
-                input_variables=input_vars_list,
-                output_variables=vars_cfg.get("output", vars_cfg.get("outputVariables", [])) if isinstance(vars_cfg, dict) else [],
+                input_variables=normalized_input_vars,
+                output_variables=normalized_output_vars,
                 runtime_context=runtime_ctx_map
             )
         )
