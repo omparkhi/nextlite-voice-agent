@@ -125,6 +125,9 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       PLIVO_AUTH_ID: ${PLIVO_AUTH_ID:-}
       PLIVO_AUTH_TOKEN: ${PLIVO_AUTH_TOKEN:-}
+      PLIVO_PHONE_NUMBER: ${PLIVO_PHONE_NUMBER:-}
+      PLIVO_CALLER_ID: ${PLIVO_CALLER_ID:-}
+      PUBLIC_URL: ${PUBLIC_URL:-}
       STT_MODEL: ${STT_MODEL:-saaras:v3-realtime}
       LLM_MODEL: ${LLM_MODEL:-sarvam-2b}
       TTS_MODEL: ${TTS_MODEL:-bulbul:v2}
