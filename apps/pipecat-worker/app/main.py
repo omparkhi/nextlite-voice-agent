@@ -2898,7 +2898,12 @@ async def websocket_plivo_endpoint(
             http_client=shared_http_client,
         )
 
-        # Telephony Platform Safety: Ensure end_call and transfer_call tools are registered for live calls
+        # Telephony Platform Safety: Ensure end_call tool is registered; transfer_call ONLY if emergency transfer is enabled
+        guard = (runtime_config.prompt.guardrails or {}) if runtime_config and runtime_config.prompt else {}
+        is_emergency_enabled = guard.get("emergencyTransferEnabled")
+        if is_emergency_enabled is None:
+            is_emergency_enabled = bool(guard.get("emergencyPhone") or guard.get("emergency_phone") or getattr(runtime_config.prompt, "emergency_phone", None))
+
         if runtime_config and runtime_config.tools and runtime_config.tools.enabled:
             if not any(t.name == "end_call" for t in resolved_tools):
                 end_call_factory = tool_registry.get("end_call")
@@ -2919,24 +2924,27 @@ async def websocket_plivo_endpoint(
                     except Exception as e:
                         logger.debug(f"[ToolRegistry] Error adding fallback end_call: {e}")
 
-            if not any(t.name in ("transfer_call", "transfer_emergency_call") for t in resolved_tools):
-                emergency_factory = tool_registry.get("transfer_call")
-                if emergency_factory:
-                    try:
-                        raw_schema = emergency_factory.create(
-                            context=tool_context,
-                            tool_config=None,
-                            runtime_config=runtime_config,
-                            http_client=shared_http_client,
-                        )
-                        inst_schema = tool_registry._instrument_function_schema(
-                            raw_schema=raw_schema,
-                            llm_name="transfer_call",
-                            context=tool_context,
-                        )
-                        resolved_tools.append(inst_schema)
-                    except Exception as e:
-                        logger.debug(f"[ToolRegistry] Error adding fallback transfer_call: {e}")
+            if is_emergency_enabled:
+                if not any(t.name in ("transfer_call", "transfer_emergency_call") for t in resolved_tools):
+                    emergency_factory = tool_registry.get("transfer_call")
+                    if emergency_factory:
+                        try:
+                            raw_schema = emergency_factory.create(
+                                context=tool_context,
+                                tool_config=None,
+                                runtime_config=runtime_config,
+                                http_client=shared_http_client,
+                            )
+                            inst_schema = tool_registry._instrument_function_schema(
+                                raw_schema=raw_schema,
+                                llm_name="transfer_call",
+                                context=tool_context,
+                            )
+                            resolved_tools.append(inst_schema)
+                        except Exception as e:
+                            logger.debug(f"[ToolRegistry] Error adding fallback transfer_call: {e}")
+            else:
+                resolved_tools = [t for t in resolved_tools if t.name not in ("transfer_call", "transfer_emergency_call")]
 
         startup_tracker.record_stage("tool_registry_resolved")
         if resolved_tools:

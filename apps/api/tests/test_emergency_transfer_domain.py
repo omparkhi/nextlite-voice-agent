@@ -98,3 +98,41 @@ async def test_tool_execution_service_transfer_call():
     assert result["severity"] == "CRITICAL"
     assert "targetPhone" in result
     assert "Emergency call transfer initiated" in result["message"]
+
+
+def test_filter_agent_runtime_tools_respects_emergency_transfer_disabled():
+    from app.domain.tool_registry import filter_agent_runtime_tools
+
+    # Default all tools enabled
+    tools = filter_agent_runtime_tools(
+        tools_cfg={"enabled": True},
+        guardrails_cfg={"emergencyTransferEnabled": False}
+    )
+    assert not any(t.name in ("transfer_call", "transfer_emergency_call") for t in tools)
+    assert any(t.name == "book_appointment" for t in tools)
+    assert any(t.name == "end_call" for t in tools)
+
+    # When emergency transfer is enabled
+    tools_enabled = filter_agent_runtime_tools(
+        tools_cfg={"enabled": True},
+        guardrails_cfg={"emergencyTransferEnabled": True, "emergencyPhone": "+919876543210"}
+    )
+    assert any(t.name == "transfer_call" for t in tools_enabled)
+
+
+def test_prompt_compiler_respects_emergency_transfer_disabled():
+    from app.services.prompt_compiler_service import prompt_compiler
+
+    compiled = prompt_compiler.compile_system_prompt(
+        configuration={
+            "guardrails": {
+                "emergencyTransferEnabled": False,
+            },
+            "instructions": "In an emergency, tell caller to contact doctor on WhatsApp at +919876543210."
+        }
+    )
+
+    assert "Live phone call transfer is DISABLED" in compiled
+    assert "invoke the `transfer_call` tool" not in compiled
+    assert "In an emergency, tell caller to contact doctor on WhatsApp" in compiled
+

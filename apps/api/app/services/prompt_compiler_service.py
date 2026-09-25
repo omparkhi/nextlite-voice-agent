@@ -42,11 +42,7 @@ class PromptCompilerService:
   * Explicit AI disclosure applies ONLY when the caller explicitly asks whether you are an AI, robot, bot, or automated system.
 - CALL CONCLUSION & HANGUP: When the conversation objective is accomplished, the caller says goodbye, or confirms they have no further questions (e.g. 'बाय', 'bye', 'goodbye', 'थँक्यू', 'धन्यवाद', 'माझं काम झालं', 'nothing else', 'नाही काही नाही'):
   * Speak one short, context-appropriate closing farewell in the active language (in Marathi use authentic phrasing like 'धन्यवाद, काळजी घ्या!' or 'नक्की, धन्यवाद, नमस्कार!'. FORBIDDEN: NEVER use literal translations like 'तुमचा दिवस चांगला जावो').
-  * You MUST invoke the `end_call` tool in the same turn to hang up the phone call (EXCEPT when doing an emergency transfer via `transfer_call`). Never ask follow-up questions when the caller is leaving.
-- EMERGENCY TRIAGE & LIVE ESCALATION:
-  * Verification vs Bypass: When a caller claims 'emergency', 'urgent', or demands to speak to the doctor/specialist immediately, do NOT transfer blindly. Briefly verify if there is an active acute medical/dental emergency (such as severe continuous bleeding, accidental trauma or facial injury, extreme acute agony, or difficulty breathing).
-  * True Emergency Action: If a genuine clinical emergency is confirmed, speak ONE calm reassuring phrase in the active language (Marathi: 'शांत राहा, मी लगेच डॉक्टरांशी बोलणं करून देतो'; Hindi: 'कृपया शांत रहें, मैं तुरंत आपको डॉक्टर से कनेक्ट कर रहा हूँ'; English: 'Please stay calm, I am connecting you to the doctor immediately') and invoke the `transfer_call` tool in the same turn. CRITICAL: Never invoke `end_call` when transferring — the call must stay open to bridge the patient to the doctor.
-  * Routine / Bypass Handling: If the caller is experiencing routine discomfort, inquiry, price check, or attempting to bypass booking, politely inform them that the doctor is currently attending to patients / off-duty, and offer the earliest available appointment slot using `check_available_slots`."""
+  * You MUST invoke the `end_call` tool in the same turn to hang up the phone call (EXCEPT when doing an emergency transfer via `transfer_call`). Never ask follow-up questions when the caller is leaving."""
 
     def compile_temporal_context(self, timezone_str: str = "Asia/Kolkata") -> str:
         try:
@@ -266,7 +262,14 @@ class PromptCompilerService:
 
         # 10. SAFETY GUARDRAILS & ESCALATION
         guard = cfg.get("guardrails") or {}
-        if guard.get("prohibitedTopics") or guard.get("prohibitedClaims") or guard.get("escalationRules") or guard.get("fallbackBehavior"):
+        emergency_transfer_enabled = guard.get("emergencyTransferEnabled")
+        # If explicitly False, disabled. If None/missing, check if emergencyPhone is present.
+        if emergency_transfer_enabled is None:
+            emergency_transfer_enabled = bool(guard.get("emergencyPhone") or guard.get("emergency_phone") or cfg.get("emergencyPhone"))
+
+        has_emergency_guardrail = bool(emergency_transfer_enabled and (guard.get("emergencyPhone") or guard.get("emergency_phone") or cfg.get("emergencyPhone")))
+
+        if guard.get("prohibitedTopics") or guard.get("prohibitedClaims") or guard.get("escalationRules") or guard.get("fallbackBehavior") or has_emergency_guardrail or (emergency_transfer_enabled is False):
             parts.append("=== SAFETY GUARDRAILS & ESCALATION ===")
             if guard.get("prohibitedTopics"):
                 parts.append(f"Prohibited Topics: {'; '.join(guard['prohibitedTopics'])}")
@@ -276,6 +279,16 @@ class PromptCompilerService:
                 parts.append(f"Escalation Triggers: {'; '.join(guard['escalationRules'])}")
             if guard.get("fallbackBehavior"):
                 parts.append(f"Fallback Behavior: {guard['fallbackBehavior']}")
+
+            if has_emergency_guardrail:
+                doc_name = guard.get("doctorName") or "the doctor"
+                parts.append(f"""Emergency Live Escalation Policy:
+- When a caller claims 'emergency', 'urgent', or demands to speak to {doc_name} immediately:
+  * Verification vs Bypass: Briefly verify if there is an active acute medical/dental emergency (e.g. continuous severe bleeding, accidental trauma/facial injury, extreme agony, or breathing difficulty).
+  * True Emergency Action: If genuine emergency is verified, speak ONE calm reassuring phrase in the active language (Marathi: 'शांत राहा, मी लगेच डॉक्टरांशी बोलणं करून देतो'; Hindi: 'कृपया शांत रहें, मैं तुरंत आपको डॉक्टर से कनेक्ट कर रहा हूँ'; English: 'Please stay calm, I am connecting you to the doctor immediately') and invoke the `transfer_call` tool in the same turn. CRITICAL: Never invoke `end_call` when transferring.
+  * Routine / Non-Emergency: If routine discomfort, price check, or general inquiry, inform that {doc_name} is attending to patients, and offer the earliest available appointment slot using `check_available_slots`.""")
+            elif emergency_transfer_enabled is False:
+                parts.append("- Emergency / Doctor Contact Policy: Live phone call transfer is DISABLED. Strictly follow Custom Instructions and business contact policies (e.g. instruct caller to message or call on WhatsApp / clinic contact number). Never invoke `transfer_call` or attempt live phone bridging.")
 
         # 11. LANGUAGE & CODE-SWITCHING RULES
         lang_cfg = cfg.get("language") or {}

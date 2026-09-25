@@ -520,7 +520,10 @@ def validate_tool_arguments(tool_id: str, arguments: Dict[str, Any]) -> Tuple[bo
     return True, None
 
 
-def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[RuntimeToolDefinition]:
+def filter_agent_runtime_tools(
+    tools_cfg: Optional[Dict[str, Any]],
+    guardrails_cfg: Optional[Dict[str, Any]] = None,
+) -> List[RuntimeToolDefinition]:
     """
     Resolves the exact list of tools to expose to runtime/LLM based on agent configuration.
     
@@ -533,6 +536,7 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
        - Deduplicate by tool identifier
     4. If bindings is empty list [] and master switch was explicitly set, return []
     5. If bindings is not specified (legacy default), return all canonical platform tools.
+    6. If guardrails_cfg.emergencyTransferEnabled is False, filter out transfer_call.
     """
     if not tools_cfg or not isinstance(tools_cfg, dict):
         return []
@@ -544,6 +548,11 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
     raw_tools = tools_cfg.get("bindings") or tools_cfg.get("tools")
     resolved_tools: List[RuntimeToolDefinition] = []
     seen_ids = set()
+
+    is_emergency_transfer_disabled = False
+    if isinstance(guardrails_cfg, dict):
+        if guardrails_cfg.get("emergencyTransferEnabled") is False:
+            is_emergency_transfer_disabled = True
 
     if raw_tools is not None:
         if isinstance(raw_tools, list):
@@ -562,6 +571,8 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
                 canonical = get_canonical_tool(t_id)
                 if canonical:
                     if canonical.id not in seen_ids:
+                        if is_emergency_transfer_disabled and canonical.id in ("transfer_call", "transfer_emergency_call"):
+                            continue
                         confirmation_req = t.get("confirmationRequired", False)
                         # Appointment REQUESTED results are backend-authored
                         # and use an approved localized template in the worker.
@@ -581,6 +592,8 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
                         seen_ids.add(canonical.id)
                 else:
                     norm_id = normalize_tool_id(t_id) or t_id
+                    if is_emergency_transfer_disabled and norm_id in ("transfer_call", "transfer_emergency_call"):
+                        continue
                     if norm_id not in seen_ids:
                         resolved_tools.append(
                             RuntimeToolDefinition(
@@ -615,6 +628,8 @@ def filter_agent_runtime_tools(tools_cfg: Optional[Dict[str, Any]]) -> List[Runt
 
     # Legacy default fallback when bindings field is absent
     for tool_def in CANONICAL_TOOL_REGISTRY.values():
+        if is_emergency_transfer_disabled and tool_def.id in ("transfer_call", "transfer_emergency_call"):
+            continue
         resolved_tools.append(
             tool_def.to_runtime_tool_definition(
                 enabled=True,

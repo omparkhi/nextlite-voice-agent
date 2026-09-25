@@ -288,7 +288,10 @@ class RuntimeAgentConfigService:
 
         # Build tools list dynamically from canonical tool registry and agent bindings
         tools_enabled = tools_cfg.get("enabled", True) if isinstance(tools_cfg, dict) else (tools_cfg is not None)
-        resolved_tool_defs: List[RuntimeToolDefinition] = filter_agent_runtime_tools(tools_cfg)
+        resolved_tool_defs: List[RuntimeToolDefinition] = filter_agent_runtime_tools(
+            tools_cfg,
+            guardrails_cfg=cfg.get("guardrails"),
+        )
 
         auto_detect_raw = lang_cfg.get("autoDetect", lang_cfg.get("autoDetectEnabled"))
         auto_detect_val = auto_detect_raw if auto_detect_raw is not None else (len(supported_langs) > 1 or True)
