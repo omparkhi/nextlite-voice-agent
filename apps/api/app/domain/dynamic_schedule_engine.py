@@ -343,7 +343,12 @@ def extract_business_schedule_from_version(version_configuration: Optional[dict]
             if isinstance(v, dict):
                 raw_k = str(v.get("key") or v.get("name") or v.get("id") or "").strip()
                 norm_k = re.sub(r"[_\-\s]", "", raw_k).lower()
-                val = v.get("defaultValue") if v.get("defaultValue") is not None else v.get("value")
+                val = None
+                for candidate_k in ("value", "defaultValue", "default", "val", "currentValue"):
+                    candidate_v = v.get(candidate_k)
+                    if candidate_v is not None and str(candidate_v).strip() != "":
+                        val = candidate_v
+                        break
                 if val is None or str(val).strip() == "":
                     continue
                 if norm_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):

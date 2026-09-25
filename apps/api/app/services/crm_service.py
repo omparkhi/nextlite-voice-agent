@@ -41,11 +41,22 @@ class CRMService:
     async def _resolve_tenant_schedule_config(self, tenant_id: uuid.UUID) -> Tuple[Optional[str], Optional[str], int]:
         """Resolves businessHours, slotDuration, and patientsPerSlot for a tenant.
         
-        Prioritizes active Deployment version snapshot, falling back to the latest AgentVersion.
+        Prioritizes the latest configured AgentVersion, falling back to active Deployment version snapshot.
         """
         from sqlalchemy import or_
 
-        # 1. Query active deployment version snapshot for any agent belonging to this tenant
+        # 1. First check the latest agent version (contains the newest edits in Agent Studio)
+        v_stmt = (
+            select(AgentVersion.configuration)
+            .join(Agent, Agent.id == AgentVersion.agentId)
+            .where(Agent.tenantId == tenant_id)
+            .order_by(AgentVersion.versionNumber.desc(), AgentVersion.createdAt.desc())
+            .limit(1)
+        )
+        v_res = await self.session.execute(v_stmt)
+        latest_cfg_json = v_res.scalar_one_or_none()
+
+        # 2. Also check active deployment version snapshot
         dep_stmt = (
             select(AgentVersion.configuration)
             .join(Deployment, Deployment.versionId == AgentVersion.id)
@@ -58,36 +69,36 @@ class CRMService:
             .limit(1)
         )
         dep_res = await self.session.execute(dep_stmt)
-        cfg_json = dep_res.scalar_one_or_none()
+        dep_cfg_json = dep_res.scalar_one_or_none()
 
-        # 2. Fallback to latest agent version
-        if not cfg_json:
-            v_stmt = (
-                select(AgentVersion.configuration)
-                .join(Agent, Agent.id == AgentVersion.agentId)
-                .where(Agent.tenantId == tenant_id)
-                .order_by(AgentVersion.versionNumber.desc())
-                .limit(1)
-            )
-            v_res = await self.session.execute(v_stmt)
-            cfg_json = v_res.scalar_one_or_none()
+        # Check latest version first
+        b_h, s_d, p_s = extract_business_schedule_from_version(latest_cfg_json if isinstance(latest_cfg_json, dict) else None)
 
-        b_h, s_d, p_s = extract_business_schedule_from_version(cfg_json if isinstance(cfg_json, dict) else None)
+        # Merge with active deployment if latest didn't specify
+        if isinstance(dep_cfg_json, dict):
+            dep_bh, dep_sd, dep_ps = extract_business_schedule_from_version(dep_cfg_json)
+            if dep_ps > 1 and p_s <= 1:
+                p_s = dep_ps
+            if dep_bh and not b_h:
+                b_h = dep_bh
+            if dep_sd and not s_d:
+                s_d = dep_sd
+
         if p_s > 1 or b_h or s_d:
             return b_h, s_d, p_s
 
-        # 3. Comprehensive scan across all agent versions for tenant if default was 1
+        # 3. Comprehensive scan across all agent versions for tenant
         all_v_stmt = (
             select(AgentVersion.configuration)
             .join(Agent, Agent.id == AgentVersion.agentId)
             .where(Agent.tenantId == tenant_id)
-            .order_by(AgentVersion.createdAt.desc())
+            .order_by(AgentVersion.versionNumber.desc(), AgentVersion.createdAt.desc())
         )
         all_v_res = await self.session.execute(all_v_stmt)
         for cand_cfg in all_v_res.scalars().all():
             if isinstance(cand_cfg, dict):
                 cand_bh, cand_sd, cand_ps = extract_business_schedule_from_version(cand_cfg)
-                if cand_ps > 1:
+                if cand_ps > 1 and p_s <= 1:
                     p_s = cand_ps
                 if cand_bh and not b_h:
                     b_h = cand_bh
