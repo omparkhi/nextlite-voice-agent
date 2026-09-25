@@ -882,8 +882,31 @@ async def publish_agent(
         notes=notes
     )
 
-    active_dep = agent.get("activeDeployment")
-    dep_id = active_dep.get("id") if active_dep else None
+    # Ensure active deployment exists and points to this new version
+    active_dep_stmt = (
+        select(Deployment).where(
+            Deployment.agentId == uuid.UUID(agent_id),
+            Deployment.status == DeploymentStatus.ACTIVE
+        ).order_by(Deployment.createdAt.desc()).limit(1)
+    )
+    active_dep_res = await session.execute(active_dep_stmt)
+    active_dep_record = active_dep_res.scalar_one_or_none()
+
+    if not active_dep_record:
+        dep_dict = await service.deploy_version(
+            agent_id=uuid.UUID(agent_id),
+            tenant_id=uuid.UUID(client_id),
+            version_id=uuid.UUID(created_version["id"]),
+            environment=DeploymentEnvironment.PRODUCTION,
+            deployed_by=user_id
+        )
+        dep_id = dep_dict.get("id")
+    else:
+        active_dep_record.versionId = uuid.UUID(created_version["id"])
+        active_dep_record.updatedAt = datetime.utcnow()
+        await session.commit()
+        dep_id = str(active_dep_record.id)
+
     await invalidate_worker_cache(dep_id)
 
     updated_agent = await service.get_agent(uuid.UUID(agent_id), uuid.UUID(client_id))
