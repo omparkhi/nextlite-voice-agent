@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Optional, Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,7 +8,7 @@ from ..schemas import (
     RuntimeAgentConfig, RuntimeTenantConfig, RuntimeAgentMetadata,
     RuntimeDeploymentMetadata, RuntimePromptConfig, RuntimeVoiceConfig,
     RuntimeLanguageConfig, RuntimeBehaviorConfig, RuntimeNudgeConfig, RuntimeKnowledgeConfig,
-    RuntimeToolConfig, RuntimeToolDefinition, RuntimeVariableConfig
+    RuntimeToolConfig, RuntimeToolDefinition, RuntimeVariableConfig, RuntimeVariableDefinition
 )
 from .prompt_compiler_service import prompt_compiler
 from ..domain.tool_registry import (
@@ -38,7 +39,6 @@ class RuntimeAgentConfigService:
             res = await self.session.execute(stmt)
             deployment = res.scalar_one_or_none()
         elif phone_number:
-            import re
             from sqlalchemy import or_
             raw_p = phone_number.strip()
             digits = re.sub(r"[^\d]", "", raw_p)
