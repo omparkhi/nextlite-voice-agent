@@ -134,6 +134,33 @@ async def get_schedule(
     res = await session.execute(query)
     db_appts = res.scalars().all()
 
+    # Determine tenant
+    if tenant_id:
+        try:
+            tenant_uuid = uuid.UUID(tenant_id)
+        except Exception:
+            tenant_uuid = await get_or_create_default_tenant(session)
+    else:
+        tenant_uuid = await get_or_create_default_tenant(session)
+
+    # Resolve dynamic capacity for tenant
+    from ..models import Agent, AgentVersion
+    from ..domain.dynamic_schedule_engine import extract_business_schedule_from_version
+    patients_per_slot = 1
+    if tenant_uuid:
+        biz_hours_query = await session.execute(
+            select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+            .where(Agent.tenantId == tenant_uuid)
+            .order_by(AgentVersion.versionNumber.desc())
+            .limit(1)
+        )
+        cfg_json = biz_hours_query.scalar_one_or_none()
+        if cfg_json and isinstance(cfg_json, dict):
+            _, _, p_s = extract_business_schedule_from_version(cfg_json)
+            patients_per_slot = p_s
+
+    effective_capacity = max(1, int(patients_per_slot or 1))
+
     # Filter for doctor if resourceName matches or general
     daily_bookings = []
     for a in db_appts:
@@ -160,41 +187,51 @@ async def get_schedule(
 
     slots = []
     for slot_time in STANDARD_TIME_SLOTS:
-        booking = next((b for b in daily_bookings if normalize_time(b["time"]) == normalize_time(slot_time)), None)
-        if booking:
-            slots.append({
-                "time": slot_time,
-                "status": "BOOKED",
-                "appointmentId": booking["id"],
-                "appointmentNumber": booking["appointmentNumber"],
-                "patientName": booking["patientName"],
-                "patientPhone": booking["patientPhone"],
-                "age": booking.get("age"),
-                "place": booking.get("place"),
-                "reason": booking["reason"],
-                "bookedBy": booking["bookedBy"],
-                "bookedByName": booking["bookedByName"],
-                "walkIn": booking["walkIn"],
-                "bookedAt": booking["bookedAt"],
-            })
-        else:
-            slots.append({
-                "time": slot_time,
-                "status": "AVAILABLE"
-            })
+        matching_bookings = [
+            b for b in daily_bookings
+            if normalize_time(b["time"]) == normalize_time(slot_time)
+        ]
+        booked_count = len(matching_bookings)
+        is_full = booked_count >= effective_capacity
+        slot_status = "BOOKED" if is_full else ("PARTIAL" if booked_count > 0 else "AVAILABLE")
+
+        primary = matching_bookings[0] if matching_bookings else None
+
+        slots.append({
+            "time": slot_time,
+            "status": "BOOKED" if is_full else ("AVAILABLE" if booked_count == 0 else "PARTIAL"),
+            "capacity": effective_capacity,
+            "bookedCount": booked_count,
+            "remainingCapacity": max(0, effective_capacity - booked_count),
+            "isFull": is_full,
+            "appointments": matching_bookings,
+            # Backwards compatibility fields for legacy clients
+            "appointmentId": primary["id"] if primary else None,
+            "appointmentNumber": primary["appointmentNumber"] if primary else None,
+            "patientName": primary["patientName"] if primary else None,
+            "patientPhone": primary["patientPhone"] if primary else None,
+            "age": primary.get("age") if primary else None,
+            "place": primary.get("place") if primary else None,
+            "reason": primary["reason"] if primary else None,
+            "bookedBy": primary["bookedBy"] if primary else None,
+            "bookedByName": primary["bookedByName"] if primary else None,
+            "walkIn": primary["walkIn"] if primary else False,
+            "bookedAt": primary["bookedAt"] if primary else None,
+        })
 
     return {
         "doctor": doc,
         "date": target_date,
+        "capacity": effective_capacity,
         "totalSlots": len(slots),
-        "bookedSlots": sum(1 for s in slots if s["status"] == "BOOKED"),
-        "availableSlots": sum(1 for s in slots if s["status"] == "AVAILABLE"),
+        "bookedSlots": sum(1 for s in slots if s.get("isFull")),
+        "availableSlots": sum(1 for s in slots if not s.get("isFull")),
         "slots": slots,
     }
 
 class BookAppointmentInput(BaseModel):
     patientName: str
-    patientPhone: str
+    patientPhone: Optional[str] = ""
     doctor: Optional[str] = None
     doctorId: Optional[str] = None
     date: str
@@ -206,6 +243,7 @@ class BookAppointmentInput(BaseModel):
     bookedByName: Optional[str] = "Walk-in Desk Receptionist"
     walkIn: Optional[bool] = True
     tenantId: Optional[str] = None
+    patientsPerSlot: Optional[int] = None
 
 @router.post("/book", status_code=status.HTTP_201_CREATED)
 async def book_receptionist_appointment(
@@ -224,30 +262,6 @@ async def book_receptionist_appointment(
     else:
         tenant_uuid = await get_or_create_default_tenant(session)
 
-    # Check conflict in DB
-    existing_res = await session.execute(
-        select(Appointment).where(
-            and_(
-                Appointment.tenantId == tenant_uuid,
-                Appointment.bookingDate == body.date,
-                Appointment.status.in_([
-                    AppointmentStatus.SCHEDULED,
-                    AppointmentStatus.REQUESTED,
-                ])
-            )
-        )
-    )
-    existing_appts = existing_res.scalars().all()
-    collision = next(
-        (a for a in existing_appts if normalize_time(a.bookingTime) == norm_time),
-        None
-    )
-    if collision:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Slot {norm_time} on {body.date} is already booked by {collision.customerName} ({collision.appointmentNumber or 'APT'})."
-        )
-
     try:
         crm = CRMService(session)
         appt = await crm.create_appointment(
@@ -264,11 +278,18 @@ async def book_receptionist_appointment(
             place=body.place,
             walk_in=body.walkIn if body.walkIn is not None else True,
             notes=body.reason,
+            patients_per_slot=body.patientsPerSlot,
         )
     except ValueError as e:
+        err_msg = str(e)
+        if "capacity" in err_msg.lower() or "already booked" in err_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=err_msg
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=err_msg
         )
 
     return {

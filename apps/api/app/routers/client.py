@@ -255,7 +255,7 @@ async def create_client_appointment(
     service = CRMService(session)
 
     customer_name = body.get("customerName") or body.get("patientName")
-    customer_phone = body.get("customerPhone") or body.get("phone") or body.get("callerPhoneNumber")
+    customer_phone = str(body.get("customerPhone") or body.get("phone") or body.get("callerPhoneNumber") or "").strip()
     booking_date = body.get("bookingDate") or body.get("appointmentDate") or body.get("date")
     booking_time = body.get("bookingTime") or body.get("appointmentTime") or body.get("time")
     title = body.get("title") or body.get("serviceType") or body.get("reason") or "Consultation"
@@ -267,10 +267,10 @@ async def create_client_appointment(
     walk_in = body.get("walkIn", True if booked_by == "RECEPTIONIST" else False)
     notes = body.get("notes") or body.get("reason")
 
-    if not customer_name or not customer_phone or not booking_date or not booking_time:
+    if not customer_name or not booking_date or not booking_time:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="customerName, customerPhone, bookingDate, and bookingTime are required."
+            detail="customerName, bookingDate, and bookingTime are required."
         )
 
     try:

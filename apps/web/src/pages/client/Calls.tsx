@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../../services/api';
 import type { CallSession } from '../../types';
 import { TableSkeleton } from '../../components/client/LoadingSkeleton';
@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/client/EmptyState';
 import { CallDetailsDrawer } from '../../components/client/CallDetailsDrawer';
 import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
 import { formatDateTimeDDMMYYYY } from '@/utils/dateFormatters';
+import { areEntitiesEqual } from '../../utils/fastDiff';
 
 export function ClientCalls() {
   const [calls, setCalls] = useState<CallSession[]>([]);
@@ -23,33 +24,36 @@ export function ClientCalls() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [whatsAppTargetCall, setWhatsAppTargetCall] = useState<CallSession | null>(null);
 
-  const loadCalls = useCallback(async () => {
-    setLoading(true);
+  const loadCalls = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.getClientCalls({
         limit,
         offset: page * limit,
         status: statusFilter !== 'ALL' ? statusFilter : undefined,
       });
-      setCalls(res.calls || []);
-      setTotal(res.total || 0);
+      const incoming = res.calls || [];
+      const incomingTotal = res.total || 0;
+      setCalls((prev) => areEntitiesEqual(prev, incoming) ? prev : incoming);
+      setTotal((prev) => prev !== incomingTotal ? incomingTotal : prev);
     } catch (err) {
       console.error('Failed to load call sessions:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, limit]);
 
   useEffect(() => {
     loadCalls();
 
-    const handleRefresh = () => loadCalls();
+    const handleRefresh = () => loadCalls(false);
+    const handleRefreshSilent = () => loadCalls(true);
     window.addEventListener('crm-refresh', handleRefresh);
-    window.addEventListener('crm-refresh-silent', handleRefresh);
+    window.addEventListener('crm-refresh-silent', handleRefreshSilent);
 
     return () => {
       window.removeEventListener('crm-refresh', handleRefresh);
-      window.removeEventListener('crm-refresh-silent', handleRefresh);
+      window.removeEventListener('crm-refresh-silent', handleRefreshSilent);
     };
   }, [loadCalls]);
 
@@ -70,17 +74,19 @@ export function ClientCalls() {
     setComposerOpen(true);
   };
 
-  const filteredCalls = calls.filter((c) => {
-    if (directionFilter !== 'ALL' && c.direction !== directionFilter) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const phoneMatch = c.callerNumber?.toLowerCase().includes(q);
-      const agentMatch = c.agent?.name.toLowerCase().includes(q);
-      const idMatch = c.id.toLowerCase().includes(q);
-      return phoneMatch || agentMatch || idMatch;
-    }
-    return true;
-  });
+  const filteredCalls = useMemo(() => {
+    return calls.filter((c) => {
+      if (directionFilter !== 'ALL' && c.direction !== directionFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const phoneMatch = c.callerNumber?.toLowerCase().includes(q);
+        const agentMatch = c.agent?.name.toLowerCase().includes(q);
+        const idMatch = c.id.toLowerCase().includes(q);
+        return phoneMatch || agentMatch || idMatch;
+      }
+      return true;
+    });
+  }, [calls, directionFilter, searchQuery]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

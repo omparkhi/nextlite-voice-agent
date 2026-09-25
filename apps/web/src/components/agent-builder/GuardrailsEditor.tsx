@@ -148,6 +148,64 @@ export function GuardrailsEditor({ guardrails = {}, onChange }: GuardrailsEditor
         </div>
       </div>
 
+      {/* Emergency Escalation & Live Transfer */}
+      <div className="bg-white rounded-2xl border border-rose-200/80 shadow-2xs p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-rose-100 pb-3">
+          <div>
+            <h4 className="font-semibold text-gray-900 text-sm flex items-center gap-2">
+              <span>🚨</span>
+              <span>Emergency Call Escalation &amp; Live Transfer</span>
+            </h4>
+            <p className="text-[11px] text-gray-500 mt-0.5">
+              Automatically transfer calls to the doctor when genuine acute emergencies (bleeding, trauma, severe pain) are verified.
+            </p>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-[11px] font-medium text-gray-700">Live Transfer Enabled</span>
+            <input
+              type="checkbox"
+              checked={guardrails.emergencyTransferEnabled ?? true}
+              onChange={(e) => onChange({ ...guardrails, emergencyTransferEnabled: e.target.checked })}
+              className="w-4 h-4 rounded text-black focus:ring-black accent-black cursor-pointer"
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-gray-700 mb-1 font-semibold">
+              Emergency Phone Number <span className="text-rose-600">*</span>
+            </label>
+            <input
+              type="tel"
+              value={guardrails.emergencyPhone || ''}
+              onChange={(e) => onChange({ ...guardrails, emergencyPhone: e.target.value })}
+              placeholder="e.g. +91 98765 43210 (Doctor Direct Mobile)"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400 focus:bg-white text-xs font-mono"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">
+              The phone number the AI will bridge/transfer to when an emergency is detected.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-gray-700 mb-1 font-semibold">
+              On-Duty Doctor / Provider Name
+            </label>
+            <input
+              type="text"
+              value={guardrails.doctorName || ''}
+              onChange={(e) => onChange({ ...guardrails, doctorName: e.target.value })}
+              placeholder="e.g. Dr. Patil"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 focus:outline-none focus:border-gray-400 focus:bg-white text-xs"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">
+              Referred to by the AI assistant when reassuring the patient.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Fallback Behavior */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs p-5 space-y-2">
         <label className="block font-semibold text-gray-900 text-sm">Fallback Behavior</label>

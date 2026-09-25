@@ -428,7 +428,7 @@ async def test_book_appointment_success():
             arguments={
                 "customerName": "Pooja Patel",
                 "title": "General Consultation",
-                "bookingDate": "2026-09-20",
+                "bookingDate": "2026-11-20",
                 "bookingTime": "14:30",
                 "resourceName": "Dr. Rao",
             },
@@ -486,7 +486,7 @@ async def test_book_appointment_direct_response_skips_post_tool_llm():
             arguments={
                 "customerName": "Pooja Patel",
                 "title": "General Consultation",
-                "bookingDate": "2026-09-20",
+                "bookingDate": "2026-11-20",
                 "bookingTime": "14:30",
             },
             function_name="book_appointment",
@@ -538,7 +538,7 @@ async def test_book_appointment_api_failure():
             arguments={
                 "customerName": "Pooja Patel",
                 "title": "Consultation",
-                "bookingDate": "2026-09-20",
+                "bookingDate": "2026-11-20",
                 "bookingTime": "14:30",
             },
             function_name="book_appointment",
@@ -588,7 +588,7 @@ async def test_book_appointment_requested_semantics_not_confirmed():
                 arguments={
                     "customerName": "User",
                     "title": "Visit",
-                    "bookingDate": "2026-09-20",
+                    "bookingDate": "2026-11-20",
                     "bookingTime": "10:00 AM",
                 },
                 function_name="book_appointment",

@@ -457,6 +457,33 @@ async def plivo_inbound_xml(
     return PlainResponse(content=xml_content, media_type="application/xml")
 
 
+@app.api_route("/api/v1/telephony/plivo/transfer-xml", methods=["GET", "POST"])
+@app.api_route("/plivo/transfer-xml", methods=["GET", "POST"])
+@app.api_route("/telephony/plivo/transfer-xml", methods=["GET", "POST"])
+async def plivo_transfer_xml(
+    request: Request,
+    to: Optional[str] = Query(default=None),
+):
+    """Generates Plivo XML to dial/bridge caller to doctor's emergency number."""
+    dest_phone = to
+    if not dest_phone:
+        params = dict(request.query_params)
+        dest_phone = params.get("to") or params.get("To") or "+919800000000"
+    
+    import re
+    raw_cid = getattr(settings, "PLIVO_CALLER_ID", None) or getattr(settings, "PLIVO_PHONE_NUMBER", None) or ""
+    clean_cid = re.sub(r"[^\d+]", "", str(raw_cid).strip()) if raw_cid else ""
+    caller_id_attr = f' callerId="{clean_cid}"' if clean_cid else ""
+    xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Dial timeout="35"{caller_id_attr}>
+        <Number>{dest_phone}</Number>
+    </Dial>
+</Response>"""
+    logger.info(f"[Plivo XML] Generated live call transfer XML to {dest_phone} (callerId='{clean_cid}')")
+    return PlainResponse(content=xml_content, media_type="application/xml")
+
+
 class DeterministicTestEchoProcessor(FrameProcessor):
     """Deterministic frame processor for unit testing echo behavior."""
 
@@ -2121,7 +2148,17 @@ async def websocket_plivo_endpoint(
             startup_tracker.record_stage("start_frame_received", first_msg_received_time)
             start_payload = initial_msg_obj.get("start", {})
             stream_id = start_payload.get("streamId")
-            call_id = start_payload.get("callId", "")
+            call_id = (
+                start_payload.get("callId")
+                or start_payload.get("callUUID")
+                or start_payload.get("CallUUID")
+                or websocket.query_params.get("call_uuid")
+                or websocket.query_params.get("CallUUID")
+                or websocket.query_params.get("callId")
+                or websocket.query_params.get("aleg_uuid")
+                or websocket.query_params.get("ALegUUID")
+                or ""
+            )
             media_format = start_payload.get("mediaFormat", {})
             logger.info(
                 f"Plivo stream started | stream_id={stream_id} | call_id={call_id} | mediaFormat={media_format}"
@@ -2136,14 +2173,34 @@ async def websocket_plivo_endpoint(
                 startup_tracker.record_stage("start_frame_received", second_msg_received_time)
                 start_payload = initial_msg_obj.get("start", {})
                 stream_id = start_payload.get("streamId")
-                call_id = start_payload.get("callId", "")
+                call_id = (
+                    start_payload.get("callId")
+                    or start_payload.get("callUUID")
+                    or start_payload.get("CallUUID")
+                    or websocket.query_params.get("call_uuid")
+                    or websocket.query_params.get("CallUUID")
+                    or websocket.query_params.get("callId")
+                    or websocket.query_params.get("aleg_uuid")
+                    or websocket.query_params.get("ALegUUID")
+                    or ""
+                )
                 media_format = start_payload.get("mediaFormat", {})
                 logger.info(f"Plivo stream started | stream_id={stream_id} | call_id={call_id} | mediaFormat={media_format}")
         else:
             startup_tracker.record_stage("plivo_start_received", first_msg_received_time)
             startup_tracker.record_stage("start_frame_received", first_msg_received_time)
             stream_id = initial_msg_obj.get("streamId", "unknown_stream")
-            call_id = initial_msg_obj.get("callId", "")
+            call_id = (
+                initial_msg_obj.get("callId")
+                or initial_msg_obj.get("callUUID")
+                or initial_msg_obj.get("CallUUID")
+                or websocket.query_params.get("call_uuid")
+                or websocket.query_params.get("CallUUID")
+                or websocket.query_params.get("callId")
+                or websocket.query_params.get("aleg_uuid")
+                or websocket.query_params.get("ALegUUID")
+                or ""
+            )
             media_format = initial_msg_obj.get("mediaFormat", {})
             logger.warning(f"Unusual initial event: {event_type}, using stream_id={stream_id}")
 
@@ -2460,8 +2517,17 @@ async def websocket_plivo_endpoint(
         )
         runner_ref: Dict[str, Any] = {"runner": None}
         serializer_holder: List[Any] = [None]
+        is_transfer_pending = [False]
+        is_end_call_pending = [False]
+        last_assistant_speech_end = [time.perf_counter()]
 
         async def _on_plivo_terminal_hangup():
+            # If a transfer is pending or active, DO NOT drop the call via REST DELETE
+            # Plivo needs the call alive to bridge the caller to the doctor's phone.
+            if is_transfer_pending[0]:
+                logger.info(f"[Plivo Hangup] Transfer is active for call_id={call_id} — skipping REST DELETE hangup to preserve live telecom bridge")
+                return
+
             # Allow final synthesized audio chunks to finish playing out through Plivo RTP buffer
             ser = serializer_holder[0]
             if ser:
@@ -2479,7 +2545,7 @@ async def websocket_plivo_endpoint(
             is_call_terminating = True
 
             # If Plivo REST API credentials and call_id are present, send REST hangup for telecom line drop
-            if settings.PLIVO_AUTH_ID and settings.PLIVO_AUTH_TOKEN and call_id:
+            if settings.PLIVO_AUTH_ID and settings.PLIVO_AUTH_TOKEN and call_id and not is_transfer_pending[0]:
                 try:
                     import base64
                     endpoint = f"https://api.plivo.com/v1/Account/{settings.PLIVO_AUTH_ID}/Call/{call_id}/"
@@ -2690,13 +2756,113 @@ async def websocket_plivo_endpoint(
             or var_map.get("appointmentduration")
             or None
         )
+        raw_cap = (
+            var_map.get("patientsPerSlot")
+            or var_map.get("patientsperslot")
+            or var_map.get("slotCapacity")
+            or var_map.get("maxPatientsPerSlot")
+            or var_map.get("capacity")
+            or None
+        )
+        from app.dynamic_schedule_engine import parse_patients_per_slot
+        patients_per_slot_val = parse_patients_per_slot(raw_cap, default_capacity=1)
 
-        is_end_call_pending = [False]
-        last_assistant_speech_end = [time.perf_counter()]
-
-        async def _on_trigger_end_call(reason: Optional[str] = None):
+        def _on_trigger_end_call(reason: Optional[str] = None):
+            if is_transfer_pending[0]:
+                logger.info(f"[EndCall] Ignored end_call because call transfer is already active (reason={reason or 'none'})")
+                return
             logger.info(f"[EndCall] Tool triggered: marking call as pending termination (reason={reason or 'none'})")
             is_end_call_pending[0] = True
+
+        async def _execute_plivo_transfer(dest_num: str, wait_delay: float):
+            if wait_delay > 0:
+                logger.info(f"[EmergencyTransfer] Waiting {wait_delay:.2f}s for reassuring speech to play before PSTN bridge cutover")
+                await asyncio.sleep(wait_delay)
+            if settings.PLIVO_AUTH_ID and settings.PLIVO_AUTH_TOKEN and call_id:
+                try:
+                    import base64
+                    import urllib.parse
+                    transfer_endpoint = f"https://api.plivo.com/v1/Account/{settings.PLIVO_AUTH_ID}/Call/{call_id}/"
+                    
+                    ws_host = websocket.headers.get("host") or websocket.headers.get("x-forwarded-host") or getattr(settings, "PUBLIC_HOST", "dandelion-gigantic-challenge.ngrok-free.dev")
+                    if "localhost" in ws_host or "127.0.0.1" in ws_host:
+                        ws_host = getattr(settings, "PUBLIC_HOST", "dandelion-gigantic-challenge.ngrok-free.dev")
+                    scheme = "https" if websocket.headers.get("x-forwarded-proto") == "https" or "wss" in str(websocket.url) or "https" in str(websocket.url) or getattr(settings, "PUBLIC_URL", "").startswith("https") else "http"
+                    
+                    base_url = getattr(settings, "PUBLIC_URL", None) or f"{scheme}://{ws_host}"
+                    base_url = base_url.rstrip("/")
+                    transfer_xml_url = f"{base_url}/plivo/transfer-xml?to={urllib.parse.quote_plus(dest_num)}"
+                    auth_bytes = f"{settings.PLIVO_AUTH_ID}:{settings.PLIVO_AUTH_TOKEN}".encode("utf-8")
+                    auth_header = f"Basic {base64.b64encode(auth_bytes).decode('utf-8')}"
+                    payload = {
+                        "aleg_url": transfer_xml_url,
+                        "aleg_method": "GET",
+                    }
+                    logger.info(f"[EmergencyTransfer] Initiating Plivo REST API transfer to endpoint={transfer_endpoint} with aleg_url={transfer_xml_url}")
+                    async with httpx.AsyncClient(timeout=8.0) as plivo_client:
+                        resp = await plivo_client.post(
+                            transfer_endpoint,
+                            json=payload,
+                            headers={
+                                "Authorization": auth_header,
+                                "Content-Type": "application/json",
+                                "Accept": "application/json",
+                            }
+                        )
+                        logger.info(f"[EmergencyTransfer] Plivo REST transfer result: status={resp.status_code} text={resp.text}")
+                except Exception as transfer_err:
+                    logger.error(f"[EmergencyTransfer] Plivo REST transfer error: {transfer_err}")
+
+                # After transfer is accepted by Plivo, pause briefly to drain audio buffer then close the WebSocket
+                # so Plivo immediately hands the active telecom call leg over to the Dial XML without stream lock
+                await asyncio.sleep(0.8)
+                logger.info(f"[EmergencyTransfer] Releasing WebSocket stream to Plivo Dial verb for stream_id={stream_id}")
+                r = runner_ref.get("runner")
+                if r:
+                    try:
+                        await r.cancel()
+                    except Exception:
+                        pass
+                try:
+                    if not websocket.client_state.name == "DISCONNECTED":
+                        await websocket.close()
+                except Exception:
+                    pass
+
+        async def _on_trigger_transfer_call(reason: Optional[str] = None, patient_name: Optional[str] = None, severity: Optional[str] = None, target_phone: Optional[str] = None):
+            is_transfer_pending[0] = True
+            is_end_call_pending[0] = False
+            dest_phone = target_phone
+            if not dest_phone and runtime_config:
+                prompt_cfg = getattr(runtime_config, "prompt", None)
+                if prompt_cfg:
+                    dest_phone = getattr(prompt_cfg, "emergency_phone", None)
+                    if not dest_phone:
+                        guard = getattr(prompt_cfg, "guardrails", None) or {}
+                        if isinstance(guard, dict):
+                            dest_phone = guard.get("emergencyPhone") or guard.get("emergency_phone")
+                biz = getattr(runtime_config, "business", None)
+                if not dest_phone and biz:
+                    dest_phone = getattr(biz, "phone", None)
+            if not dest_phone:
+                dest_phone = "+919800000000"
+
+            logger.warning(
+                f"[EmergencyTransfer] Live Plivo Call Transfer triggered | call_id={call_id} | "
+                f"to={dest_phone} | patient='{patient_name}' | severity='{severity}' | reason='{reason}'"
+            )
+
+            # Wait for reassuring speech chunks to finish outputting to caller
+            ser = serializer_holder[0]
+            wait_delay = 2.2
+            if ser:
+                now_mono = time.perf_counter()
+                est_end = getattr(ser, "estimated_outbound_speech_end", now_mono)
+                remaining = est_end - now_mono
+                if remaining > 0:
+                    wait_delay = min(remaining + 0.4, 5.0)
+            
+            asyncio.create_task(_execute_plivo_transfer(dest_phone, wait_delay))
 
         def _on_assistant_speech_stopped():
             last_assistant_speech_end[0] = time.perf_counter()
@@ -2712,10 +2878,12 @@ async def websocket_plivo_endpoint(
             timezone=tz_name,
             business_hours=biz_hours_val,
             slot_duration=slot_duration_val,
+            patients_per_slot=patients_per_slot_val,
             transcript_collector=transcript_collector,
             timing_tracker=turn_tracker,
             _call_session_task=call_session_task,
             trigger_end_call=_on_trigger_end_call,
+            trigger_transfer_call=_on_trigger_transfer_call,
         )
         resolved_tools = tool_registry.resolve_tools(
             runtime_config=runtime_config,
@@ -2723,7 +2891,7 @@ async def websocket_plivo_endpoint(
             http_client=shared_http_client,
         )
 
-        # Telephony Platform Safety: Ensure end_call tool is always registered for live calls
+        # Telephony Platform Safety: Ensure end_call and transfer_call tools are registered for live calls
         if runtime_config and runtime_config.tools and runtime_config.tools.enabled:
             if not any(t.name == "end_call" for t in resolved_tools):
                 end_call_factory = tool_registry.get("end_call")
@@ -2743,6 +2911,25 @@ async def websocket_plivo_endpoint(
                         resolved_tools.append(inst_schema)
                     except Exception as e:
                         logger.debug(f"[ToolRegistry] Error adding fallback end_call: {e}")
+
+            if not any(t.name in ("transfer_call", "transfer_emergency_call") for t in resolved_tools):
+                emergency_factory = tool_registry.get("transfer_call")
+                if emergency_factory:
+                    try:
+                        raw_schema = emergency_factory.create(
+                            context=tool_context,
+                            tool_config=None,
+                            runtime_config=runtime_config,
+                            http_client=shared_http_client,
+                        )
+                        inst_schema = tool_registry._instrument_function_schema(
+                            raw_schema=raw_schema,
+                            llm_name="transfer_call",
+                            context=tool_context,
+                        )
+                        resolved_tools.append(inst_schema)
+                    except Exception as e:
+                        logger.debug(f"[ToolRegistry] Error adding fallback transfer_call: {e}")
 
         startup_tracker.record_stage("tool_registry_resolved")
         if resolved_tools:

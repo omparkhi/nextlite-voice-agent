@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from ..logging import logger
@@ -253,17 +253,20 @@ async def create_internal_appointment(
     authenticated: bool = Depends(require_worker),
     session: AsyncSession = Depends(get_db)
 ):
-    dep_id_str = payload.get("deploymentId")
-    tenant_id_str = payload.get("tenantId")
-    agent_id_str = payload.get("agentId")
+    dep_id_str = payload.get("deploymentId") or payload.get("deployment_id")
+    tenant_id_str = payload.get("tenantId") or payload.get("tenant_id")
+    agent_id_str = payload.get("agentId") or payload.get("agent_id")
+
+    effective_tenant_id: Optional[uuid.UUID] = None
+    effective_agent_id: Optional[uuid.UUID] = None
 
     if tenant_id_str:
-        effective_tenant_id = uuid.UUID(tenant_id_str)
+        effective_tenant_id = uuid.UUID(str(tenant_id_str))
     if agent_id_str:
-        effective_agent_id = uuid.UUID(agent_id_str)
+        effective_agent_id = uuid.UUID(str(agent_id_str))
 
     if (not effective_tenant_id or not effective_agent_id) and dep_id_str:
-        dep_res = await session.execute(select(Deployment).where(Deployment.id == uuid.UUID(dep_id_str)))
+        dep_res = await session.execute(select(Deployment).where(Deployment.id == uuid.UUID(str(dep_id_str))))
         dep = dep_res.scalar_one_or_none()
         if dep:
             if not effective_tenant_id:
@@ -274,17 +277,17 @@ async def create_internal_appointment(
     if not effective_tenant_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not determine tenantId for appointment")
 
-    customer_name = payload.get("customerName") or payload.get("name")
+    customer_name = payload.get("customerName") or payload.get("customer_name") or payload.get("name")
     if not customer_name:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="customerName is required")
 
-    raw_service = payload.get("title") or payload.get("serviceType") or payload.get("service")
+    raw_service = payload.get("title") or payload.get("serviceType") or payload.get("service_type") or payload.get("service")
     service_type = sanitize_service_title(raw_service)
-    apt_date = payload.get("bookingDate") or payload.get("appointmentDate") or payload.get("date") or "Tomorrow"
-    raw_time = payload.get("bookingTime") or payload.get("appointmentTime") or payload.get("time") or "10:00 AM"
+    apt_date = payload.get("bookingDate") or payload.get("booking_date") or payload.get("appointmentDate") or payload.get("date") or "Tomorrow"
+    raw_time = payload.get("bookingTime") or payload.get("booking_time") or payload.get("appointmentTime") or payload.get("time") or "10:00 AM"
     apt_time = normalize_indic_time(raw_time)
-    phone = payload.get("customerPhone") or payload.get("phone")
-    call_session_id = uuid.UUID(payload["callSessionId"]) if payload.get("callSessionId") else None
+    phone = payload.get("customerPhone") or payload.get("customer_phone") or payload.get("phone")
+    call_session_id = uuid.UUID(str(payload["callSessionId"])) if payload.get("callSessionId") else (uuid.UUID(str(payload["call_session_id"])) if payload.get("call_session_id") else None)
 
     # Temporal validation: Reject slots in the past
     if is_past_slot(apt_date, apt_time, time_zone="Asia/Kolkata", buffer_minutes=0):
@@ -304,7 +307,7 @@ async def create_internal_appointment(
         )
         cfg_json = biz_hours_query.scalar_one_or_none()
         if cfg_json and isinstance(cfg_json, dict):
-            b_h, _ = extract_business_schedule_from_version(cfg_json)
+            b_h, _, _ = extract_business_schedule_from_version(cfg_json)
             business_hours = b_h
 
     if business_hours and not is_time_within_shifts(apt_time, business_hours):
@@ -389,8 +392,43 @@ async def create_internal_appointment(
             return ""
         return normalize_indic_time(t).strip().upper()
 
-    # Slot Conflict Check: Prevent duplicate bookings for the same date and time
     norm_target_time = _norm_time(apt_time)
+
+    # Resolve dynamic capacity for tenant
+    patients_per_slot = payload.get("patientsPerSlot") or payload.get("patients_per_slot") or payload.get("slotCapacity")
+    if patients_per_slot is None and effective_tenant_id:
+        biz_hours_query = await session.execute(
+            select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+            .where(Agent.tenantId == effective_tenant_id)
+            .order_by(AgentVersion.versionNumber.desc())
+            .limit(1)
+        )
+        cfg_json = biz_hours_query.scalar_one_or_none()
+        if cfg_json and isinstance(cfg_json, dict):
+            _, _, p_s = extract_business_schedule_from_version(cfg_json)
+            patients_per_slot = p_s
+
+    effective_capacity = max(1, int(patients_per_slot or 1))
+
+    # =========================================================================
+    # ATOMIC CONCURRENCY GUARANTEE: PostgreSQL Transaction-Scoped Advisory Lock
+    # Locks strictly the deterministic tuple (tenant_id, booking_date, normalized_slot)
+    # Guarantees serialization even when ZERO rows exist for the slot.
+    # =========================================================================
+    try:
+        tenant_key_str = str(effective_tenant_id)
+        slot_key_str = f"{apt_date}:{norm_target_time}"
+        from sqlalchemy import func
+        await session.execute(
+            select(func.pg_advisory_xact_lock(
+                func.hashtext(tenant_key_str),
+                func.hashtext(slot_key_str)
+            ))
+        )
+    except Exception as lock_err:
+        logger.debug(f"[InternalAPI] Advisory lock notice: {lock_err}")
+
+    # Slot Capacity Check inside the transaction lock
     existing_slot_res = await session.execute(
         select(Appointment).where(
             Appointment.tenantId == effective_tenant_id,
@@ -401,12 +439,17 @@ async def create_internal_appointment(
             ])
         )
     )
-    for existing in existing_slot_res.scalars().all():
-        if _norm_time(existing.bookingTime) == norm_target_time:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Slot {apt_time} on {apt_date} is already booked for patient '{existing.customerName}' ({existing.appointmentNumber})."
-            )
+    matching_appts = [
+        existing for existing in existing_slot_res.scalars().all()
+        if _norm_time(existing.bookingTime) == norm_target_time
+    ]
+
+    if len(matching_appts) >= effective_capacity:
+        patient_list_str = ", ".join([f"'{a.customerName}' ({a.appointmentNumber})" for a in matching_appts])
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Slot {apt_time} on {apt_date} has reached full capacity ({len(matching_appts)}/{effective_capacity} patients: {patient_list_str})."
+        )
 
     apt_repo = AppointmentRepository(session)
     apt_number = await apt_repo.get_next_appointment_number(effective_tenant_id)
@@ -455,24 +498,29 @@ async def create_internal_appointment(
 
 @router.get("/appointments/check-slots")
 async def check_internal_appointment_slots(
-    deployment_id: Optional[str] = Query(None, alias="deploymentId"),
-    tenant_id: Optional[str] = Query(None, alias="tenantId"),
-    booking_date: str = Query(..., alias="bookingDate"),
-    phone: Optional[str] = Query(None),
-    preferred_time: Optional[str] = Query(None, alias="preferredTime"),
-    business_hours: Optional[str] = Query(None, alias="businessHours"),
-    slot_duration: Optional[str] = Query(None, alias="slotDuration"),
+    request: Request,
     authenticated: bool = Depends(require_worker),
     session: AsyncSession = Depends(get_db)
 ):
+    params = dict(request.query_params)
+    effective_dep_id = params.get("deploymentId") or params.get("deployment_id")
+    effective_tenant_id_str = params.get("tenantId") or params.get("tenant_id")
+    effective_booking_date = params.get("bookingDate") or params.get("booking_date") or params.get("date") or "Tomorrow"
+    effective_phone = params.get("phone") or params.get("customerPhone") or params.get("customer_phone")
+    effective_pref_time = params.get("preferredTime") or params.get("preferred_time") or params.get("time")
+    effective_biz_hours = params.get("businessHours") or params.get("business_hours")
+    effective_slot_dur = params.get("slotDuration") or params.get("slot_duration")
+    raw_pps = params.get("patientsPerSlot") or params.get("patients_per_slot") or params.get("slotCapacity")
+    effective_patients_per_slot = int(raw_pps) if raw_pps is not None and str(raw_pps).strip() else None
+
     effective_tenant_id = None
-    if deployment_id:
-        dep_res = await session.execute(select(Deployment).where(Deployment.id == uuid.UUID(deployment_id)))
+    if effective_dep_id:
+        dep_res = await session.execute(select(Deployment).where(Deployment.id == uuid.UUID(str(effective_dep_id))))
         dep = dep_res.scalar_one_or_none()
         if dep:
             effective_tenant_id = dep.tenantId
-    elif tenant_id:
-        effective_tenant_id = uuid.UUID(tenant_id)
+    elif effective_tenant_id_str:
+        effective_tenant_id = uuid.UUID(str(effective_tenant_id_str))
 
     if not effective_tenant_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="deploymentId or tenantId required")
@@ -480,11 +528,12 @@ async def check_internal_appointment_slots(
     crm_service = CRMService(session)
     return await crm_service.check_slots(
         tenant_id=effective_tenant_id,
-        booking_date=booking_date,
-        phone=phone,
-        preferred_time=preferred_time,
-        business_hours=business_hours,
-        slot_duration=slot_duration,
+        booking_date=effective_booking_date,
+        phone=effective_phone,
+        preferred_time=effective_pref_time,
+        business_hours=effective_biz_hours,
+        slot_duration=effective_slot_dur,
+        patients_per_slot=effective_patients_per_slot,
     )
 
 

@@ -5,8 +5,9 @@ import { api } from '../../services/api';
 import type { Appointment } from '../../types';
 
 import { TimeSlotInput } from '../../components/client/TimeSlotInput';
-import { generateTimeSlots, getNearestUpcomingSlot } from '../../utils/timeSlots';
+import { generateTimeSlots, getNearestUpcomingSlot, normalizeTimeString } from '../../utils/timeSlots';
 import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
+import { areEntitiesEqual } from '../../utils/fastDiff';
 
 function formatSlugToName(slug?: string): string {
   if (!slug) return 'Clinic';
@@ -33,7 +34,6 @@ export function ReceptionistDashboard() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
-  const [syncing, setSyncing] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date>(new Date());
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -41,6 +41,7 @@ export function ReceptionistDashboard() {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
+  const [viewMode, setViewMode] = useState<'TABLE' | 'SLOTS'>('TABLE');
 
   // Fast Row-Entry Form State (auto-defaults to nearest upcoming slot)
   const [slotTime, setSlotTime] = useState<string>(() => getNearestUpcomingSlot(generateTimeSlots()));
@@ -51,6 +52,33 @@ export function ReceptionistDashboard() {
   const [addingRow, setAddingRow] = useState<boolean>(false);
 
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Dynamic slot capacity resolution (default 1, dynamically updated from backend clinic configuration)
+  const [dynamicCapacity, setDynamicCapacity] = useState<number>(() => (user as any)?.patientsPerSlot || 1);
+  const defaultCapacity = dynamicCapacity || (user as any)?.patientsPerSlot || 1;
+
+  // Compute slot occupancy and active appointments per slot
+  const slotOccupancy = React.useMemo(() => {
+    const counts: Record<string, { booked: number; capacity: number; appts: Appointment[] }> = {};
+    const activeAppts = appointments.filter(a => a.status !== 'CANCELLED');
+    
+    for (const appt of activeAppts) {
+      const norm = normalizeTimeString(appt.bookingTime) || appt.bookingTime;
+      if (!counts[norm]) {
+        counts[norm] = { booked: 0, capacity: defaultCapacity, appts: [] };
+      }
+      counts[norm].booked += 1;
+      counts[norm].appts.push(appt);
+      if (counts[norm].booked > counts[norm].capacity) {
+        counts[norm].capacity = counts[norm].booked;
+      }
+    }
+    return counts;
+  }, [appointments, defaultCapacity]);
+
+  const normSlotTime = normalizeTimeString(slotTime) || slotTime;
+  const currentSlotOcc = slotOccupancy[normSlotTime] || { booked: 0, capacity: defaultCapacity, appts: [] };
+  const isSelectedSlotFull = currentSlotOcc.booked >= currentSlotOcc.capacity && currentSlotOcc.capacity > 0 && currentSlotOcc.booked > 0;
 
   // Resolve Clinic Display Name
   const clinicDisplayName =
@@ -64,7 +92,6 @@ export function ReceptionistDashboard() {
   // Load appointments for selected date
   const loadAppointments = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    else setSyncing(true);
     setErrorMsg(null);
 
     try {
@@ -73,15 +100,20 @@ export function ReceptionistDashboard() {
         limit: 100,
         tenantId: user?.tenantId,
       });
-      setAppointments(res.appointments || []);
+      const incoming = res.appointments || [];
+      setAppointments((prev) => (areEntitiesEqual(prev, incoming) ? prev : incoming));
+
+      if (res.patientsPerSlot || res.capacity) {
+        const newCap = res.patientsPerSlot || res.capacity || 1;
+        setDynamicCapacity((prev) => (prev === newCap ? prev : newCap));
+      }
       setLastSyncTime(new Date());
     } catch (err: any) {
       if (!silent) {
         setErrorMsg(err?.message || 'Unable to connect to clinic schedule.');
       }
     } finally {
-      setLoading(false);
-      setSyncing(false);
+      if (!silent) setLoading(false);
     }
   }, [selectedDate, user?.tenantId]);
 
@@ -90,11 +122,13 @@ export function ReceptionistDashboard() {
     loadAppointments();
   }, [loadAppointments]);
 
-  // Real-time polling every 4 seconds to sync with phone bookings
+  // Real-time background sync polling every 5 seconds (silent diffing prevents flickering)
   useEffect(() => {
     const timer = setInterval(() => {
-      loadAppointments(true);
-    }, 4000);
+      if (document.visibilityState === 'visible') {
+        loadAppointments(true);
+      }
+    }, 5000);
     return () => clearInterval(timer);
   }, [loadAppointments]);
 
@@ -107,7 +141,7 @@ export function ReceptionistDashboard() {
       return;
     }
 
-    const cleanPhone = phone.trim() ? phone.trim() : '+91 98000 00000';
+    const cleanPhone = phone.trim() ? phone.trim() : '';
 
     setAddingRow(true);
     setErrorMsg(null);
@@ -127,6 +161,7 @@ export function ReceptionistDashboard() {
         bookedByName: bookedByName,
         age: age.trim() || undefined,
         walkIn: true,
+        patientsPerSlot: defaultCapacity,
       });
 
       if (res) {
@@ -156,28 +191,34 @@ export function ReceptionistDashboard() {
     }
   };
 
-  // Filtered Appointments
-  const filteredAppointments = appointments.filter((appt) => {
-    if (sourceFilter === 'AI' && appt.bookedBy !== 'AGENT') return false;
-    if (sourceFilter === 'DESK' && appt.bookedBy !== 'RECEPTIONIST' && appt.bookedBy !== 'MANUAL_CLIENT') return false;
-    if (sourceFilter === 'WHATSAPP' && appt.bookedBy !== 'WHATSAPP') return false;
+  // Filtered Appointments (Memoized to avoid layout shifts)
+  const filteredAppointments = React.useMemo(() => {
+    return appointments.filter((appt) => {
+      if (sourceFilter === 'AI' && appt.bookedBy !== 'AGENT') return false;
+      if (sourceFilter === 'DESK' && appt.bookedBy !== 'RECEPTIONIST' && appt.bookedBy !== 'MANUAL_CLIENT') return false;
+      if (sourceFilter === 'WHATSAPP' && appt.bookedBy !== 'WHATSAPP') return false;
 
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      appt.customerName?.toLowerCase().includes(q) ||
-      appt.customerPhone?.toLowerCase().includes(q) ||
-      appt.appointmentNumber?.toLowerCase().includes(q) ||
-      (appt.title && appt.title.toLowerCase().includes(q))
-    );
-  });
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        appt.customerName?.toLowerCase().includes(q) ||
+        appt.customerPhone?.toLowerCase().includes(q) ||
+        appt.appointmentNumber?.toLowerCase().includes(q) ||
+        (appt.title && appt.title.toLowerCase().includes(q))
+      );
+    });
+  }, [appointments, sourceFilter, searchQuery]);
 
-  // Calculate Metrics
-  const totalCount = appointments.length;
-  const aiCount = appointments.filter((a) => a.bookedBy === 'AGENT').length;
-  const deskCount = appointments.filter((a) => a.bookedBy === 'RECEPTIONIST' || a.bookedBy === 'MANUAL_CLIENT').length;
-  const whatsappCount = appointments.filter((a) => a.bookedBy === 'WHATSAPP').length;
-  const completedCount = appointments.filter((a) => a.status === 'COMPLETED').length;
+  // Calculate Metrics (Memoized)
+  const { totalCount, aiCount, deskCount, whatsappCount, completedCount } = React.useMemo(() => {
+    return {
+      totalCount: appointments.length,
+      aiCount: appointments.filter((a) => a.bookedBy === 'AGENT').length,
+      deskCount: appointments.filter((a) => a.bookedBy === 'RECEPTIONIST' || a.bookedBy === 'MANUAL_CLIENT').length,
+      whatsappCount: appointments.filter((a) => a.bookedBy === 'WHATSAPP').length,
+      completedCount: appointments.filter((a) => a.status === 'COMPLETED').length,
+    };
+  }, [appointments]);
 
   return (
     <div className="min-h-screen bg-white text-[#0c0a09] font-sans flex flex-col">
@@ -216,12 +257,12 @@ export function ReceptionistDashboard() {
           <button
             type="button"
             onClick={() => loadAppointments(false)}
-            disabled={loading || syncing}
+            disabled={loading}
             className="px-3.5 py-1.5 rounded-full border border-[#e7e5e4] bg-white hover:bg-[#f0efed] text-[#0c0a09] text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
             title="Refresh schedule now"
           >
             <svg
-              className={`w-3.5 h-3.5 text-[#777169] ${syncing ? 'animate-spin' : ''}`}
+              className={`w-3.5 h-3.5 text-[#777169] ${loading ? 'animate-spin' : ''}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -265,12 +306,12 @@ export function ReceptionistDashboard() {
           <button
             type="button"
             onClick={() => loadAppointments(false)}
-            disabled={loading || syncing}
+            disabled={loading}
             className="p-2 rounded-full border border-[#e7e5e4] bg-white hover:bg-[#f0efed] text-[#0c0a09] transition shadow-2xs"
             title="Refresh Schedule"
           >
             <svg
-              className={`w-4 h-4 text-[#777169] ${syncing ? 'animate-spin' : ''}`}
+              className={`w-4 h-4 text-[#777169] ${loading ? 'animate-spin' : ''}`}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -608,12 +649,24 @@ export function ReceptionistDashboard() {
             <form onSubmit={handleQuickAdd} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 items-end">
               {/* Slot Time */}
               <div className="sm:col-span-1 md:col-span-3">
-                <label className="block text-[10px] sm:text-[11px] font-medium text-[#777169] uppercase tracking-wider mb-1 leading-none">
-                  Time Slot (Pick or Type)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[10px] sm:text-[11px] font-medium text-[#777169] uppercase tracking-wider leading-none">
+                    Time Slot (Pick or Type)
+                  </label>
+                  {isSelectedSlotFull ? (
+                    <span className="text-[10px] font-bold text-rose-600 uppercase tracking-wider">
+                      FULL ({currentSlotOcc.booked}/{currentSlotOcc.capacity})
+                    </span>
+                  ) : currentSlotOcc.booked > 0 ? (
+                    <span className="text-[10px] text-amber-700 font-medium">
+                      {currentSlotOcc.booked}/{currentSlotOcc.capacity} booked
+                    </span>
+                  ) : null}
+                </div>
                 <TimeSlotInput
                   value={slotTime}
                   onChange={setSlotTime}
+                  slotOccupancy={slotOccupancy}
                 />
               </div>
 
@@ -650,11 +703,11 @@ export function ReceptionistDashboard() {
               {/* Phone */}
               <div className="sm:col-span-1 md:col-span-3">
                 <label className="block text-[10px] sm:text-[11px] font-medium text-[#777169] uppercase tracking-wider mb-1 leading-none">
-                  Phone Number
+                  Phone Number (Optional)
                 </label>
                 <input
                   type="tel"
-                  placeholder="e.g. 9876543210"
+                  placeholder="e.g. 9876543210 (optional)"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   className="w-full px-3 py-2 text-xs font-medium bg-white border border-[#d6d3d1] rounded-xl text-[#0c0a09] placeholder:text-[#a8a29e] focus:outline-none focus:border-[#0c0a09] shadow-2xs h-10 leading-normal"
@@ -665,11 +718,17 @@ export function ReceptionistDashboard() {
               <div className="sm:col-span-2 md:col-span-2">
                 <button
                   type="submit"
-                  disabled={addingRow}
-                  className="w-full h-10 bg-[#0c0a09] hover:opacity-90 text-white rounded-xl text-xs font-medium transition-all shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer leading-none"
+                  disabled={addingRow || isSelectedSlotFull}
+                  className={`w-full h-10 rounded-xl text-xs font-medium transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer leading-none ${
+                    isSelectedSlotFull
+                      ? 'bg-rose-100 text-rose-700 border border-rose-200 cursor-not-allowed opacity-80'
+                      : 'bg-[#0c0a09] hover:opacity-90 text-white disabled:opacity-50'
+                  }`}
                 >
                   {addingRow ? (
                     <span>Saving...</span>
+                  ) : isSelectedSlotFull ? (
+                    <span>Slot FULL ({currentSlotOcc.booked}/{currentSlotOcc.capacity})</span>
                   ) : (
                     <span>+ Quick Book</span>
                   )}
@@ -741,27 +800,58 @@ export function ReceptionistDashboard() {
                 </div>
               </div>
 
-              {/* Search Input */}
-              <div className="relative w-full sm:w-64">
-                <svg
-                  className="w-4 h-4 text-[#777169] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search patient, phone..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-white border border-[#d6d3d1] rounded-full text-[#0c0a09] placeholder:text-[#a8a29e] focus:outline-none focus:border-[#0c0a09] font-medium leading-normal"
-                />
+              {/* View Switcher & Search Input */}
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <div className="inline-flex rounded-full bg-[#f0efed] p-0.5 text-xs font-medium shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('TABLE')}
+                    className={`px-3 py-1 rounded-full transition cursor-pointer text-xs leading-none ${
+                      viewMode === 'TABLE'
+                        ? 'bg-white text-[#0c0a09] font-semibold shadow-2xs'
+                        : 'text-[#777169] hover:text-[#0c0a09]'
+                    }`}
+                  >
+                    Register View
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('SLOTS')}
+                    className={`px-3 py-1 rounded-full transition cursor-pointer text-xs flex items-center gap-1.5 leading-none ${
+                      viewMode === 'SLOTS'
+                        ? 'bg-white text-[#0c0a09] font-semibold shadow-2xs'
+                        : 'text-[#777169] hover:text-[#0c0a09]'
+                    }`}
+                  >
+                    <span>Slot Schedule</span>
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-[#0c0a09] text-white">
+                      {Object.keys(slotOccupancy).length}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Search Input */}
+                <div className="relative flex-1 sm:w-56">
+                  <svg
+                    className="w-4 h-4 text-[#777169] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search patient, phone..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3.5 py-1.5 text-xs bg-white border border-[#d6d3d1] rounded-full text-[#0c0a09] placeholder:text-[#a8a29e] focus:outline-none focus:border-[#0c0a09] font-medium leading-normal"
+                  />
+                </div>
               </div>
             </div>
 
@@ -783,6 +873,127 @@ export function ReceptionistDashboard() {
                 <p className="text-xs text-[#777169] max-w-sm mx-auto">
                   Use the quick registration form above to add a walk-in patient, or incoming AI phone bookings will appear in real time.
                 </p>
+              </div>
+            ) : viewMode === 'SLOTS' ? (
+              <div className="p-4 sm:p-5 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {generateTimeSlots().map((slot) => {
+                    const norm = normalizeTimeString(slot) || slot;
+                    const occ = slotOccupancy[norm] || { booked: 0, capacity: defaultCapacity, appts: [] };
+                    const isFull = occ.booked >= occ.capacity && occ.capacity > 0 && occ.booked > 0;
+
+                    // Filter appointments inside this slot if searching or filtering by source
+                    const slotAppts = occ.appts.filter((appt) => {
+                      if (sourceFilter === 'AI' && appt.bookedBy !== 'AGENT') return false;
+                      if (sourceFilter === 'DESK' && appt.bookedBy !== 'RECEPTIONIST' && appt.bookedBy !== 'MANUAL_CLIENT') return false;
+                      if (sourceFilter === 'WHATSAPP' && appt.bookedBy !== 'WHATSAPP') return false;
+                      if (!searchQuery.trim()) return true;
+                      const q = searchQuery.toLowerCase();
+                      return (
+                        appt.customerName?.toLowerCase().includes(q) ||
+                        appt.customerPhone?.toLowerCase().includes(q) ||
+                        appt.appointmentNumber?.toLowerCase().includes(q)
+                      );
+                    });
+
+                    // Hide empty slots if search query is active
+                    if (occ.booked === 0 && searchQuery) return null;
+
+                    return (
+                      <div
+                        key={slot}
+                        className={`p-4 rounded-2xl border transition-all ${
+                          isFull
+                            ? 'bg-[#fef2f2]/40 border-[#fecaca]'
+                            : occ.booked > 0
+                            ? 'bg-white border-[#e7e5e4] shadow-2xs'
+                            : 'bg-[#fafafa]/50 border-[#f0efed]'
+                        }`}
+                      >
+                        {/* Slot Header */}
+                        <div className="flex items-center justify-between pb-2.5 border-b border-[#f0efed]">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-semibold text-xs text-[#0c0a09]">{slot}</span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide ${
+                                isFull
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  : occ.booked > 0
+                                  ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                  : 'bg-[#f0efed] text-[#777169]'
+                              }`}
+                            >
+                              {isFull ? `FULL (${occ.booked}/${occ.capacity})` : `${occ.booked} / ${occ.capacity} booked`}
+                            </span>
+                          </div>
+
+                          {!isFull ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSlotTime(slot);
+                                nameInputRef.current?.focus();
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-[#0c0a09] text-white hover:opacity-90 text-[10px] font-semibold transition cursor-pointer shadow-2xs"
+                            >
+                              + Add Patient
+                            </button>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 uppercase tracking-wider">
+                              FULL
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Patients in this slot */}
+                        <div className="mt-3 space-y-2">
+                          {slotAppts.length === 0 ? (
+                            <p className="text-[11px] text-[#a8a29e] italic py-1 text-center">
+                              {occ.booked === 0 ? 'No patients booked' : 'No matching patients'}
+                            </p>
+                          ) : (
+                            slotAppts.map((appt) => (
+                              <div
+                                key={appt.id}
+                                onClick={() => {
+                                  setSelectedAppointment(appt);
+                                  setIsDetailsOpen(true);
+                                }}
+                                className="p-2.5 rounded-xl bg-white border border-[#e7e5e4] hover:border-[#0c0a09] transition flex items-center justify-between cursor-pointer shadow-2xs text-xs"
+                              >
+                                <div className="truncate mr-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-[#0c0a09] truncate">{appt.customerName}</span>
+                                    {appt.appointmentNumber && (
+                                      <span className="font-mono text-[10px] text-[#777169]">({appt.appointmentNumber})</span>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-[#777169] truncate">
+                                    {appt.customerPhone} &bull; {appt.title || 'Consultation'}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider ${
+                                      appt.status === 'COMPLETED'
+                                        ? 'bg-[#f0efed] text-[#4e4e4e]'
+                                        : appt.status === 'CANCELLED'
+                                        ? 'bg-[#fef2f2] text-[#dc2626]'
+                                        : 'bg-[#dcfce7] text-[#15803d]'
+                                    }`}
+                                  >
+                                    {appt.status}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               <>
@@ -849,7 +1060,7 @@ export function ReceptionistDashboard() {
 
                             {/* Phone */}
                             <td className="py-3 px-3 text-center align-middle text-[#777169] text-xs font-mono whitespace-nowrap leading-normal">
-                              {appt.customerPhone}
+                              {appt.customerPhone && appt.customerPhone !== '+91 98000 00000' && appt.customerPhone !== '+910000000000' ? appt.customerPhone : '—'}
                             </td>
 
                             {/* Reason / Title */}

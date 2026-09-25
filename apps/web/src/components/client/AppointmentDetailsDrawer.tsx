@@ -60,10 +60,6 @@ export function AppointmentDetailsDrawer({
       setErrorMessage('Patient / Customer Name is required.');
       return;
     }
-    if (!customerPhone.trim()) {
-      setErrorMessage('Contact phone number is required.');
-      return;
-    }
     if (!bookingDate.trim()) {
       setErrorMessage('Appointment date is required.');
       return;
@@ -232,14 +228,14 @@ export function AppointmentDetailsDrawer({
                 {/* Phone Number */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-[#0c0a09]">
-                    Contact Phone <span className="text-red-500">*</span>
+                    Contact Phone (Optional)
                   </label>
                   <input
                     type="text"
                     disabled={isReadOnly}
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="e.g. +91 98765 43210"
+                    placeholder="e.g. +91 98765 43210 (optional)"
                     className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs font-mono text-[#0c0a09] placeholder-[#a8a29e] focus:outline-none focus:border-[#0c0a09]"
                   />
                 </div>

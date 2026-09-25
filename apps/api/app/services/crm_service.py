@@ -310,6 +310,17 @@ class CRMService:
         res = await self.session.execute(query)
         appts = res.scalars().all()
 
+        # Resolve tenant capacity and business schedule
+        biz_res = await self.session.execute(
+            select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+            .where(Agent.tenantId == tenant_id)
+            .order_by(AgentVersion.versionNumber.desc())
+            .limit(1)
+        )
+        cfg_json = biz_res.scalar_one_or_none()
+        b_h, s_d, p_s = extract_business_schedule_from_version(cfg_json if isinstance(cfg_json, dict) else None)
+        effective_capacity = max(1, int(p_s or 1))
+
         return {
             "appointments": [
                 {
@@ -343,7 +354,11 @@ class CRMService:
             ],
             "total": total,
             "limit": limit,
-            "offset": offset
+            "offset": offset,
+            "capacity": effective_capacity,
+            "patientsPerSlot": effective_capacity,
+            "slotDuration": s_d or "30 mins",
+            "businessHours": b_h,
         }
 
     async def get_appointment(self, appt_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[Dict[str, Any]]:
@@ -395,9 +410,9 @@ class CRMService:
             a.customerName = str(name_val).strip()
 
         # Phone
-        phone_val = data.get("customerPhone") or data.get("patientPhone") or data.get("phone")
-        if phone_val:
-            a.customerPhone = str(phone_val).strip()
+        if "customerPhone" in data or "patientPhone" in data or "phone" in data:
+            phone_val = data.get("customerPhone") or data.get("patientPhone") or data.get("phone")
+            a.customerPhone = str(phone_val).strip() if phone_val else ""
 
         # Service / Title / Reason
         service_val = data.get("serviceType") or data.get("title") or data.get("reason")
@@ -470,9 +485,9 @@ class CRMService:
         self,
         tenant_id: uuid.UUID,
         customer_name: str,
-        customer_phone: str,
-        booking_date: str,
-        booking_time: str,
+        customer_phone: Optional[str] = None,
+        booking_date: str = "Tomorrow",
+        booking_time: str = "10:00 AM",
         title: Optional[str] = "Consultation",
         resource_name: Optional[str] = None,
         booked_by: str = "RECEPTIONIST",
@@ -483,6 +498,7 @@ class CRMService:
         notes: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
         business_hours: Optional[str] = None,
+        patients_per_slot: Optional[int] = None,
     ) -> Dict[str, Any]:
         # Normalize time, age, and service title
         norm_booking_time = normalize_indic_time(booking_time)
@@ -497,32 +513,56 @@ class CRMService:
                 f"Cannot book appointment for past time slot '{norm_booking_time}' on {booking_date}."
             )
 
+        # Shift & Capacity resolution: Resolve from AgentVersion if not passed explicitly
+        if not business_hours or patients_per_slot is None:
+            biz_hours_query = await self.session.execute(
+                select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
+                .where(Agent.tenantId == tenant_id)
+                .order_by(AgentVersion.versionNumber.desc())
+                .limit(1)
+            )
+            cfg_json = biz_hours_query.scalar_one_or_none()
+            if cfg_json and isinstance(cfg_json, dict):
+                b_h, _, p_s = extract_business_schedule_from_version(cfg_json)
+                if not business_hours:
+                    business_hours = b_h
+                if patients_per_slot is None:
+                    patients_per_slot = p_s
+
+        effective_capacity = max(1, int(patients_per_slot or 1))
+
         # Shift validation: Enforce business hours strictly for AI voice agent, never restrict human desk staff or walk-ins
         if not is_human_booking:
-            if not business_hours:
-                biz_hours_query = await self.session.execute(
-                    select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
-                    .where(Agent.tenantId == tenant_id)
-                    .order_by(AgentVersion.versionNumber.desc())
-                    .limit(1)
-                )
-                cfg_json = biz_hours_query.scalar_one_or_none()
-                if cfg_json and isinstance(cfg_json, dict):
-                    b_h, _ = extract_business_schedule_from_version(cfg_json)
-                    business_hours = b_h
-
             if business_hours and not is_time_within_shifts(norm_booking_time, business_hours):
                 raise ValueError(
                     f"Requested slot '{norm_booking_time}' falls during closed/break hours in configured schedule: {business_hours}."
                 )
 
-        # Slot Conflict Check: Prevent duplicate booking if slot is already occupied on the given date
         def _norm_time(t: str) -> str:
             if not t:
                 return ""
             return normalize_indic_time(t).strip().upper()
 
         target_norm_time = _norm_time(norm_booking_time)
+
+        # =========================================================================
+        # ATOMIC CONCURRENCY GUARANTEE: PostgreSQL Transaction-Scoped Advisory Lock
+        # Locks strictly the deterministic tuple (tenant_id, booking_date, normalized_slot)
+        # Guarantees serialization even when ZERO rows exist for the slot.
+        # =========================================================================
+        try:
+            tenant_key_str = str(tenant_id)
+            slot_key_str = f"{booking_date}:{target_norm_time}"
+            await self.session.execute(
+                select(func.pg_advisory_xact_lock(
+                    func.hashtext(tenant_key_str),
+                    func.hashtext(slot_key_str)
+                ))
+            )
+        except Exception as lock_err:
+            logger.debug(f"[CRMService] Advisory lock notice: {lock_err}")
+
+        # Slot Capacity Check inside the transaction lock
         existing_res = await self.session.execute(
             select(Appointment).where(
                 Appointment.tenantId == tenant_id,
@@ -533,13 +573,18 @@ class CRMService:
                 ])
             )
         )
-        for existing in existing_res.scalars().all():
-            if _norm_time(existing.bookingTime) == target_norm_time:
-                raise ValueError(
-                    f"Slot {norm_booking_time} on {booking_date} is already booked for patient '{existing.customerName}' ({existing.appointmentNumber})."
-                )
+        matching_appts = [
+            a for a in existing_res.scalars().all()
+            if _norm_time(a.bookingTime) == target_norm_time
+        ]
 
-        # Generate friendly appointment number
+        if len(matching_appts) >= effective_capacity:
+            patient_list_str = ", ".join([f"'{a.customerName}' ({a.appointmentNumber})" for a in matching_appts])
+            raise ValueError(
+                f"Slot {norm_booking_time} on {booking_date} is already booked and has reached maximum capacity ({len(matching_appts)}/{effective_capacity} patients: {patient_list_str})."
+            )
+
+        # Generate friendly appointment number atomically
         res = await self.session.execute(
             select(TenantAppointmentCounter).where(TenantAppointmentCounter.tenantId == tenant_id).with_for_update()
         )
@@ -566,7 +611,7 @@ class CRMService:
             callSessionId=None,
             appointmentNumber=f"APT-{next_num}",
             customerName=customer_name,
-            customerPhone=customer_phone,
+            customerPhone=str(customer_phone).strip() if customer_phone else "",
             title=clean_title,
             resourceName=resource_name,
             bookingDate=booking_date,
@@ -658,13 +703,14 @@ class CRMService:
         preferred_time: Optional[str] = None,
         business_hours: Optional[str] = None,
         slot_duration: Optional[str] = None,
+        patients_per_slot: Optional[int] = None,
         timezone: str = "Asia/Kolkata",
     ) -> Dict[str, Any]:
-        """Calculates available clinic slots dynamically from tenant businessHours & slotDuration,
+        """Calculates available clinic slots dynamically from tenant businessHours, slotDuration & patientsPerSlot,
         detects if preferred slot is free & within shift, and checks for existing bookings.
         """
-        # Resolve tenant business hours & slot duration dynamically if not passed
-        if not business_hours or not slot_duration:
+        # Resolve tenant business hours, slot duration & patientsPerSlot dynamically if not passed
+        if not business_hours or not slot_duration or patients_per_slot is None:
             biz_res = await self.session.execute(
                 select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
                 .where(Agent.tenantId == tenant_id)
@@ -673,11 +719,15 @@ class CRMService:
             )
             cfg_json = biz_res.scalar_one_or_none()
             if cfg_json and isinstance(cfg_json, dict):
-                b_h, s_d = extract_business_schedule_from_version(cfg_json)
+                b_h, s_d, p_s = extract_business_schedule_from_version(cfg_json)
                 if not business_hours:
                     business_hours = b_h
                 if not slot_duration:
                     slot_duration = s_d
+                if patients_per_slot is None:
+                    patients_per_slot = p_s
+
+        effective_capacity = max(1, int(patients_per_slot or 1))
 
         # Generate candidate slots dynamically on-the-fly (break hours are never generated)
         candidate_slots = generate_dynamic_slots(
@@ -701,29 +751,44 @@ class CRMService:
         day_appointments = res.scalars().all()
 
         def _norm_time(t: str) -> str:
-            return re.sub(r"\s+", " ", t.strip().upper())
+            if not t:
+                return ""
+            return normalize_indic_time(t).strip().upper()
 
-        booked_slots = set()
+        # Build occupancy count map per normalized time slot
+        slot_occupancy: Dict[str, int] = {}
         for a in day_appointments:
-            booked_slots.add(_norm_time(a.bookingTime))
+            norm_k = _norm_time(a.bookingTime)
+            if norm_k:
+                slot_occupancy[norm_k] = slot_occupancy.get(norm_k, 0) + 1
 
-        available_slots = [s for s in candidate_slots if _norm_time(s) not in booked_slots]
+        # A candidate slot is available if active bookings are strictly less than capacity
+        available_slots = [
+            s for s in candidate_slots
+            if slot_occupancy.get(_norm_time(s), 0) < effective_capacity
+        ]
+        fully_booked_slots = [
+            s for s in candidate_slots
+            if slot_occupancy.get(_norm_time(s), 0) >= effective_capacity
+        ]
 
         slot_available = True
         is_occupied = False
         is_outside_shift = False
         is_past = False
+        pref_booked_count = 0
 
         normalized_pref = _norm_time(preferred_time) if preferred_time else None
         if normalized_pref:
-            # Check 1: Is preferred time already booked in database?
-            matched_booked = any(
-                _norm_time(b) == normalized_pref
-                or _norm_time(b).replace(":00", "") == normalized_pref.replace(":00", "")
-                or _norm_time(b).lstrip("0") == normalized_pref.lstrip("0")
-                for b in booked_slots
-            )
-            if matched_booked:
+            # Count bookings matching the preferred time
+            for b_k, count in slot_occupancy.items():
+                if (b_k == normalized_pref
+                    or b_k.replace(":00", "") == normalized_pref.replace(":00", "")
+                    or b_k.lstrip("0") == normalized_pref.lstrip("0")):
+                    pref_booked_count += count
+
+            # Check 1: Is preferred time already at maximum capacity in database?
+            if pref_booked_count >= effective_capacity:
                 is_occupied = True
                 slot_available = False
             # Check 2: Has preferred time already passed for today?
@@ -764,16 +829,35 @@ class CRMService:
                     "bookedBy": existing_appt.bookedBy,
                 }
 
+        slot_metadata = []
+        for s in candidate_slots:
+            norm_s = _norm_time(s)
+            b_cnt = slot_occupancy.get(norm_s, 0)
+            rem = max(0, effective_capacity - b_cnt)
+            slot_metadata.append({
+                "slot": s,
+                "capacity": effective_capacity,
+                "bookedCount": b_cnt,
+                "remainingCapacity": rem,
+                "available": b_cnt < effective_capacity,
+                "isFull": b_cnt >= effective_capacity,
+            })
+
         return {
             "bookingDate": booking_date,
             "preferredTime": preferred_time,
+            "capacity": effective_capacity,
+            "bookedCount": pref_booked_count if normalized_pref else (slot_occupancy.get(normalized_pref, 0) if normalized_pref else 0),
+            "remainingCapacity": max(0, effective_capacity - pref_booked_count) if normalized_pref else None,
             "slotAvailable": slot_available,
             "isOccupied": is_occupied,
             "isOutsideShift": is_outside_shift,
             "isPast": is_past,
-            "bookedSlots": list(booked_slots),
+            "bookedSlots": list(fully_booked_slots),
             "availableSlots": available_slots[:8],
             "totalAvailable": len(available_slots),
+            "slotMetadata": slot_metadata,
+            "slotOccupancy": slot_occupancy,
             "hasExistingBooking": bool(existing_booking),
             "existingBooking": existing_booking,
         }

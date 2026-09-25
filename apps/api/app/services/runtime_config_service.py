@@ -214,7 +214,15 @@ class RuntimeAgentConfigService:
             prompt=RuntimePromptConfig(
                 compiled_system_prompt=compiled_prompt,
                 greeting=resolved_greeting,
-                timezone=timezone
+                timezone=timezone,
+                guardrails=cfg.get("guardrails") or {},
+                emergency_phone=(
+                    (cfg.get("guardrails") or {}).get("emergencyPhone")
+                    or (cfg.get("guardrails") or {}).get("emergency_phone")
+                    or cfg.get("emergencyPhone")
+                    or biz_info.get("phone")
+                    or biz_info.get("phoneNumber")
+                )
             ),
             voice=RuntimeVoiceConfig(
                 provider=voice_cfg.get("provider", "sarvam"),

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { Appointment } from '../../types';
@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/client/EmptyState';
 import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
 // import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
 import { formatDateDDMMYYYY } from '../../utils/dateFormatters';
+import { areEntitiesEqual } from '../../utils/fastDiff';
 
 import { useAuth } from '../../contexts/AuthContext';
 import { TimeSlotInput } from '../../components/client/TimeSlotInput';
@@ -77,14 +78,16 @@ export function ClientAppointments() {
         offset: page * limit,
         status: statusFilter !== 'ALL' ? statusFilter : undefined,
       });
-      setAppointments(res.appointments || []);
-      setTotal(res.total || 0);
+      const incoming = res.appointments || [];
+      const incomingTotal = res.total || 0;
+      setAppointments((prev) => areEntitiesEqual(prev, incoming) ? prev : incoming);
+      setTotal((prev) => prev !== incomingTotal ? incomingTotal : prev);
     } catch (err) {
       console.error('Failed to load appointments:', err);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, limit]);
 
   useEffect(() => {
     loadAppointments();
@@ -94,15 +97,9 @@ export function ClientAppointments() {
     window.addEventListener('crm-refresh', handleRefresh);
     window.addEventListener('crm-refresh-silent', handleRefreshSilent);
 
-    // Live sync polling every 10s
-    const pollInterval = setInterval(() => {
-      loadAppointments(true);
-    }, 10000);
-
     return () => {
       window.removeEventListener('crm-refresh', handleRefresh);
       window.removeEventListener('crm-refresh-silent', handleRefreshSilent);
-      clearInterval(pollInterval);
     };
   }, [loadAppointments]);
 
@@ -181,8 +178,8 @@ export function ClientAppointments() {
 
   const handleCreateWalkInBooking = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCustomerName || !newCustomerPhone || !newBookingDate || !newBookingTime) {
-      setBookingError('Please fill in patient name, phone number, date, and time.');
+    if (!newCustomerName || !newBookingDate || !newBookingTime) {
+      setBookingError('Please fill in patient name, date, and time.');
       return;
     }
 
@@ -193,7 +190,7 @@ export function ClientAppointments() {
     try {
       const res = await api.bookClientAppointment({
         customerName: newCustomerName.trim(),
-        customerPhone: newCustomerPhone.trim(),
+        customerPhone: newCustomerPhone.trim() || undefined,
         bookingDate: newBookingDate,
         bookingTime: newBookingTime,
         title: newTitle.trim() || 'General Consultation',
@@ -226,29 +223,31 @@ export function ClientAppointments() {
     }
   };
 
-  const filteredAppointments = appointments.filter((a) => {
-    if (bookedByFilter !== 'ALL') {
-      const bBy = (a.bookedBy || 'AGENT').toUpperCase();
-      if (bookedByFilter === 'AGENT' && bBy !== 'AGENT') return false;
-      if (bookedByFilter === 'RECEPTIONIST' && bBy !== 'RECEPTIONIST' && !a.walkIn) return false;
-      if (bookedByFilter === 'WHATSAPP' && bBy !== 'WHATSAPP') return false;
-    }
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter((a) => {
+      if (bookedByFilter !== 'ALL') {
+        const bBy = (a.bookedBy || 'AGENT').toUpperCase();
+        if (bookedByFilter === 'AGENT' && bBy !== 'AGENT') return false;
+        if (bookedByFilter === 'RECEPTIONIST' && bBy !== 'RECEPTIONIST' && !a.walkIn) return false;
+        if (bookedByFilter === 'WHATSAPP' && bBy !== 'WHATSAPP') return false;
+      }
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const numMatch = a.appointmentNumber?.toLowerCase().includes(q);
-      const nameMatch = a.customerName.toLowerCase().includes(q);
-      const phoneMatch = a.customerPhone.toLowerCase().includes(q);
-      const titleMatch = a.title?.toLowerCase().includes(q);
-      const bookedByMatch = a.bookedByName?.toLowerCase().includes(q) || a.bookedBy?.toLowerCase().includes(q);
-      const ageVal = a.age || ((a.metadata as any)?.age != null ? String((a.metadata as any).age) : '');
-      const placeVal = a.place || ((a.metadata as any)?.place != null ? String((a.metadata as any).place) : '') || ((a.metadata as any)?.location != null ? String((a.metadata as any).location) : '');
-      const ageMatch = ageVal.toLowerCase().includes(q);
-      const placeMatch = placeVal.toLowerCase().includes(q);
-      return numMatch || nameMatch || phoneMatch || titleMatch || ageMatch || placeMatch || bookedByMatch;
-    }
-    return true;
-  });
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const numMatch = a.appointmentNumber?.toLowerCase().includes(q);
+        const nameMatch = a.customerName.toLowerCase().includes(q);
+        const phoneMatch = a.customerPhone?.toLowerCase().includes(q);
+        const titleMatch = a.title?.toLowerCase().includes(q);
+        const bookedByMatch = a.bookedByName?.toLowerCase().includes(q) || a.bookedBy?.toLowerCase().includes(q);
+        const ageVal = a.age || ((a.metadata as any)?.age != null ? String((a.metadata as any).age) : '');
+        const placeVal = a.place || ((a.metadata as any)?.place != null ? String((a.metadata as any).place) : '') || ((a.metadata as any)?.location != null ? String((a.metadata as any).location) : '');
+        const ageMatch = ageVal.toLowerCase().includes(q);
+        const placeMatch = placeVal.toLowerCase().includes(q);
+        return numMatch || nameMatch || phoneMatch || titleMatch || ageMatch || placeMatch || bookedByMatch;
+      }
+      return true;
+    });
+  }, [appointments, bookedByFilter, searchQuery]);
 
   const getStatusBadge = (status: Appointment['status']) => {
     switch (status) {
@@ -446,7 +445,7 @@ export function ClientAppointments() {
 
                       <td className="px-5 py-4 whitespace-nowrap">
                         <span className="font-semibold text-[#0c0a09] block">{appt.customerName}</span>
-                        <span className="font-mono text-[11px] text-[#777169]">{appt.customerPhone}</span>
+                        <span className="font-mono text-[11px] text-[#777169]">{appt.customerPhone && appt.customerPhone !== '+91 98000 00000' && appt.customerPhone !== '+910000000000' ? appt.customerPhone : '—'}</span>
                       </td>
 
                       <td className="px-3 py-4 whitespace-nowrap font-medium text-[#0c0a09]">
@@ -592,12 +591,11 @@ export function ClientAppointments() {
 
                 <div>
                   <label className="block text-[11px] font-semibold text-[#44403c] mb-1">
-                    Mobile Phone Number *
+                    Mobile Phone Number (Optional)
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="e.g. +91 98765 43210"
+                    placeholder="e.g. +91 98765 43210 (optional)"
                     value={newCustomerPhone}
                     onChange={(e) => setNewCustomerPhone(e.target.value)}
                     className="w-full bg-[#fafafa] border border-[#e7e5e4] rounded-xl px-3 py-2 text-xs text-[#0c0a09] focus:outline-none focus:border-[#0c0a09]"

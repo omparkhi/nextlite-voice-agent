@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { Appointment, FollowUpItem } from '../../types';
@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/client/EmptyState';
 import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
 import { WhatsAppComposer } from '../../components/client/WhatsAppComposer';
 import { formatDateTimeDDMMYYYY } from '@/utils/dateFormatters';
+import { areEntitiesEqual } from '../../utils/fastDiff';
 
 export function ClientFollowUps() {
   const { isViewer } = useOutletContext<{ isViewer: boolean }>();
@@ -35,8 +36,8 @@ export function ClientFollowUps() {
 
   const limit = 15;
 
-  const loadAppointments = useCallback(async () => {
-    setLoadingAppts(true);
+  const loadAppointments = useCallback(async (silent = false) => {
+    if (!silent) setLoadingAppts(true);
     try {
       const res = await api.getClientAppointments({
         limit,
@@ -44,31 +45,35 @@ export function ClientFollowUps() {
         status: apptStatusFilter !== 'ALL' ? apptStatusFilter : undefined,
         bookedBy: 'WHATSAPP',
       });
-      setAppointments(res.appointments || []);
-      setAppointmentsTotal(res.total || 0);
+      const incoming = res.appointments || [];
+      const incomingTotal = res.total || 0;
+      setAppointments((prev) => areEntitiesEqual(prev, incoming) ? prev : incoming);
+      setAppointmentsTotal((prev) => prev !== incomingTotal ? incomingTotal : prev);
     } catch (err) {
       console.error('Failed to load WhatsApp appointments:', err);
     } finally {
-      setLoadingAppts(false);
+      if (!silent) setLoadingAppts(false);
     }
-  }, [appointmentsPage, apptStatusFilter]);
+  }, [appointmentsPage, apptStatusFilter, limit]);
 
-  const loadFollowUps = useCallback(async () => {
-    setLoadingFollowUps(true);
+  const loadFollowUps = useCallback(async (silent = false) => {
+    if (!silent) setLoadingFollowUps(true);
     try {
       const res = await api.getClientFollowUps({
         limit,
         offset: followUpsPage * limit,
         status: msgStatusFilter !== 'ALL' ? msgStatusFilter : undefined,
       });
-      setFollowUps(res.followUps || []);
-      setFollowUpsTotal(res.total || 0);
+      const incoming = res.followUps || [];
+      const incomingTotal = res.total || 0;
+      setFollowUps((prev) => areEntitiesEqual(prev, incoming) ? prev : incoming);
+      setFollowUpsTotal((prev) => prev !== incomingTotal ? incomingTotal : prev);
     } catch (err) {
       console.error('Failed to load follow-ups:', err);
     } finally {
-      setLoadingFollowUps(false);
+      if (!silent) setLoadingFollowUps(false);
     }
-  }, [followUpsPage, msgStatusFilter]);
+  }, [followUpsPage, msgStatusFilter, limit]);
 
   useEffect(() => {
     loadAppointments();
@@ -80,15 +85,19 @@ export function ClientFollowUps() {
 
   useEffect(() => {
     const handleRefresh = () => {
-      loadAppointments();
-      loadFollowUps();
+      loadAppointments(false);
+      loadFollowUps(false);
+    };
+    const handleRefreshSilent = () => {
+      loadAppointments(true);
+      loadFollowUps(true);
     };
     window.addEventListener('crm-refresh', handleRefresh);
-    window.addEventListener('crm-refresh-silent', handleRefresh);
+    window.addEventListener('crm-refresh-silent', handleRefreshSilent);
 
     return () => {
       window.removeEventListener('crm-refresh', handleRefresh);
-      window.removeEventListener('crm-refresh-silent', handleRefresh);
+      window.removeEventListener('crm-refresh-silent', handleRefreshSilent);
     };
   }, [loadAppointments, loadFollowUps]);
 
@@ -122,16 +131,18 @@ export function ClientFollowUps() {
     }
   };
 
-  const filteredAppointments = appointments.filter((appt) => {
-    if (!apptSearchQuery.trim()) return true;
-    const q = apptSearchQuery.toLowerCase();
-    const numMatch = appt.appointmentNumber?.toLowerCase().includes(q);
-    const nameMatch = appt.customerName?.toLowerCase().includes(q);
-    const phoneMatch = appt.customerPhone?.toLowerCase().includes(q);
-    const titleMatch = appt.title?.toLowerCase().includes(q);
-    const notesMatch = appt.notes?.toLowerCase().includes(q);
-    return Boolean(numMatch || nameMatch || phoneMatch || titleMatch || notesMatch);
-  });
+  const filteredAppointments = useMemo(() => {
+    return appointments.filter((appt) => {
+      if (!apptSearchQuery.trim()) return true;
+      const q = apptSearchQuery.toLowerCase();
+      const numMatch = appt.appointmentNumber?.toLowerCase().includes(q);
+      const nameMatch = appt.customerName?.toLowerCase().includes(q);
+      const phoneMatch = appt.customerPhone?.toLowerCase().includes(q);
+      const titleMatch = appt.title?.toLowerCase().includes(q);
+      const notesMatch = appt.notes?.toLowerCase().includes(q);
+      return Boolean(numMatch || nameMatch || phoneMatch || titleMatch || notesMatch);
+    });
+  }, [appointments, apptSearchQuery]);
 
   const apptTotalPages = Math.ceil(appointmentsTotal / limit);
   const msgTotalPages = Math.ceil(followUpsTotal / limit);

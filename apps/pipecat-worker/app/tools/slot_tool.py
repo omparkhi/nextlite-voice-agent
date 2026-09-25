@@ -84,6 +84,8 @@ def create_check_slots_tool_factory(
             query_params["businessHours"] = context.business_hours
         if getattr(context, "slot_duration", None):
             query_params["slotDuration"] = context.slot_duration
+        if getattr(context, "patients_per_slot", None):
+            query_params["patientsPerSlot"] = str(context.patients_per_slot)
 
         headers = {
             "Authorization": f"Bearer {worker_secret}",
@@ -104,39 +106,53 @@ def create_check_slots_tool_factory(
                     f"availableCount={data.get('totalAvailable')} | hasExisting={data.get('hasExistingBooking')}"
                 )
 
+                avail = data.get("availableSlots", [])
+                capacity_val = data.get("capacity", 1)
                 result_data = {
                     "success": True,
                     "date": resolved_date,
                     "slotAvailable": data.get("slotAvailable", True),
                     "preferredTime": pref_time,
-                    "availableSlots": data.get("availableSlots", []),
+                    "capacity": capacity_val,
+                    "bookedCount": data.get("bookedCount", 0),
+                    "remainingCapacity": data.get("remainingCapacity"),
+                    "availableSlots": avail,
                     "hasExistingBooking": data.get("hasExistingBooking", False),
                     "existingBooking": data.get("existingBooking"),
                 }
 
-                if data.get("hasExistingBooking"):
-                    eb = data.get("existingBooking") or {}
-                    result_data["guidance"] = (
-                        f"The caller already has an upcoming appointment scheduled on {eb.get('bookingDate')} "
-                        f"at {eb.get('bookingTime')} for {eb.get('service')}. Politely remind them and ask if they "
-                        f"would like to reschedule or keep this booking."
-                    )
-                elif not data.get("slotAvailable") and pref_time:
-                    avail = data.get("availableSlots", [])
+                if not data.get("slotAvailable") and pref_time:
                     if avail:
                         result_data["guidance"] = (
-                            f"The requested slot {pref_time} is already booked or outside open operational shifts. "
-                            f"Politely inform the caller that {pref_time} is already booked and offer available alternative slots such as {', '.join(avail[:3])}."
+                            f"The requested slot {pref_time} is already booked on {resolved_date} and has reached maximum capacity ({capacity_val}/{capacity_val} patients) or is outside open operational shifts. "
+                            f"Politely inform the caller that {pref_time} is full/unavailable and offer available open slots such as {', '.join(avail[:3])}."
                         )
                     else:
                         result_data["guidance"] = (
                             f"The requested slot {pref_time} is not available on {resolved_date}, and no further open slots remain for this date. "
                             f"Politely suggest booking for the next business day."
                         )
+                elif data.get("hasExistingBooking") and data.get("existingBooking"):
+                    eb = data.get("existingBooking") or {}
+                    eb_date = eb.get("bookingDate")
+                    eb_time = eb.get("bookingTime")
+                    result_data["guidance"] = (
+                        f"Slot {pref_time or 'requested time'} on {resolved_date} is available for booking (capacity: {capacity_val} patients/slot). "
+                        f"Note: The caller currently has an existing appointment on {eb_date} at {eb_time}. "
+                        f"Confirm that {pref_time or 'the requested slot'} is open. Ask the caller if they would like to reschedule their existing {eb_time} appointment to {pref_time or resolved_date} or book a new appointment. "
+                        f"Never tell the caller that the slot is taken by another person."
+                    )
+                elif not pref_time:
+                    result_data["guidance"] = (
+                        f"The following time slots on {resolved_date} are OPEN and ready for booking (clinic accommodates up to {capacity_val} patients per slot): "
+                        f"{', '.join(avail[:6])}. "
+                        f"Every slot in availableSlots has open capacity. If the caller asks for available times, mention these open times and let them choose."
+                    )
                 else:
                     result_data["guidance"] = (
-                        f"Slot {pref_time or 'time'} on {resolved_date} is available. You may proceed to confirm details "
-                        f"(Name, service, age) and book the appointment."
+                        f"Slot {pref_time} on {resolved_date} is 100% available and open for booking (capacity: {capacity_val} patients/slot). "
+                        f"Confidently tell the caller that {pref_time} is available and proceed to confirm their details (Name, reason, age) and book the appointment. "
+                        f"Do NOT say the slot is booked by someone else."
                     )
 
                 await params.result_callback(

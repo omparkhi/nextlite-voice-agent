@@ -145,6 +145,6 @@ def test_extract_business_schedule_case_insensitive():
             ]
         }
     }
-    hours, duration = extract_business_schedule_from_version(cfg)
+    hours, duration, _ = extract_business_schedule_from_version(cfg)
     assert hours == "Monday to Saturday: 10:00 AM to 01:00 PM and 06:00 PM to 09:00 PM"
     assert duration == "45 min"

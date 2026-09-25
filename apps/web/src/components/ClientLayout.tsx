@@ -46,14 +46,13 @@ export function ClientLayout() {
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
-  // Optional 15-second light background polling while active tab is visible
+  // 12-second background sync while active tab is visible
   useEffect(() => {
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         window.dispatchEvent(new CustomEvent('crm-refresh-silent'));
-        setLastUpdated(new Date());
       }
-    }, 15000);
+    }, 12000);
 
     return () => clearInterval(interval);
   }, []);

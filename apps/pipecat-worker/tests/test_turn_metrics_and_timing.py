@@ -519,7 +519,7 @@ async def test_appointment_tool_failure_anti_hallucination_and_no_secrets():
         arguments={
             "customerName": "Rohan Sharma",
             "title": "Doctor Consultation",
-            "bookingDate": "2026-09-20",
+            "bookingDate": "2026-11-20",
             "bookingTime": "10:30 AM",
         },
         tool_call_id="call-fail-1",

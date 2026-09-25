@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     PLIVO_AUTH_ID: str = ""
     PLIVO_AUTH_TOKEN: str = ""
     PLIVO_PHONE_NUMBER: str = ""
+    PLIVO_CALLER_ID: str = ""
+    PUBLIC_URL: str = "https://dandelion-gigantic-challenge.ngrok-free.dev"
+    PUBLIC_HOST: str = "dandelion-gigantic-challenge.ngrok-free.dev"
 
     # Optional simple security token for POC endpoint
     POC_SECRET_KEY: str = ""

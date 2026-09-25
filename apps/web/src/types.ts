@@ -191,6 +191,8 @@ export interface AgentConfiguration {
     address?: string;
     hours?: string;
     timezone?: string;
+    phone?: string;
+    emergencyPhone?: string;
     contactInformation?: string;
     customFacts?: Record<string, any>;
   };
@@ -214,6 +216,9 @@ export interface AgentConfiguration {
     competitorHandling?: string;
     abuseHandling?: string;
     fallbackBehavior?: string;
+    emergencyPhone?: string;
+    emergencyTransferEnabled?: boolean;
+    doctorName?: string;
   };
   language: {
     primary: string;
@@ -649,7 +654,7 @@ export interface Appointment {
   callSessionId?: string | null;
   appointmentNumber?: string | null; // e.g. 'A-001'
   customerName: string;
-  customerPhone: string;
+  customerPhone?: string | null;
   age?: string | null;
   place?: string | null;
   title: string;

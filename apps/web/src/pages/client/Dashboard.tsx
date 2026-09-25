@@ -11,6 +11,7 @@ import {
 } from '../../components/client/AnalyticsChart';
 import { ActivityFeed, ActivityItem } from '../../components/client/ActivityFeed';
 import { CardSkeleton } from '../../components/client/LoadingSkeleton';
+import { areEntitiesEqual, areObjectsEqual } from '../../utils/fastDiff';
 
 export function ClientDashboard() {
   const navigate = useNavigate();
@@ -26,7 +27,8 @@ export function ClientDashboard() {
     return 'Good evening';
   };
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [overviewData, callsRes, leadsRes, apptsRes, followUpsRes] = await Promise.all([
         api.getAnalyticsOverview().catch(() => null),
@@ -37,7 +39,7 @@ export function ClientDashboard() {
       ]);
 
       if (overviewData) {
-        setAnalytics(overviewData);
+        setAnalytics((prev) => areObjectsEqual(prev, overviewData) ? prev : overviewData);
       }
 
       // Build consolidated real activity stream
@@ -93,24 +95,26 @@ export function ClientDashboard() {
 
       // Sort chronological descending
       items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setActivities(items.slice(0, 8));
+      const nextActivities = items.slice(0, 8);
+      setActivities((prev) => areEntitiesEqual(prev, nextActivities) ? prev : nextActivities);
     } catch (err) {
       console.error('Failed to load dashboard overview:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     loadData();
 
-    const handleRefresh = () => loadData();
+    const handleRefresh = () => loadData(false);
+    const handleRefreshSilent = () => loadData(true);
     window.addEventListener('crm-refresh', handleRefresh);
-    window.addEventListener('crm-refresh-silent', handleRefresh);
+    window.addEventListener('crm-refresh-silent', handleRefreshSilent);
 
     return () => {
       window.removeEventListener('crm-refresh', handleRefresh);
-      window.removeEventListener('crm-refresh-silent', handleRefresh);
+      window.removeEventListener('crm-refresh-silent', handleRefreshSilent);
     };
   }, [loadData]);
 

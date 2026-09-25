@@ -254,8 +254,16 @@ export const api = {
     if (params?.status) stringParams.status = params.status;
     if (params?.bookingDate) stringParams.bookingDate = params.bookingDate;
     if (params?.bookedBy) stringParams.bookedBy = params.bookedBy;
-    if (params?.tenantId) stringParams.tenantId = params.tenantId;
-    return request<{ appointments: Appointment[]; total: number; limit: number; offset: number }>('/api/client/appointments', {
+    return request<{
+      appointments: Appointment[];
+      total: number;
+      limit: number;
+      offset: number;
+      patientsPerSlot?: number;
+      capacity?: number;
+      slotDuration?: string;
+      businessHours?: string;
+    }>('/api/client/appointments', {
       params: stringParams,
     });
   },
@@ -271,7 +279,7 @@ export const api = {
 
   bookClientAppointment: (data: {
     customerName: string;
-    customerPhone: string;
+    customerPhone?: string;
     bookingDate: string;
     bookingTime: string;
     title?: string;
@@ -282,6 +290,7 @@ export const api = {
     place?: string;
     walkIn?: boolean;
     notes?: string;
+    patientsPerSlot?: number;
   }) =>
     request<{ success: boolean; appointment: Appointment }>('/api/client/appointments/book', {
       method: 'POST',
@@ -290,7 +299,7 @@ export const api = {
 
   createClientAppointment: (data: {
     customerName: string;
-    customerPhone: string;
+    customerPhone?: string;
     bookingDate: string;
     bookingTime: string;
     title?: string;
@@ -301,6 +310,7 @@ export const api = {
     place?: string;
     walkIn?: boolean;
     notes?: string;
+    patientsPerSlot?: number;
   }) =>
     request<{ success: boolean; appointment: Appointment }>('/api/client/appointments/book', {
       method: 'POST',

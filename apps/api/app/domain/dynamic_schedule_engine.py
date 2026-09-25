@@ -240,34 +240,85 @@ def generate_dynamic_slots(
     return generated_slots
 
 
-def extract_business_schedule_from_version(version_configuration: Optional[dict]) -> Tuple[Optional[str], Optional[str]]:
-    """Extracts businessHours and slotDuration safely from an AgentVersion configuration JSON dict.
+def parse_patients_per_slot(capacity_val: Optional[Any], default_capacity: int = 1) -> int:
+    """Parses patientsPerSlot / capacity configuration values into a positive integer >= 1.
+    
+    Examples:
+        - 3 -> 3
+        - "3" -> 3
+        - "3 patients" -> 3
+        - None -> 1
+        - 0 -> 1
+        - -5 -> 1
+    """
+    if capacity_val is None:
+        return max(1, default_capacity)
+    if isinstance(capacity_val, (int, float)):
+        return max(1, int(capacity_val))
+
+    s = str(capacity_val).strip()
+    if not s:
+        return max(1, default_capacity)
+
+    match = re.search(r"\b(\d+)\b", s)
+    if match:
+        try:
+            val = int(match.group(1))
+            return max(1, val)
+        except (ValueError, TypeError):
+            pass
+
+    return max(1, default_capacity)
+
+
+def extract_business_schedule_from_version(version_configuration: Optional[dict]) -> Tuple[Optional[str], Optional[str], int]:
+    """Extracts businessHours, slotDuration, and patientsPerSlot safely from an AgentVersion configuration JSON dict.
     
     Supports case-insensitive variations and aliases (e.g. slotduration, slotDuration, slot_duration,
-    businessHours, businesshours, workingHours).
+    businessHours, businesshours, workingHours, patientsPerSlot, slotCapacity, maxPatientsPerSlot).
     """
     if not version_configuration or not isinstance(version_configuration, dict):
-        return None, None
+        return None, None, 1
 
     biz_info = version_configuration.get("businessInformation") or {}
     biz_hours = biz_info.get("hours") if isinstance(biz_info, dict) else None
 
-    vars_cfg = version_configuration.get("variables") or {}
-    input_vars = vars_cfg.get("inputVariables") or vars_cfg.get("input") if isinstance(vars_cfg, dict) else []
+    vars_cfg = version_configuration.get("variables") or []
+    if isinstance(vars_cfg, dict):
+        input_vars = vars_cfg.get("inputVariables") or vars_cfg.get("input") or []
+    elif isinstance(vars_cfg, list):
+        input_vars = vars_cfg
+    else:
+        input_vars = []
+
     if not isinstance(input_vars, list):
         input_vars = []
 
     slot_duration = None
+    patients_per_slot = 1
+
+    # Also check direct top-level keys
+    for top_k, top_v in version_configuration.items():
+        norm_top_k = re.sub(r"[_\-\s]", "", str(top_k)).lower()
+        if norm_top_k in ("patientsperslot", "patientsperslots", "slotcapacity", "maxpatientsperslot", "maxpatients", "capacity"):
+            patients_per_slot = parse_patients_per_slot(top_v, default_capacity=1)
+        elif norm_top_k in ("slotduration", "slotinterval", "appointmentduration", "slotminutes", "duration"):
+            slot_duration = str(top_v)
+        elif norm_top_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):
+            biz_hours = str(top_v)
+
     for v in input_vars:
         if isinstance(v, dict):
-            raw_k = str(v.get("key") or "").strip()
+            raw_k = str(v.get("key") or v.get("name") or v.get("id") or "").strip()
             norm_k = re.sub(r"[_\-\s]", "", raw_k).lower()
             val = v.get("defaultValue") if v.get("defaultValue") is not None else v.get("value")
-            if not val:
+            if val is None or str(val).strip() == "":
                 continue
             if norm_k in ("businesshours", "workinghours", "clinichours", "hours", "shifts"):
                 biz_hours = str(val)
             elif norm_k in ("slotduration", "slotinterval", "appointmentduration", "slotminutes", "duration"):
                 slot_duration = str(val)
+            elif norm_k in ("patientsperslot", "patientsperslots", "slotcapacity", "maxpatientsperslot", "maxpatients", "capacity"):
+                patients_per_slot = parse_patients_per_slot(val, default_capacity=1)
 
-    return biz_hours, slot_duration
+    return biz_hours, slot_duration, patients_per_slot

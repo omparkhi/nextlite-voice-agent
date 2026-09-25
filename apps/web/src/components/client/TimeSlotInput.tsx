@@ -8,6 +8,7 @@ interface TimeSlotInputProps {
   className?: string;
   placeholder?: string;
   disabled?: boolean;
+  slotOccupancy?: Record<string, { booked: number; capacity: number }>;
 }
 
 export function TimeSlotInput({
@@ -17,6 +18,7 @@ export function TimeSlotInput({
   className = '',
   placeholder = 'e.g. 10:00 AM',
   disabled = false,
+  slotOccupancy,
 }: TimeSlotInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isNativePicker, setIsNativePicker] = useState(false);
@@ -156,6 +158,9 @@ export function TimeSlotInput({
           <div className="grid grid-cols-2 gap-1">
             {availableSlots.map((slot) => {
               const isSelected = value === slot;
+              const occ = slotOccupancy ? slotOccupancy[slot] : undefined;
+              const isFull = occ ? occ.booked >= occ.capacity : false;
+
               return (
                 <button
                   key={slot}
@@ -164,11 +169,25 @@ export function TimeSlotInput({
                   className={`px-2.5 py-1.5 text-xs rounded-lg font-medium text-left transition flex items-center justify-between cursor-pointer ${
                     isSelected
                       ? 'bg-[#0c0a09] text-white'
+                      : isFull
+                      ? 'bg-[#fef2f2]/60 text-[#991b1b] hover:bg-[#fef2f2]'
                       : 'text-[#4e4e4e] hover:bg-[#f0efed] hover:text-[#0c0a09]'
                   }`}
                 >
-                  <span>{slot}</span>
-                  {isSelected && <span className="text-[10px]">✓</span>}
+                  <span className="truncate">{slot}</span>
+                  {isSelected ? (
+                    <span className="text-[10px]">✓</span>
+                  ) : occ ? (
+                    isFull ? (
+                      <span className="text-[9px] font-bold uppercase tracking-wider px-1 py-0.2 rounded bg-rose-100 text-rose-700">
+                        FULL
+                      </span>
+                    ) : occ.booked > 0 ? (
+                      <span className="text-[9px] font-medium px-1 py-0.2 rounded bg-amber-100 text-amber-800">
+                        {occ.booked}/{occ.capacity}
+                      </span>
+                    ) : null
+                  ) : null}
                 </button>
               );
             })}

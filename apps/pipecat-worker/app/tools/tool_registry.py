@@ -40,6 +40,10 @@ from app.tools.end_call_tool import (
     END_CALL_TOOL_NAME,
     create_end_call_tool_factory,
 )
+from app.tools.emergency_tool import (
+    TRANSFER_CALL_TOOL_NAME,
+    create_transfer_call_tool_factory,
+)
 
 if TYPE_CHECKING:
     from app.call_lifecycle import CallTranscriptCollector, TrustedCallContext
@@ -62,10 +66,12 @@ class ToolRuntimeContext:
     timezone: Optional[str] = None
     business_hours: Optional[str] = None
     slot_duration: Optional[str] = None
+    patients_per_slot: Optional[int] = None
     transcript_collector: Optional["CallTranscriptCollector"] = None
     timing_tracker: Optional[Any] = None
     _call_session_task: Optional[Any] = None
     trigger_end_call: Optional[Callable[..., None]] = None
+    trigger_transfer_call: Optional[Callable[..., Any]] = None
 
     async def ensure_call_session_id(self) -> Optional[str]:
         """Ensures that the background CallSession creation task has completed before tool execution."""
@@ -327,6 +333,24 @@ class EndCallToolFactory:
         )
 
 
+class EmergencyToolFactory:
+    tool_id = TRANSFER_CALL_TOOL_NAME
+
+    def create(
+        self,
+        context: ToolRuntimeContext,
+        tool_config: Optional[RuntimeToolDefinition] = None,
+        runtime_config: Optional[RuntimeAgentConfig] = None,
+        http_client: Optional[httpx.AsyncClient] = None,
+    ) -> FunctionSchema:
+        desc = tool_config.description if tool_config and tool_config.description else None
+        return create_transfer_call_tool_factory(
+            context=context,
+            description_override=desc,
+            http_client=http_client,
+        )
+
+
 class ToolRegistry:
     """NextLite Voice Tool Registry for Pipecat Worker.
     
@@ -342,6 +366,7 @@ class ToolRegistry:
         self.register(SlotToolFactory())
         self.register(RescheduleToolFactory())
         self.register(EndCallToolFactory())
+        self.register(EmergencyToolFactory())
 
     def register(self, factory: ToolFactory) -> "ToolRegistry":
         """Register a tool factory with the registry."""

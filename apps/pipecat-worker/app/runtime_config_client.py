@@ -48,6 +48,8 @@ class RuntimePromptConfig(BaseContractModel):
     compiled_system_prompt: str = Field(..., alias="compiledSystemPrompt")
     greeting: Optional[str] = None
     timezone: Optional[str] = None
+    guardrails: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    emergency_phone: Optional[str] = Field(default=None, alias="emergencyPhone")
 
 
 class RuntimeVoiceConfig(BaseContractModel):

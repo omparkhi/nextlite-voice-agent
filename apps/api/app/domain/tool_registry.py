@@ -21,6 +21,7 @@ CANONICAL_PLATFORM_TOOLS = (
     "check_available_slots",
     "reschedule_appointment",
     "end_call",
+    "transfer_call",
 )
 
 CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
@@ -75,6 +76,20 @@ CANONICAL_TOOL_LABEL_MAP: Dict[str, str] = {
     "terminate_call": "end_call",
     "disconnect_call": "end_call",
     "disconnect": "end_call",
+    # Call Transfer & Emergency Escalation
+    "transfer_call": "transfer_call",
+    "transfer call": "transfer_call",
+    "transfer_emergency_call": "transfer_call",
+    "transfer emergency call": "transfer_call",
+    "emergency_transfer": "transfer_call",
+    "emergency transfer": "transfer_call",
+    "emergency_escalation": "transfer_call",
+    "emergency escalation": "transfer_call",
+    "transfer_to_doctor": "transfer_call",
+    "transfer to doctor": "transfer_call",
+    "escalate_call": "transfer_call",
+    "escalate call": "transfer_call",
+    "transfer": "transfer_call",
 }
 
 PROTECTED_CONTEXT_KEYS = {
@@ -335,6 +350,48 @@ CANONICAL_TOOL_REGISTRY: Dict[str, ToolDefinition] = {
             "properties": {
                 "success": {"type": "boolean"},
                 "action": {"type": "string"},
+                "message": {"type": "string"}
+            },
+            "required": ["success"]
+        },
+        is_platform_default=True,
+        confirmation_supported=False
+    ),
+    "transfer_call": ToolDefinition(
+        id="transfer_call",
+        name="transfer_call",
+        display_name="Live Call Transfer / Emergency Escalation",
+        description="Transfer the ongoing phone call directly to the doctor or emergency staff when a true medical/dental emergency is verified (such as active severe bleeding, accidental trauma/fracture, or unbearable acute distress). Always speak a calming reassuring phrase in the caller's active language before invoking this tool.",
+        category="Telephony",
+        parameters={
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string",
+                    "description": "Specific clinical reason or symptom justifying emergency transfer (e.g. 'Severe continuous bleeding', 'Facial trauma', 'Unbearable pain')"
+                },
+                "patientName": {
+                    "type": "string",
+                    "description": "Optional patient name"
+                },
+                "severity": {
+                    "type": "string",
+                    "enum": ["CRITICAL", "EMERGENCY", "URGENT"],
+                    "description": "Severity level of the emergency"
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional brief clinical observations"
+                }
+            },
+            "required": ["reason"]
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "success": {"type": "boolean"},
+                "action": {"type": "string"},
+                "targetPhone": {"type": "string"},
                 "message": {"type": "string"}
             },
             "required": ["success"]

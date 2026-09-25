@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '../../services/api';
 import type { Lead } from '../../types';
@@ -6,6 +6,7 @@ import { TableSkeleton } from '../../components/client/LoadingSkeleton';
 import { EmptyState } from '../../components/client/EmptyState';
 import { LeadDetailsDrawer } from '../../components/client/LeadDetailsDrawer';
 import { formatDateDDMMYYYY } from '@/utils/dateFormatters';
+import { areEntitiesEqual } from '../../utils/fastDiff';
 
 export function ClientLeads() {
   const { isViewer } = useOutletContext<{ isViewer: boolean }>();
@@ -21,33 +22,36 @@ export function ClientLeads() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const loadLeads = useCallback(async () => {
-    setLoading(true);
+  const loadLeads = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.getClientLeads({
         limit,
         offset: page * limit,
         status: statusFilter !== 'ALL' ? statusFilter : undefined,
       });
-      setLeads(res.leads || []);
-      setTotal(res.total || 0);
+      const incoming = res.leads || [];
+      const incomingTotal = res.total || 0;
+      setLeads((prev) => areEntitiesEqual(prev, incoming) ? prev : incoming);
+      setTotal((prev) => prev !== incomingTotal ? incomingTotal : prev);
     } catch (err) {
       console.error('Failed to load leads:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, limit]);
 
   useEffect(() => {
     loadLeads();
 
-    const handleRefresh = () => loadLeads();
+    const handleRefresh = () => loadLeads(false);
+    const handleRefreshSilent = () => loadLeads(true);
     window.addEventListener('crm-refresh', handleRefresh);
-    window.addEventListener('crm-refresh-silent', handleRefresh);
+    window.addEventListener('crm-refresh-silent', handleRefreshSilent);
 
     return () => {
       window.removeEventListener('crm-refresh', handleRefresh);
-      window.removeEventListener('crm-refresh-silent', handleRefresh);
+      window.removeEventListener('crm-refresh-silent', handleRefreshSilent);
     };
   }, [loadLeads]);
 
@@ -72,16 +76,18 @@ export function ClientLeads() {
     setSelectedLead(updated);
   };
 
-  const filteredLeads = leads.filter((l) => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const nameMatch = l.customerName.toLowerCase().includes(q);
-      const phoneMatch = l.customerPhone.toLowerCase().includes(q);
-      const interestMatch = l.interestCategory?.toLowerCase().includes(q);
-      return nameMatch || phoneMatch || interestMatch;
-    }
-    return true;
-  });
+  const filteredLeads = useMemo(() => {
+    return leads.filter((l) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const nameMatch = l.customerName.toLowerCase().includes(q);
+        const phoneMatch = l.customerPhone.toLowerCase().includes(q);
+        const interestMatch = l.interestCategory?.toLowerCase().includes(q);
+        return nameMatch || phoneMatch || interestMatch;
+      }
+      return true;
+    });
+  }, [leads, searchQuery]);
 
   const getStatusBadge = (status: Lead['status']) => {
     switch (status) {

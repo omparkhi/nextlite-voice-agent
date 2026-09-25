@@ -419,7 +419,7 @@ class Appointment(Base):
     callSessionId: Mapped[Optional[uuid.UUID]] = mapped_column("call_session_id", UUID(as_uuid=True), ForeignKey("call_sessions.id", ondelete="SET NULL"), nullable=True)
     appointmentNumber: Mapped[Optional[str]] = mapped_column("appointment_number", String(50), nullable=True)
     customerName: Mapped[str] = mapped_column("customer_name", String(255), nullable=False)
-    customerPhone: Mapped[str] = mapped_column("customer_phone", String(50), nullable=False)
+    customerPhone: Mapped[Optional[str]] = mapped_column("customer_phone", String(50), nullable=True, default="")
     title: Mapped[str] = mapped_column("title", String(255), nullable=False, default="Appointment")
     resourceName: Mapped[Optional[str]] = mapped_column("resource_name", String(255), nullable=True)
     bookingDate: Mapped[str] = mapped_column("booking_date", String(50), nullable=False)

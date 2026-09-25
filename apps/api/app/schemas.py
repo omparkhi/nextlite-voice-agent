@@ -32,6 +32,8 @@ class RuntimePromptConfig(CamelModel):
     compiled_system_prompt: str
     greeting: Optional[str] = ""
     timezone: Optional[str] = "Asia/Kolkata"
+    guardrails: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    emergency_phone: Optional[str] = None
 
 class RuntimeVoiceConfig(CamelModel):
     provider: str = "sarvam"

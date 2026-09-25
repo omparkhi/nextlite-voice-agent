@@ -234,6 +234,8 @@ def create_book_appointment_tool_factory(
             payload["businessHours"] = biz_hours
         if getattr(context, "slot_duration", None):
             payload["slotDuration"] = context.slot_duration
+        if getattr(context, "patients_per_slot", None):
+            payload["patientsPerSlot"] = context.patients_per_slot
         if context.tenant_id:
             payload["tenantId"] = context.tenant_id
         if context.agent_id:
@@ -296,6 +298,8 @@ def create_book_appointment_tool_factory(
                     "appointmentId": appointment_id,
                     "appointmentNumber": appointment_number,
                     "status": "REQUESTED",
+                    "slot": booking_time,
+                    "date": booking_date,
                     "message": (
                         f"Your appointment request has been recorded with appointment number {appointment_number}. "
                         "The team will verify availability and confirm it."
@@ -308,21 +312,36 @@ def create_book_appointment_tool_factory(
                 except Exception:
                     pass
 
-                status = response.status_code
-                error_code = err_data.get("code") or (
-                    "UNAUTHORIZED" if status == 401
-                    else "DEPLOYMENT_NOT_FOUND" if status == 404
-                    else "DEPLOYMENT_INACTIVE" if status == 409
-                    else "APPOINTMENT_REQUEST_FAILED"
-                )
-                logger.warning(
-                    f"[AppointmentTool] API returned status {status} for appointment creation: {err_data.get('error') or err_data.get('message')}"
-                )
-                result = {
-                    "success": False,
-                    "error": error_code,
-                    "message": "Unable to record the appointment request at this time. Please try again later.",
-                }
+                status_code = response.status_code
+                raw_detail = str(err_data.get("detail") or err_data.get("message") or "")
+                if status_code == 409 or "capacity" in raw_detail.lower() or "already booked" in raw_detail.lower() or "full" in raw_detail.lower():
+                    logger.warning(
+                        f"[AppointmentTool] Slot capacity full for {booking_time} on {booking_date}: {raw_detail}"
+                    )
+                    result = {
+                        "success": False,
+                        "error": "SLOT_CAPACITY_FULL",
+                        "slot": booking_time,
+                        "date": booking_date,
+                        "message": (
+                            f"The requested slot {booking_time} on {booking_date} has reached maximum capacity. "
+                            "Please inform the caller that this slot is full and offer alternative open slots."
+                        ),
+                    }
+                else:
+                    error_code = err_data.get("code") or (
+                        "UNAUTHORIZED" if status_code == 401
+                        else "DEPLOYMENT_NOT_FOUND" if status_code == 404
+                        else "APPOINTMENT_REQUEST_FAILED"
+                    )
+                    logger.warning(
+                        f"[AppointmentTool] API returned status {status_code} for appointment creation: {raw_detail}"
+                    )
+                    result = {
+                        "success": False,
+                        "error": error_code,
+                        "message": "Unable to record the appointment request at this time. Please try again later.",
+                    }
         except httpx.TimeoutException:
             logger.warning("[AppointmentTool] Timeout connecting to appointments API")
             result = {

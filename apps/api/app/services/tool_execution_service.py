@@ -72,6 +72,14 @@ class ToolExecutionService:
                 "message": "Call termination initiated.",
                 "reason": reason
             }
+        elif canonical_name == "transfer_call":
+            return await self._execute_transfer_call(
+                arguments=safe_args,
+                tenant_id=trusted_tenant_id,
+                agent_id=trusted_agent_id,
+                caller_phone=trusted_caller_phone,
+                call_session_id=call_session_id
+            )
         else:
             raise ValueError(f"Tool {canonical_name} is not implemented in internal registry")
 
@@ -262,4 +270,47 @@ class ToolExecutionService:
             "success": True,
             "results": [f"Relevant knowledge retrieved for: {query}"],
             "confidence": 0.92
+        }
+
+    async def _execute_transfer_call(
+        self,
+        arguments: Dict[str, Any],
+        tenant_id: uuid.UUID,
+        agent_id: Optional[uuid.UUID],
+        caller_phone: Optional[str],
+        call_session_id: Optional[uuid.UUID]
+    ) -> Dict[str, Any]:
+        reason = arguments.get("reason", "Medical/Clinical Emergency")
+        patient_name = arguments.get("patientName") or "Caller"
+        severity = arguments.get("severity") or "EMERGENCY"
+        notes = arguments.get("notes") or ""
+
+        # Dynamically lookup emergency escalation phone from Agent configuration or Tenant
+        target_phone = "+919800000000"
+        if agent_id:
+            agent_res = await self.session.execute(select(Agent).where(Agent.id == agent_id))
+            agent = agent_res.scalar_one_or_none()
+            if agent and agent.configuration:
+                cfg = agent.configuration
+                target_phone = (
+                    cfg.get("guardrails", {}).get("emergencyPhone")
+                    or cfg.get("emergencyPhone")
+                    or cfg.get("businessInformation", {}).get("emergencyPhone")
+                    or cfg.get("businessInformation", {}).get("phone")
+                    or cfg.get("variables", {}).get("runtimeContext", {}).get("emergencyPhone")
+                    or target_phone
+                )
+
+        logger.warning(
+            f"[EmergencyEscalation] LIVE CALL TRANSFER triggered | tenant={tenant_id} | "
+            f"patient='{patient_name}' | severity='{severity}' | reason='{reason}' | target='{target_phone}'"
+        )
+
+        return {
+            "success": True,
+            "action": "TRANSFER",
+            "targetPhone": target_phone,
+            "reason": reason,
+            "severity": severity,
+            "message": f"Emergency call transfer initiated to doctor/clinic on {target_phone}."
         }
