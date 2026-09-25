@@ -5,7 +5,12 @@ import { api } from '../../services/api';
 import type { Appointment } from '../../types';
 
 import { TimeSlotInput } from '../../components/client/TimeSlotInput';
-import { generateTimeSlots, getNearestUpcomingSlot, normalizeTimeString } from '../../utils/timeSlots';
+import {
+  generateTimeSlots,
+  generateGroupedTimeSlots,
+  getNearestUpcomingSlot,
+  normalizeTimeString,
+} from '../../utils/timeSlots';
 import { AppointmentDetailsDrawer } from '../../components/client/AppointmentDetailsDrawer';
 import { areEntitiesEqual } from '../../utils/fastDiff';
 
@@ -55,6 +60,8 @@ export function ReceptionistDashboard() {
 
   // Dynamic slot capacity resolution (default 1, dynamically updated from backend clinic configuration)
   const [dynamicCapacity, setDynamicCapacity] = useState<number>(() => (user as any)?.patientsPerSlot || 1);
+  const [clinicHours, setClinicHours] = useState<string | undefined>(undefined);
+  const [clinicDuration, setClinicDuration] = useState<string | undefined>(undefined);
   const defaultCapacity = dynamicCapacity || (user as any)?.patientsPerSlot || 1;
 
   // Compute slot occupancy and active appointments per slot
@@ -79,6 +86,11 @@ export function ReceptionistDashboard() {
   const normSlotTime = normalizeTimeString(slotTime) || slotTime;
   const currentSlotOcc = slotOccupancy[normSlotTime] || { booked: 0, capacity: defaultCapacity, appts: [] };
   const isSelectedSlotFull = currentSlotOcc.booked >= currentSlotOcc.capacity && currentSlotOcc.capacity > 0 && currentSlotOcc.booked > 0;
+
+  // Grouped shifts based on dynamic business hours
+  const groupedShifts = React.useMemo(() => {
+    return generateGroupedTimeSlots(clinicHours, clinicDuration);
+  }, [clinicHours, clinicDuration]);
 
   // Resolve Clinic Display Name
   const clinicDisplayName =
@@ -106,6 +118,12 @@ export function ReceptionistDashboard() {
       if (res.patientsPerSlot || res.capacity) {
         const newCap = res.patientsPerSlot || res.capacity || 1;
         setDynamicCapacity((prev) => (prev === newCap ? prev : newCap));
+      }
+      if (res.businessHours) {
+        setClinicHours(res.businessHours);
+      }
+      if (res.slotDuration) {
+        setClinicDuration(res.slotDuration);
       }
       setLastSyncTime(new Date());
     } catch (err: any) {
@@ -666,6 +684,8 @@ export function ReceptionistDashboard() {
                 <TimeSlotInput
                   value={slotTime}
                   onChange={setSlotTime}
+                  businessHours={clinicHours}
+                  slotDuration={clinicDuration}
                   slotOccupancy={slotOccupancy}
                 />
               </div>
@@ -875,125 +895,159 @@ export function ReceptionistDashboard() {
                 </p>
               </div>
             ) : viewMode === 'SLOTS' ? (
-              <div className="p-4 sm:p-5 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {generateTimeSlots().map((slot) => {
-                    const norm = normalizeTimeString(slot) || slot;
-                    const occ = slotOccupancy[norm] || { booked: 0, capacity: defaultCapacity, appts: [] };
-                    const isFull = occ.booked >= occ.capacity && occ.capacity > 0 && occ.booked > 0;
-
-                    // Filter appointments inside this slot if searching or filtering by source
-                    const slotAppts = occ.appts.filter((appt) => {
-                      if (sourceFilter === 'AI' && appt.bookedBy !== 'AGENT') return false;
-                      if (sourceFilter === 'DESK' && appt.bookedBy !== 'RECEPTIONIST' && appt.bookedBy !== 'MANUAL_CLIENT') return false;
-                      if (sourceFilter === 'WHATSAPP' && appt.bookedBy !== 'WHATSAPP') return false;
-                      if (!searchQuery.trim()) return true;
-                      const q = searchQuery.toLowerCase();
-                      return (
-                        appt.customerName?.toLowerCase().includes(q) ||
-                        appt.customerPhone?.toLowerCase().includes(q) ||
-                        appt.appointmentNumber?.toLowerCase().includes(q)
-                      );
-                    });
-
-                    // Hide empty slots if search query is active
-                    if (occ.booked === 0 && searchQuery) return null;
-
-                    return (
-                      <div
-                        key={slot}
-                        className={`p-4 rounded-2xl border transition-all ${
-                          isFull
-                            ? 'bg-[#fef2f2]/40 border-[#fecaca]'
-                            : occ.booked > 0
-                            ? 'bg-white border-[#e7e5e4] shadow-2xs'
-                            : 'bg-[#fafafa]/50 border-[#f0efed]'
-                        }`}
-                      >
-                        {/* Slot Header */}
-                        <div className="flex items-center justify-between pb-2.5 border-b border-[#f0efed]">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-xs text-[#0c0a09]">{slot}</span>
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide ${
-                                isFull
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                  : occ.booked > 0
-                                  ? 'bg-amber-100 text-amber-900 border border-amber-200'
-                                  : 'bg-[#f0efed] text-[#777169]'
-                              }`}
-                            >
-                              {isFull ? `FULL (${occ.booked}/${occ.capacity})` : `${occ.booked} / ${occ.capacity} booked`}
-                            </span>
-                          </div>
-
-                          {!isFull ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSlotTime(slot);
-                                nameInputRef.current?.focus();
-                                window.scrollTo({ top: 0, behavior: 'smooth' });
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-[#0c0a09] text-white hover:opacity-90 text-[10px] font-semibold transition cursor-pointer shadow-2xs"
-                            >
-                              + Add Patient
-                            </button>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 uppercase tracking-wider">
-                              FULL
-                            </span>
-                          )}
+              <div className="p-4 sm:p-6 space-y-6">
+                {groupedShifts.map((shift) => (
+                  <div key={shift.id} className="space-y-3.5">
+                    {/* Shift Header */}
+                    <div className="flex items-center justify-between pb-2 border-b border-[#e7e5e4]">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 rounded-lg bg-[#f0efed] text-[#0c0a09]">
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
                         </div>
+                        <h4 className="text-xs font-semibold text-[#0c0a09] tracking-tight">
+                          {shift.timeRange}
+                        </h4>
+                      </div>
+                      <span className="text-[10px] font-medium text-[#777169] bg-[#fafafa] px-2.5 py-0.5 rounded-full border border-[#e7e5e4]">
+                        {shift.slots.length} time slots
+                      </span>
+                    </div>
 
-                        {/* Patients in this slot */}
-                        <div className="mt-3 space-y-2">
-                          {slotAppts.length === 0 ? (
-                            <p className="text-[11px] text-[#a8a29e] italic py-1 text-center">
-                              {occ.booked === 0 ? 'No patients booked' : 'No matching patients'}
-                            </p>
-                          ) : (
-                            slotAppts.map((appt) => (
-                              <div
-                                key={appt.id}
-                                onClick={() => {
-                                  setSelectedAppointment(appt);
-                                  setIsDetailsOpen(true);
-                                }}
-                                className="p-2.5 rounded-xl bg-white border border-[#e7e5e4] hover:border-[#0c0a09] transition flex items-center justify-between cursor-pointer shadow-2xs text-xs"
-                              >
-                                <div className="truncate mr-2">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="font-semibold text-[#0c0a09] truncate">{appt.customerName}</span>
-                                    {appt.appointmentNumber && (
-                                      <span className="font-mono text-[10px] text-[#777169]">({appt.appointmentNumber})</span>
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-[#777169] truncate">
-                                    {appt.customerPhone} &bull; {appt.title || 'Consultation'}
+                    {/* Shift Slots Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                      {shift.slots.map((slot) => {
+                        const norm = normalizeTimeString(slot) || slot;
+                        const occ = slotOccupancy[norm] || { booked: 0, capacity: defaultCapacity, appts: [] };
+                        const isFull = occ.booked >= occ.capacity && occ.capacity > 0 && occ.booked > 0;
+
+                        // Filter appointments inside this slot if searching or filtering by source
+                        const slotAppts = occ.appts.filter((appt) => {
+                          if (sourceFilter === 'AI' && appt.bookedBy !== 'AGENT') return false;
+                          if (sourceFilter === 'DESK' && appt.bookedBy !== 'RECEPTIONIST' && appt.bookedBy !== 'MANUAL_CLIENT') return false;
+                          if (sourceFilter === 'WHATSAPP' && appt.bookedBy !== 'WHATSAPP') return false;
+                          if (!searchQuery.trim()) return true;
+                          const q = searchQuery.toLowerCase();
+                          return (
+                            appt.customerName?.toLowerCase().includes(q) ||
+                            appt.customerPhone?.toLowerCase().includes(q) ||
+                            appt.appointmentNumber?.toLowerCase().includes(q)
+                          );
+                        });
+
+                        // Hide empty slots if search query is active
+                        if (occ.booked === 0 && searchQuery) return null;
+
+                        return (
+                          <div
+                            key={slot}
+                            className={`p-3.5 rounded-2xl border transition-all ${
+                              isFull
+                                ? 'bg-rose-50/30 border-rose-200'
+                                : occ.booked > 0
+                                ? 'bg-white border-[#e7e5e4] shadow-2xs hover:border-[#a8a29e]'
+                                : 'bg-[#fafaf9]/60 border-[#f0efed] hover:border-[#d6d3d1]'
+                            }`}
+                          >
+                            {/* Slot Header */}
+                            <div className="flex items-center justify-between pb-2 border-b border-[#f0efed]">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-xs text-[#0c0a09]">{slot}</span>
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[9px] font-semibold tracking-wide ${
+                                    isFull
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                      : occ.booked > 0
+                                      ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                                      : 'bg-[#f0efed] text-[#777169]'
+                                  }`}
+                                >
+                                  {isFull ? `FULL (${occ.booked}/${occ.capacity})` : `${occ.booked}/${occ.capacity} booked`}
+                                </span>
+                              </div>
+
+                              {!isFull ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSlotTime(slot);
+                                    nameInputRef.current?.focus();
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-[#0c0a09] text-white hover:bg-[#262626] text-[10px] font-medium transition cursor-pointer shadow-2xs flex items-center gap-1"
+                                >
+                                  <span>+ Book</span>
+                                </button>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-bold text-rose-700 bg-rose-100 border border-rose-200 uppercase tracking-wider">
+                                  FULL
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Patients in this slot */}
+                            <div className="mt-2.5 space-y-1.5">
+                              {slotAppts.length === 0 ? (
+                                <div
+                                  onClick={() => {
+                                    if (!isFull) {
+                                      setSlotTime(slot);
+                                      nameInputRef.current?.focus();
+                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }
+                                  }}
+                                  className="py-3 text-center cursor-pointer group"
+                                >
+                                  <p className="text-[11px] text-[#a8a29e] group-hover:text-[#0c0a09] transition">
+                                    {occ.booked === 0 ? '+ Click to book this slot' : 'No matching patients'}
                                   </p>
                                 </div>
-                                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider ${
-                                      appt.status === 'COMPLETED'
-                                        ? 'bg-[#f0efed] text-[#4e4e4e]'
-                                        : appt.status === 'CANCELLED'
-                                        ? 'bg-[#fef2f2] text-[#dc2626]'
-                                        : 'bg-[#dcfce7] text-[#15803d]'
-                                    }`}
+                              ) : (
+                                slotAppts.map((appt) => (
+                                  <div
+                                    key={appt.id}
+                                    onClick={() => {
+                                      setSelectedAppointment(appt);
+                                      setIsDetailsOpen(true);
+                                    }}
+                                    className="p-2 rounded-xl bg-white border border-[#e7e5e4] hover:border-[#0c0a09] transition flex items-center justify-between cursor-pointer shadow-2xs text-xs"
                                   >
-                                    {appt.status}
-                                  </span>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                                    <div className="truncate mr-2">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-semibold text-[#0c0a09] truncate">{appt.customerName}</span>
+                                        {appt.appointmentNumber && (
+                                          <span className="text-[10px] text-[#777169]">({appt.appointmentNumber})</span>
+                                        )}
+                                      </div>
+                                      <p className="text-[10px] text-[#777169] truncate">
+                                        {appt.customerPhone || 'Walk-in'} &bull; {appt.title || 'Consultation'}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider ${
+                                          appt.status === 'COMPLETED'
+                                            ? 'bg-[#f0efed] text-[#4e4e4e]'
+                                            : appt.status === 'CANCELLED'
+                                            ? 'bg-[#fef2f2] text-[#dc2626]'
+                                            : 'bg-[#dcfce7] text-[#15803d]'
+                                        }`}
+                                      >
+                                        {appt.status}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <>

@@ -69,6 +69,8 @@ export function ClientAppointments() {
     isOutsideShift?: boolean;
   } | null>(null);
   const [existingBookingInfo, setExistingBookingInfo] = useState<any>(null);
+  const [businessHours, setBusinessHours] = useState<string | undefined>(undefined);
+  const [slotDuration, setSlotDuration] = useState<string | undefined>(undefined);
 
   const loadAppointments = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -82,6 +84,8 @@ export function ClientAppointments() {
       const incomingTotal = res.total || 0;
       setAppointments((prev) => areEntitiesEqual(prev, incoming) ? prev : incoming);
       setTotal((prev) => prev !== incomingTotal ? incomingTotal : prev);
+      if (res.businessHours) setBusinessHours(res.businessHours);
+      if (res.slotDuration) setSlotDuration(res.slotDuration);
     } catch (err) {
       console.error('Failed to load appointments:', err);
     } finally {
@@ -650,6 +654,8 @@ export function ClientAppointments() {
                   <TimeSlotInput
                     value={newBookingTime}
                     onChange={setNewBookingTime}
+                    businessHours={businessHours}
+                    slotDuration={slotDuration}
                   />
                 </div>
               </div>
