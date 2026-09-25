@@ -144,22 +144,9 @@ async def get_schedule(
         tenant_uuid = await get_or_create_default_tenant(session)
 
     # Resolve dynamic capacity for tenant
-    from ..models import Agent, AgentVersion
-    from ..domain.dynamic_schedule_engine import extract_business_schedule_from_version
-    patients_per_slot = 1
-    if tenant_uuid:
-        biz_hours_query = await session.execute(
-            select(AgentVersion.configuration).join(Agent, Agent.id == AgentVersion.agentId)
-            .where(Agent.tenantId == tenant_uuid)
-            .order_by(AgentVersion.versionNumber.desc())
-            .limit(1)
-        )
-        cfg_json = biz_hours_query.scalar_one_or_none()
-        if cfg_json and isinstance(cfg_json, dict):
-            _, _, p_s = extract_business_schedule_from_version(cfg_json)
-            patients_per_slot = p_s
-
-    effective_capacity = max(1, int(patients_per_slot or 1))
+    crm_service = CRMService(session)
+    b_h, s_d, p_s = await crm_service._resolve_tenant_schedule_config(tenant_uuid)
+    effective_capacity = max(1, int(p_s or 1))
 
     # Filter for doctor if resourceName matches or general
     daily_bookings = []

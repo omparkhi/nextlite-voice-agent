@@ -138,6 +138,9 @@ class CRMService:
                                         await self.session.commit()
                                     break
 
+        b_h, s_d, p_s = await self._resolve_tenant_schedule_config(tenant_id)
+        effective_capacity = max(1, int(p_s or 1))
+
         return {
             "tenant": {
                 "id": str(tenant.id),
@@ -151,9 +154,15 @@ class CRMService:
                 "email": user.email,
                 "role": user.role.value if hasattr(user.role, "value") else str(user.role),
                 "emailVerified": user.emailVerified,
+                "patientsPerSlot": effective_capacity,
+                "capacity": effective_capacity,
                 "createdAt": to_utc_iso(user.createdAt),
             } if user else None,
             "doctorName": doctor_name,
+            "patientsPerSlot": effective_capacity,
+            "capacity": effective_capacity,
+            "slotDuration": s_d or "30 mins",
+            "businessHours": b_h,
             "subscription": {
                 "id": str(sub.id),
                 "status": sub.status.value if hasattr(sub.status, "value") else str(sub.status),
