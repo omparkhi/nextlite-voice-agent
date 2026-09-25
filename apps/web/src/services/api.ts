@@ -254,6 +254,7 @@ export const api = {
     if (params?.status) stringParams.status = params.status;
     if (params?.bookingDate) stringParams.bookingDate = params.bookingDate;
     if (params?.bookedBy) stringParams.bookedBy = params.bookedBy;
+    if (params?.tenantId) stringParams.tenantId = params.tenantId;
     return request<{
       appointments: Appointment[];
       total: number;

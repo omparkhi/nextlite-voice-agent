@@ -43,12 +43,15 @@ class CRMService:
         
         Prioritizes active Deployment version snapshot, falling back to the latest AgentVersion.
         """
-        # 1. Query active deployment version snapshot
+        from sqlalchemy import or_
+
+        # 1. Query active deployment version snapshot for any agent belonging to this tenant
         dep_stmt = (
             select(AgentVersion.configuration)
             .join(Deployment, Deployment.versionId == AgentVersion.id)
+            .join(Agent, Agent.id == Deployment.agentId)
             .where(
-                Deployment.tenantId == tenant_id,
+                or_(Deployment.tenantId == tenant_id, Agent.tenantId == tenant_id),
                 Deployment.status == DeploymentStatus.ACTIVE
             )
             .order_by(Deployment.createdAt.desc())
@@ -69,7 +72,29 @@ class CRMService:
             v_res = await self.session.execute(v_stmt)
             cfg_json = v_res.scalar_one_or_none()
 
-        return extract_business_schedule_from_version(cfg_json if isinstance(cfg_json, dict) else None)
+        b_h, s_d, p_s = extract_business_schedule_from_version(cfg_json if isinstance(cfg_json, dict) else None)
+        if p_s > 1 or b_h or s_d:
+            return b_h, s_d, p_s
+
+        # 3. Comprehensive scan across all agent versions for tenant if default was 1
+        all_v_stmt = (
+            select(AgentVersion.configuration)
+            .join(Agent, Agent.id == AgentVersion.agentId)
+            .where(Agent.tenantId == tenant_id)
+            .order_by(AgentVersion.createdAt.desc())
+        )
+        all_v_res = await self.session.execute(all_v_stmt)
+        for cand_cfg in all_v_res.scalars().all():
+            if isinstance(cand_cfg, dict):
+                cand_bh, cand_sd, cand_ps = extract_business_schedule_from_version(cand_cfg)
+                if cand_ps > 1:
+                    p_s = cand_ps
+                if cand_bh and not b_h:
+                    b_h = cand_bh
+                if cand_sd and not s_d:
+                    s_d = cand_sd
+
+        return b_h, s_d, p_s
 
     # Profile
     async def get_client_profile(self, tenant_id: uuid.UUID) -> Optional[Dict[str, Any]]:
