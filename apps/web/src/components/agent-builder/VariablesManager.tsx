@@ -129,7 +129,6 @@ export function VariablesManager({
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingVar, setEditingVar] = useState<InputVariable | null>(null);
   const [deletingVar, setDeletingVar] = useState<InputVariable | null>(null);
-  const [openActionMenuKey, setOpenActionMenuKey] = useState<string | null>(null);
 
   // Form state for add/edit modal
   const [formKey, setFormKey] = useState('');
@@ -179,7 +178,6 @@ export function VariablesManager({
     setFormDefault(v.defaultValue !== undefined ? String(v.defaultValue) : '');
     setFormRequired(v.required || false);
     setFormError(null);
-    setOpenActionMenuKey(null);
   };
 
   const handleSaveAdd = () => {
@@ -233,7 +231,6 @@ export function VariablesManager({
 
   const confirmDelete = (v: InputVariable) => {
     setDeletingVar(v);
-    setOpenActionMenuKey(null);
   };
 
   const executeDelete = () => {
@@ -285,13 +282,13 @@ export function VariablesManager({
       </div>
 
       {/* 2-COLUMN VARIABLE TABLE */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-2xs">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50/70 text-gray-500 font-semibold uppercase tracking-wider text-[10px]">
               <th className="py-3 px-5">Variable name</th>
               <th className="py-3 px-5">Default value</th>
-              <th className="py-3 px-4 text-right w-16"></th>
+              <th className="py-3 px-4 text-right w-24">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -351,43 +348,29 @@ export function VariablesManager({
                     </td>
 
                     <td className="py-3 px-4 text-right relative" onClick={(e) => e.stopPropagation()}>
-                      <div className="relative inline-block text-left">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setOpenActionMenuKey(openActionMenuKey === v.key ? null : v.key);
+                            openEditModal(v);
                           }}
-                          className="w-7 h-7 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-600 font-bold transition-colors"
-                          title="Actions"
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                          title="Edit variable"
                         >
-                          ⋮
+                          ✏️
                         </button>
-
-                        {openActionMenuKey === v.key && (
-                          <div className="absolute right-0 mt-1 w-32 bg-white rounded-xl shadow-lg border border-gray-200 py-1 z-30 text-xs">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openEditModal(v);
-                              }}
-                              className="w-full px-3 py-1.5 text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2 font-medium"
-                            >
-                              <span>✏️</span> Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                confirmDelete(v);
-                              }}
-                              className="w-full px-3 py-1.5 text-left text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-medium"
-                            >
-                              <span>🗑</span> Delete
-                            </button>
-                          </div>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmDelete(v);
+                          }}
+                          className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                          title="Delete variable"
+                        >
+                          🗑️
+                        </button>
                       </div>
                     </td>
                   </tr>
