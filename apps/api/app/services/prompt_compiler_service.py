@@ -44,6 +44,27 @@ class PromptCompilerService:
   * Speak one short, context-appropriate closing farewell in the active language (in Marathi use authentic phrasing like 'धन्यवाद, काळजी घ्या!' or 'नक्की, धन्यवाद, नमस्कार!'. FORBIDDEN: NEVER use literal translations like 'तुमचा दिवस चांगला जावो').
   * You MUST invoke the `end_call` tool in the same turn to hang up the phone call (EXCEPT when doing an emergency transfer via `transfer_call`). Never ask follow-up questions when the caller is leaving."""
 
+    LEAN_CORE_SAFETY_BOUNDARY = """=== PLATFORM SAFETY & CONVERSATIONAL RULES ===
+- ROLE & PERSONA: Warm human voice receptionist. Speak concisely in 2-8 words per turn (max 1-2 short sentences). Direct answer first. One question at a time. Never use markdown, bullet points, asterisks, AI jargon, or read aloud reference UUIDs/appointment IDs.
+- PRIVACY & PHONE: Caller phone number is captured automatically via telephony metadata. Never ask for, repeat, or expose phone numbers.
+- TOOL & BOOKING TRUTH: Never claim slot availability or booking confirmation until the corresponding tool executes and returns success.
+- OPERATING HOURS: Outside working hours/shifts, state closed hours directly without invoking availability tools.
+- EMERGENCY: On acute medical emergency (severe continuous bleeding, accidental trauma, extreme agony), speak 1 calm reassuring phrase and invoke transfer_call in the same turn. Never invoke end_call on emergency transfer.
+- HANGUP: When caller says goodbye, confirms done, or states they will call later, speak 1 short farewell and invoke end_call. Never ask follow-up questions when caller is leaving."""
+
+    def compile_lean_temporal_context(self, timezone_str: str = "Asia/Kolkata") -> str:
+        try:
+            tz = zoneinfo.ZoneInfo(timezone_str)
+        except Exception:
+            tz = zoneinfo.ZoneInfo("Asia/Kolkata")
+        now = datetime.now(tz)
+        return (
+            f"=== TEMPORAL CLOCK ===\n"
+            f"- Date: {now.strftime('%A, %B %d, %Y')} ({now.strftime('%Y-%m-%d')})\n"
+            f"- Time: {now.strftime('%I:%M %p').lstrip('0')} ({timezone_str})\n"
+            f"- Grounding: Today is strictly {now.strftime('%Y-%m-%d')}. In tools, format bookingDate as YYYY-MM-DD."
+        )
+
     def compile_temporal_context(self, timezone_str: str = "Asia/Kolkata") -> str:
         try:
             tz = zoneinfo.ZoneInfo(timezone_str)
@@ -61,7 +82,7 @@ class PromptCompilerService:
 - Relative Day References: Today is {now.strftime('%A')}. When a caller says 'tomorrow' or 'कल'/'उद्या', refer to the day immediately after {now.strftime('%A')}.
 - Past Slots Rule: The current local time is {formatted_time}. Any slot earlier than {formatted_time} today has already passed and CANNOT be offered or booked for today."""
 
-    def compile_system_prompt(
+    def compile_lean_system_prompt(
         self,
         configuration: Any = None,
         knowledge_results: Optional[List[Dict[str, Any]]] = None,
@@ -71,6 +92,208 @@ class PromptCompilerService:
         primary_lang: Optional[str] = None,
         supported_langs: Optional[List[str]] = None,
     ) -> str:
+        """Assembles high-density, lean system prompt (Phase 1 Token Compression)."""
+        parts: List[str] = []
+
+        if isinstance(configuration, str):
+            cfg = {"systemPrompt": configuration}
+        elif isinstance(configuration, dict):
+            cfg = configuration
+        elif base_prompt:
+            cfg = {"systemPrompt": base_prompt}
+        else:
+            cfg = {}
+
+        vars_cfg = cfg.get("variables")
+        if isinstance(vars_cfg, dict):
+            input_vars = vars_cfg.get("input") or vars_cfg.get("inputVariables") or []
+            runtime_ctx = vars_cfg.get("runtimeContext") or cfg.get("runtimeContext") or {}
+        elif isinstance(vars_cfg, list):
+            input_vars = vars_cfg
+            runtime_ctx = cfg.get("runtimeContext") or {}
+        else:
+            input_vars = []
+            runtime_ctx = cfg.get("runtimeContext") or {}
+
+        from ..domain.variable_resolver import build_effective_variable_map
+        effective_vars = build_effective_variable_map(
+            variables=input_vars,
+            runtime_context=runtime_ctx,
+            config=cfg
+        )
+
+        # 1. LEAN CORE SAFETY & VOICE CONTRACT
+        parts.append(self.LEAN_CORE_SAFETY_BOUNDARY)
+
+        # 2. LEAN TEMPORAL CLOCK
+        tz_str = (
+            timezone
+            or effective_vars.get("timezone")
+            or cfg.get("timezone")
+            or cfg.get("businessInformation", {}).get("timezone")
+            or "Asia/Kolkata"
+        )
+        parts.append(self.compile_lean_temporal_context(tz_str))
+
+        # 3. IDENTITY & PERSONA
+        identity = cfg.get("identity") or {}
+        agent_name = (
+            effective_vars.get("agentName")
+            or identity.get("agentName")
+            or identity.get("displayName")
+            or identity.get("name")
+            or "Receptionist"
+        )
+        biz_info = cfg.get("businessInformation") or {}
+        biz_name = (
+            effective_vars.get("businessName")
+            or identity.get("businessName")
+            or biz_info.get("businessName")
+            or ""
+        )
+        persona = cfg.get("persona") or {}
+        tone = persona.get("tone") or persona.get("personality") or "Warm and professional"
+
+        parts.append(f"=== IDENTITY ===\nYou are {agent_name}{f', representing {biz_name}' if biz_name else ''}. Tone: {tone}.")
+
+        # 4. BUSINESS INFORMATION & ACTIVE VARIABLES
+        biz_type = effective_vars.get("businessType") or biz_info.get("businessType")
+        biz_desc = biz_info.get("description")
+        biz_loc = effective_vars.get("businessAddress") or biz_info.get("location") or biz_info.get("address")
+        biz_hours = effective_vars.get("businessHours") or biz_info.get("hours")
+        biz_care_phone = effective_vars.get("customerCareNumber") or biz_info.get("phone") or biz_info.get("contactInformation")
+
+        biz_lines = []
+        if biz_type:
+            biz_lines.append(f"Type: {biz_type}")
+        if biz_desc:
+            biz_lines.append(f"Description: {biz_desc}")
+        if biz_loc:
+            biz_lines.append(f"Location: {biz_loc}")
+        if biz_hours:
+            biz_lines.append(f"Working Hours: {biz_hours} (Bookings strictly during open shifts)")
+        if biz_care_phone:
+            biz_lines.append(f"Contact: {biz_care_phone}")
+        if biz_lines:
+            parts.append("=== BUSINESS INFORMATION ===\n" + "\n".join(f"- {l}" for l in biz_lines))
+
+        if effective_vars:
+            excluded_keys = {"businessHours", "businessAddress", "businessName", "businessType", "customerCareNumber", "timezone", "agentName"}
+            var_lines = [f"- {k}: {v}" for k, v in effective_vars.items() if v and str(v).strip() and k not in excluded_keys]
+            if var_lines:
+                parts.append("=== BUSINESS VARIABLES ===\n" + "\n".join(var_lines))
+
+        # 5. CONVERSATION PHASES (Compact)
+        conv = cfg.get("conversation") or {}
+        phases = conv.get("phases") or []
+        if phases:
+            phase_lines = []
+            for idx, phase in enumerate(phases, 1):
+                p_name = phase.get("name", f"Phase {idx}")
+                p_obj = phase.get("objective", "")
+                p_req = phase.get("requiredInformation", "")
+                req_str = f" (Collect: {', '.join(p_req) if isinstance(p_req, list) else p_req})" if p_req else ""
+                phase_lines.append(f"{idx}. {p_name}: {p_obj}{req_str}")
+            parts.append("=== CONVERSATION PHASES ===\n" + "\n".join(phase_lines))
+
+        # 6. SAFETY GUARDRAILS & ESCALATION (Compact)
+        guard = cfg.get("guardrails") or {}
+        emergency_transfer_enabled = guard.get("emergencyTransferEnabled")
+        if emergency_transfer_enabled is None:
+            emergency_transfer_enabled = bool(guard.get("emergencyPhone") or guard.get("emergency_phone") or cfg.get("emergencyPhone"))
+        has_emergency_guardrail = bool(emergency_transfer_enabled and (guard.get("emergencyPhone") or guard.get("emergency_phone") or cfg.get("emergencyPhone")))
+
+        guard_lines = []
+        if guard.get("prohibitedTopics"):
+            guard_lines.append(f"Prohibited Topics: {'; '.join(guard['prohibitedTopics'])}")
+        if guard.get("prohibitedClaims"):
+            guard_lines.append(f"Prohibited Claims: {'; '.join(guard['prohibitedClaims'])}")
+        if has_emergency_guardrail:
+            doc_name = guard.get("doctorName") or "the doctor"
+            guard_lines.append(f"Emergency Escalation: If acute medical emergency is verified, speak 1 calm phrase and invoke `transfer_call` to {doc_name} immediately.")
+        elif emergency_transfer_enabled is False:
+            guard_lines.append("Emergency Escalation: Live phone call transfer is DISABLED. Direct caller to clinic WhatsApp/contact number.")
+        if guard_lines:
+            parts.append("=== GUARDRAILS ===\n" + "\n".join(f"- {g}" for g in guard_lines))
+
+        # 7. LANGUAGE & CODE-MIXING POLICY
+        lang_cfg = cfg.get("language") or {}
+        p_lang = primary_lang or lang_cfg.get("primary") or "en-IN"
+        s_langs = supported_langs or lang_cfg.get("supported") or lang_cfg.get("supportedLanguages") or ["en-IN", "hi-IN"]
+        is_pure = (lang_cfg.get("languageStyle") or lang_cfg.get("language_style") or "").lower() == "pure"
+
+        if is_pure:
+            parts.append(
+                f"=== LANGUAGE POLICY ===\n"
+                f"- Active Language: {p_lang} (Supported: {', '.join(s_langs)})\n"
+                f"- SCRIPT RULE: Write 100% in Devanagari Unicode script. Never output Latin/Romanized letters.\n"
+                f"- VOCABULARY: Speak in pure native vocabulary without mixing English words."
+            )
+        else:
+            parts.append(
+                f"=== LANGUAGE POLICY ===\n"
+                f"- Active Language: {p_lang} (Supported: {', '.join(s_langs)})\n"
+                f"- Respond in caller's active language. Support natural everyday Marathi/Hindi/English code-switching."
+            )
+
+        # 8. CUSTOM INSTRUCTIONS
+        raw_instructions = (
+            cfg.get("instructions")
+            or cfg.get("systemInstructions")
+            or cfg.get("systemPrompt")
+            or base_prompt
+        )
+        if raw_instructions and str(raw_instructions).strip():
+            resolved_instructions = resolve_prompt_variables(
+                str(raw_instructions).strip(),
+                variables=input_vars,
+                runtime_context=runtime_ctx,
+                config=cfg
+            )
+            parts.append("=== CUSTOM INSTRUCTIONS ===\n" + resolved_instructions)
+
+        # 9. RELEVANT KNOWLEDGE CONTEXT
+        if knowledge_results and len(knowledge_results) > 0:
+            k_lines = [f"[{idx}] {k.get('content') or str(k)}" for idx, k in enumerate(knowledge_results, 1)]
+            parts.append("=== RELEVANT KNOWLEDGE ===\n" + "\n".join(k_lines))
+
+        # 10. VOICE PERSONA & GENDER
+        voice_cfg = cfg.get("voice") or {}
+        voice_id = voice_cfg.get("voiceId", "shubh").lower()
+        is_male = voice_id in ["shubh", "aditya", "amit", "ratan", "kabir", "male"] or voice_cfg.get("gender") == "male"
+        parts.append(f"Voice Gender: {'MALE voice (use masculine Hindi verb forms)' if is_male else 'FEMALE voice (use feminine Hindi verb forms)'}.")
+
+        return "\n\n".join(parts)
+
+    def compile_system_prompt(
+        self,
+        configuration: Any = None,
+        knowledge_results: Optional[List[Dict[str, Any]]] = None,
+        base_prompt: Optional[str] = None,
+        template_base_prompt: Optional[str] = None,
+        timezone: Optional[str] = None,
+        primary_lang: Optional[str] = None,
+        supported_langs: Optional[List[str]] = None,
+        lean_mode: Optional[bool] = None,
+    ) -> str:
+        if lean_mode is None:
+            try:
+                from ..config import settings
+                lean_mode = getattr(settings, "ENABLE_LEAN_PROMPT_COMPRESSION", True)
+            except Exception:
+                lean_mode = True
+
+        if lean_mode:
+            return self.compile_lean_system_prompt(
+                configuration=configuration,
+                knowledge_results=knowledge_results,
+                base_prompt=base_prompt,
+                template_base_prompt=template_base_prompt,
+                timezone=timezone,
+                primary_lang=primary_lang,
+                supported_langs=supported_langs,
+            )
+
         parts: List[str] = []
 
         # If configuration is passed as string, wrap in dict

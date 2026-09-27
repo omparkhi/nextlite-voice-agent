@@ -468,10 +468,50 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
         f"{code_switching_guidance}"
     )
 
-def build_full_instructions(base_instructions: str, language_code: str, language_style: str = "mixed") -> str:
+
+def build_lean_language_instruction(language_code: str, language_style: str = "mixed", base_instructions: str = "") -> str:
+    """Builds lean active language directive for prompt compression."""
+    norm = normalize_language_code(language_code)
+    lang_name = get_language_display_name(norm)
+    base_lang = norm.split("-")[0].lower() if norm else ""
+    is_pure_mode = (language_style or "").lower() == "pure"
+
+    if is_pure_mode:
+        script_rule = "Write 100% in Devanagari Unicode script without Latin letters or English words."
+    elif base_lang in ("mr", "hi"):
+        script_rule = f"Speak natural everyday conversational {lang_name} (Minglish/Hinglish allowed)."
+    else:
+        script_rule = f"Speak clearly and naturally in {lang_name}."
+
+    return (
+        f"\n\n=== ACTIVE LANGUAGE ===\n"
+        f"- Active: {lang_name} ({norm}). {script_rule} Never restart greeting or re-ask answered questions."
+    )
+
+
+def build_full_instructions(
+    base_instructions: str,
+    language_code: str,
+    language_style: str = "mixed",
+    lean_mode: Optional[bool] = None,
+) -> str:
     clean_base = re.sub(r"\n\n=== ACTIVE CONVERSATION LANGUAGE POLICY ===[\s\S]*$", "", base_instructions)
+    clean_base = re.sub(r"\n\n=== ACTIVE LANGUAGE ===[\s\S]*$", "", clean_base)
     clean_base = re.sub(r"\n\n# Active Conversation Language[\s\S]*$", "", clean_base)
-    return f"{clean_base}{build_language_instruction(language_code, language_style=language_style, base_instructions=clean_base)}"
+
+    if lean_mode is None:
+        try:
+            from app.config import settings
+            lean_mode = getattr(settings, "ENABLE_LEAN_PROMPT_COMPRESSION", True)
+        except Exception:
+            lean_mode = True
+
+    if lean_mode:
+        lang_instr = build_lean_language_instruction(language_code, language_style=language_style, base_instructions=clean_base)
+    else:
+        lang_instr = build_language_instruction(language_code, language_style=language_style, base_instructions=clean_base)
+
+    return f"{clean_base}{lang_instr}"
 
 @dataclass
 class ProcessTurnResult:

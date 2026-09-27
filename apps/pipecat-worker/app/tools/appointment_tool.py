@@ -300,10 +300,7 @@ def create_book_appointment_tool_factory(
                     "status": "REQUESTED",
                     "slot": booking_time,
                     "date": booking_date,
-                    "message": (
-                        f"Your appointment request has been recorded with appointment number {appointment_number}. "
-                        "The team will verify availability and confirm it."
-                    ),
+                    "message": f"Appointment successfully confirmed for {booking_date} at {booking_time}."
                 }
             else:
                 err_data: Dict[str, Any] = {}

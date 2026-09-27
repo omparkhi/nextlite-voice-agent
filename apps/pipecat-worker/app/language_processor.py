@@ -18,6 +18,7 @@ except ImportError:
     LLMMessagesUpdateFrame = object
     LLMContext = object
 
+from app.config import settings
 from app.language_manager import ConversationLanguageManager, build_full_instructions
 
 # Pure hesitation noise tokens that contain 0 semantic content or intent
@@ -112,7 +113,8 @@ class LanguageContextProcessor(FrameProcessor):
                         new_system_content = build_full_instructions(
                             self._base_system_prompt,
                             result.current_language,
-                            language_style=getattr(self._language_manager, "language_style", "mixed")
+                            language_style=getattr(self._language_manager, "language_style", "mixed"),
+                            lean_mode=getattr(settings, "ENABLE_LEAN_PROMPT_COMPRESSION", True),
                         )
                         system_msg["content"] = new_system_content
                         

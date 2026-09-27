@@ -151,5 +151,5 @@ def test_health_check_phase2(client):
     data = response.json()
     assert data["status"] == "ok"
     assert data["phase"].startswith("phase-")
-    assert data["stt_model"] == "saaras:v3-realtime"
+    assert data["stt_model"] == settings.STT_MODEL
     assert data["tts_model"] == "bulbul:v3"

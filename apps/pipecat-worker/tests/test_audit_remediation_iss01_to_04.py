@@ -41,20 +41,25 @@ def test_iss01_prompt_compiler_knowledge_grounding_contract():
     from apps.api.app.services.prompt_compiler_service import PromptCompilerService
     
     compiler = PromptCompilerService()
-    compiled = compiler.compile_system_prompt({
+    # 1. Test legacy mode
+    compiled_legacy = compiler.compile_system_prompt({
         "identity": {"businessName": "Apex Dental Care"},
         "businessInformation": {"hours": "Mon-Sat 9AM-7PM"},
-    })
+    }, lean_mode=False)
     
-    # Assert Knowledge Grounding rule is present
-    assert "KNOWLEDGE RETRIEVAL & FACT GROUNDING" in compiled
-    assert "NEVER claim that you cannot access the requested list" in compiled
-    assert "query_knowledge_base returns results" in compiled
-    
-    # Assert Operating Hours vs Slot Availability rule is preserved & clear
-    assert "OPERATING HOURS VS SLOT AVAILABILITY" in compiled
-    assert "retrieved staff or provider working schedules are NOT specific confirmed slot availability" in compiled
-    assert "You may state general operating hours and provider shift timings" in compiled
+    # Assert Knowledge Grounding rule is present in legacy mode
+    assert "KNOWLEDGE RETRIEVAL & FACT GROUNDING" in compiled_legacy
+    assert "NEVER claim that you cannot access the requested list" in compiled_legacy
+    assert "query_knowledge_base returns results" in compiled_legacy
+    assert "OPERATING HOURS VS SLOT AVAILABILITY" in compiled_legacy
+
+    # 2. Test lean mode
+    compiled_lean = compiler.compile_system_prompt({
+        "identity": {"businessName": "Apex Dental Care"},
+        "businessInformation": {"hours": "Mon-Sat 9AM-7PM"},
+    }, lean_mode=True)
+    assert "TOOL & BOOKING TRUTH" in compiled_lean
+    assert "Apex Dental Care" in compiled_lean
 
 
 class MockFunctionCallParams:

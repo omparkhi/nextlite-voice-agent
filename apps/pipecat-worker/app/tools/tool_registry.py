@@ -72,6 +72,7 @@ class ToolRuntimeContext:
     _call_session_task: Optional[Any] = None
     trigger_end_call: Optional[Callable[..., None]] = None
     trigger_transfer_call: Optional[Callable[..., Any]] = None
+    workflow_state: Optional[Any] = None
 
     async def ensure_call_session_id(self) -> Optional[str]:
         """Ensures that the background CallSession creation task has completed before tool execution."""
@@ -555,6 +556,16 @@ class ToolRegistry:
                         success=True,
                         args=args if isinstance(args, dict) else None,
                     )
+                if context.workflow_state and hasattr(context.workflow_state, "update_from_tool"):
+                    try:
+                        context.workflow_state.update_from_tool(
+                            llm_name,
+                            args if isinstance(args, dict) else {},
+                            res if isinstance(res, dict) else {},
+                        )
+                    except Exception as ws_err:
+                        logger.debug(f"[WorkflowState] Notice: {ws_err}")
+
                 logger.info(
                     f"[AudioTiming] tool_completed tool={llm_name} "
                     f"callSessionId={context.call_session_id or 'none'} "

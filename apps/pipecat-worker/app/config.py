@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     PUBLIC_URL: str = "https://dandelion-gigantic-challenge.ngrok-free.dev"
     PUBLIC_HOST: str = "dandelion-gigantic-challenge.ngrok-free.dev"
 
+    # Phase 1: LLM Cost & Prompt Optimization Flags
+    ENABLE_LEAN_PROMPT_COMPRESSION: bool = True
+    ENABLE_LLM_PROMPT_WARMUP: bool = False
+
     # Optional simple security token for POC endpoint
     POC_SECRET_KEY: str = ""
 

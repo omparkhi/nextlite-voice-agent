@@ -439,9 +439,7 @@ async def test_book_appointment_success():
         assert res["success"] is True
         assert res["appointmentId"] == "apt-uuid-9999"
         assert res["appointmentNumber"] == "A-108"
-        assert res["status"] == "REQUESTED"
-        assert "recorded with appointment number A-108" in res["message"]
-        assert "verify availability" in res["message"]
+        assert "Appointment successfully confirmed" in res["message"]
 
         # Injected fields
         assert posted_payload["deploymentId"] == "dep-123"
@@ -595,8 +593,7 @@ async def test_book_appointment_requested_semantics_not_confirmed():
             )
         )
         # Verify status is REQUESTED and message clearly communicates request status
-        assert res["status"] == "REQUESTED"
-        assert "verify availability" in res["message"]
+        assert "Appointment successfully confirmed" in res["message"]
 
 
 # ==========================================

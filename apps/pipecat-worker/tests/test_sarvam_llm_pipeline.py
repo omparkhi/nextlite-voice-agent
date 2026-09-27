@@ -91,7 +91,7 @@ def test_phase4_pipeline_assembly():
         api_key="test_key",
         sample_rate=8000,
         settings=SarvamRealtimeSTTService.Settings(
-            model=settings.STT_MODEL,
+            model="saaras:v3-realtime",
             stream_type="fast",
         ),
         endpointing="vad",
