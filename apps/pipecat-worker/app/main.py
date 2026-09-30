@@ -18,6 +18,7 @@ import re
 import struct
 import sys
 import time
+import xml.sax.saxutils
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
@@ -49,7 +50,7 @@ from app.runtime_config_client import (
     extract_deployment_id,
 )
 from app.language_manager import ConversationLanguageManager, build_full_instructions
-from app.language_processor import LanguageContextProcessor
+from app.language_processor import LanguageContextProcessor, clean_asr_hallucinations
 from app.temporal_context import (
     DEFAULT_TIMEZONE,
     build_temporal_and_calendar_instructions,
@@ -448,15 +449,52 @@ async def plivo_inbound_xml(
 
     query_suffix = f"?{'&'.join(query_parts)}" if query_parts else ""
     ws_url = f"{scheme}://{server_host}/ws/plivo{query_suffix}"
-
-    import xml.sax.saxutils
     xml_ws_url = xml.sax.saxutils.escape(ws_url)
+    http_scheme = "https" if scheme == "wss" else "http"
+    callback_url = f"{http_scheme}://{server_host}/api/v1/telephony/plivo/recordings"
+    xml_callback_url = xml.sax.saxutils.escape(callback_url)
 
     xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+    <Record callbackUrl="{xml_callback_url}" callbackMethod="POST" recordSession="true" maxLength="3600" fileFormat="mp3" />
     <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=8000">{xml_ws_url}</Stream>
 </Response>"""
     return PlainResponse(content=xml_content, media_type="application/xml")
+
+
+@app.api_route("/api/v1/telephony/plivo/recordings", methods=["GET", "POST"])
+@app.api_route("/plivo/recordings", methods=["GET", "POST"])
+@app.api_route("/telephony/plivo/recordings", methods=["GET", "POST"])
+async def plivo_recordings_webhook_proxy(request: Request):
+    """Proxies Plivo recording callbacks to the NextLite Control Plane API."""
+    target_url = f"{settings.NEXTLITE_API_URL}/api/webhooks/plivo/recordings"
+    try:
+        params = dict(request.query_params)
+        if request.method == "POST":
+            try:
+                form_data = await request.form()
+                form_dict = dict(form_data)
+                if form_dict:
+                    params.update(form_dict)
+            except Exception:
+                pass
+            try:
+                raw_json = await request.json()
+                if isinstance(raw_json, dict):
+                    params.update(raw_json)
+            except Exception:
+                pass
+
+        client = getattr(request.app.state, "http_client", None)
+        if client:
+            await client.post(target_url, json=params, timeout=10.0)
+        else:
+            async with httpx.AsyncClient(timeout=10.0) as temp_client:
+                await temp_client.post(target_url, json=params)
+        return PlainResponse(content="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response/>", media_type="application/xml")
+    except Exception as e:
+        logger.warning(f"[Recording Webhook Proxy] Error forwarding callback: {e}")
+        return PlainResponse(content="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response/>", media_type="application/xml")
 
 
 @app.api_route("/api/v1/telephony/plivo/transfer-xml", methods=["GET", "POST"])
@@ -795,80 +833,8 @@ class InstrumentedSarvamTTSService(SarvamTTSService):
 
     @traced_tts
     async def run_tts(self, text: str, context_id: str):
-        from app.phrase_audio_cache import global_phrase_audio_cache
-        from pipecat.frames.frames import TTSAudioRawFrame, TTSStartedFrame, TTSStoppedFrame
-
-        sample_rate = getattr(self, "sample_rate", 8000)
-
-        # 1. Check for pre-rendered full phrase match (e.g. Turn 1 slot collection response)
-        full_match = global_phrase_audio_cache.get_full_phrase(
-            tenant_id=self._tenant_id,
-            language=self._active_language,
-            voice_id=self._voice_id,
-            model=self._model_name,
-            sample_rate=sample_rate,
-            phrase_text=text,
-        )
-        if full_match and full_match.is_telephony_safe(sample_rate):
-            logger.info(f"[TTSFastPath] Full response cache hit for text='{text[:30]}...' ({len(full_match.audio_chunks)} chunks)")
-            yield TTSStartedFrame(context_id=context_id)
-            for chunk in full_match.audio_chunks:
-                yield TTSAudioRawFrame(
-                    audio=chunk,
-                    sample_rate=sample_rate,
-                    num_channels=1,
-                    context_id=context_id,
-                )
-            yield TTSStoppedFrame(context_id=context_id)
-            return
-
-        # 2. Check for starter prefix match (e.g. "ठीक आहे, मी तपासतो...")
-        is_greeting_context = bool(
-            context_id == "greeting_fast_path"
-            or (hasattr(self, "_current_turn_type") and getattr(self, "_current_turn_type", None) == "greeting")
-        )
-        starter_match = global_phrase_audio_cache.match_starter(
-            text_chunk=text,
-            tenant_id=self._tenant_id,
-            language=self._active_language,
-            voice_id=self._voice_id,
-            model=self._model_name,
-            sample_rate=sample_rate,
-        )
-        if starter_match:
-            cached_starter, remainder = starter_match
-            # Avoid sentence splitting when remainder is a long uncached sentence (>15 chars or >2 words)
-            # or during call greeting context, as starter audio (~300ms) finishes long before Sarvam TTS
-            # network synthesis of the remainder completes (~2500ms), causing mid-sentence silence breaks.
-            is_long_uncached_remainder = bool(remainder and (len(remainder.strip()) > 15 or len(remainder.strip().split()) > 2))
-            if not is_greeting_context and not is_long_uncached_remainder:
-                logger.info(
-                    f"[TTSFastPath] Starter audio injected for text='{text[:30]}...' "
-                    f"({len(cached_starter.audio_chunks)} chunks, remainder='{remainder[:25]}...')"
-                )
-                yield TTSStartedFrame(context_id=context_id)
-                for chunk in cached_starter.audio_chunks:
-                    yield TTSAudioRawFrame(
-                        audio=chunk,
-                        sample_rate=sample_rate,
-                        num_channels=1,
-                        context_id=context_id,
-                    )
-                if remainder:
-                    async for frame in super().run_tts(remainder, context_id):
-                        # Suppress duplicate TTSStartedFrame since starter audio already started playback
-                        if not isinstance(frame, TTSStartedFrame):
-                            yield frame
-                else:
-                    yield TTSStoppedFrame(context_id=context_id)
-                return
-            else:
-                logger.debug(
-                    f"[TTSFastPath] Bypassing starter splitting for long sentence/greeting text='{text[:30]}...' "
-                    "to maintain contiguous streaming TTS audio"
-                )
-
-        # 3. Fallback to normal live Sarvam Bulbul WebSocket TTS
+        # Stream text directly to Sarvam Bulbul WebSocket to guarantee 100% sentence
+        # continuity, natural neural inflection, and prevent premature TTSStoppedFrame cutoff.
         async for frame in super().run_tts(text, context_id):
             yield frame
 
@@ -1128,7 +1094,6 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         # Phase 1: Tool Schema Scoping on post-tool turns when lean prompt compression is enabled
         if is_post_tool and getattr(settings, "ENABLE_LEAN_PROMPT_COMPRESSION", True) and has_tools:
             orig_tools = params.get("tools", [])
-            # If the tool just executed was informational/booking, the model is generating the final spoken response.
             # Retain only terminal/emergency tools if present, or suppress schemas to save ~450-650 tokens.
             lean_tools = [
                 t for t in orig_tools
@@ -1141,13 +1106,19 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
                 params.pop("tools", None)
                 has_tools = False
 
+        if is_post_tool and has_tools:
+            # On post-tool turns, the model must synthesize natural spoken dialogue to the caller.
+            # Setting tool_choice="none" guarantees the LLM generates conversational text rather
+            # than entering a function-calling sampling loop or emitting empty deltas.
+            params["tool_choice"] = "none"
+
         if self._runtime_config:
             runtime_cfg = self._runtime_config.runtime
             if is_post_tool:
                 if runtime_cfg.post_tool_max_tokens:
                     params["max_tokens"] = runtime_cfg.post_tool_max_tokens
-                elif getattr(settings, "ENABLE_LEAN_PROMPT_COMPRESSION", True):
-                    params["max_tokens"] = 60
+                else:
+                    params["max_tokens"] = getattr(runtime_cfg, "max_tokens", 150) or 150
             elif has_tools:
                 if runtime_cfg.tool_max_tokens:
                     params["max_tokens"] = runtime_cfg.tool_max_tokens
@@ -1366,8 +1337,12 @@ class RealtimeStreamingTimingMonitor(FrameProcessor):
             pass
 
         elif isinstance(frame, (LLMTextFrame, TextFrame)):
-            # If current turn is greeting, skip (greeting does not go through LLM)
-            if self._turn_tracker and self._turn_tracker.turn_type == "greeting":
+            # If current turn is greeting or greeting is active, skip (greeting does not go through LLM)
+            is_greeting = bool(
+                (self._turn_tracker and self._turn_tracker.turn_type == "greeting")
+                or (self._startup_tracker and self._startup_tracker.greeting_completed is None and self._startup_tracker.greeting_queued is not None)
+            )
+            if is_greeting:
                 pass
             else:
                 text_chunk = getattr(frame, "text", "")
@@ -1965,6 +1940,7 @@ class DiagnosticPlivoFrameSerializer(PlivoFrameSerializer):
 
 
 @app.websocket("/ws/plivo")
+@app.websocket("/ws")
 async def websocket_plivo_endpoint(
     websocket: WebSocket,
     token: Optional[str] = Query(default=None),
@@ -2427,6 +2403,7 @@ async def websocket_plivo_endpoint(
                         tenantId=runtime_config.tenant.tenant_id,
                         agentId=runtime_config.agent.agent_id,
                         deploymentId=resolved_deployment_id,
+                        plivoCallUuid=call_id or None,
                         roomName=stream_id,
                         callerNumber=caller_number,
                         direction=direction,
@@ -2442,6 +2419,7 @@ async def websocket_plivo_endpoint(
                 logger.info(
                     f"[CallSession] Created ACTIVE session id={session_record.id} in background | "
                     f"tenantId={runtime_config.tenant.tenant_id} | agentId={runtime_config.agent.agent_id} | "
+                    f"plivoCallUuid={session_record.plivo_call_uuid or call_id or 'none'} | "
                     f"direction={direction} | caller={caller_number or 'none'}"
                 )
                 return session_record.id
@@ -2786,10 +2764,16 @@ async def websocket_plivo_endpoint(
         # 8. Instantiate Sarvam Realtime STT Service
         startup_tracker.record_stage("stt_service_create_start")
         initial_stt_lang = language_manager.get_stt_initial_language()
+        stt_mode = getattr(settings, "STT_MODE", "verbatim")
+        stt_threshold = getattr(settings, "STT_VAD_THRESHOLD", 0.68)
+        stt_silence_duration_ms = getattr(settings, "STT_VAD_SILENCE_DURATION_MS", 180)
+        stt_min_speech_duration_ms = getattr(settings, "STT_VAD_MIN_SPEECH_DURATION_MS", 200)
+
         logger.info(
             f"[SarvamRealtimeSTT Config] Initializing SarvamRealtimeSTTService | model={stt_model} | "
-            f"stream_type=fast | sample_rate={stream_sample_rate} | language={initial_stt_lang} "
-            f"(primary={language_manager.primary_language})"
+            f"stream_type=fast | mode={stt_mode} | sample_rate={stream_sample_rate} | language={initial_stt_lang} "
+            f"(primary={language_manager.primary_language}) | threshold={stt_threshold} | "
+            f"silence_duration_ms={stt_silence_duration_ms} | min_speech_duration_ms={stt_min_speech_duration_ms}"
         )
         stt_service = SarvamRealtimeSTTService(
             api_key=settings.SARVAM_API_KEY,
@@ -2797,7 +2781,11 @@ async def websocket_plivo_endpoint(
             settings=SarvamRealtimeSTTService.Settings(
                 model=stt_model,
                 language_code=initial_stt_lang,
+                mode=stt_mode,
                 stream_type="fast",
+                threshold=stt_threshold,
+                silence_duration_ms=stt_silence_duration_ms,
+                min_speech_duration_ms=stt_min_speech_duration_ms,
             ),
             endpointing="vad",
             ttfs_p99_latency=0.15,
@@ -3104,9 +3092,10 @@ async def websocket_plivo_endpoint(
             tools=resolved_tools if resolved_tools else NOT_GIVEN,
         )
         
+        user_turn_timeout = getattr(settings, "USER_TURN_STOP_TIMEOUT", 0.08)
         turn_strategies = UserTurnStrategies(
             start=[ExternalUserTurnStartStrategy(enable_interruptions=True)],
-            stop=[ExternalUserTurnStopStrategy(timeout=0.12, wait_for_transcript=True)],
+            stop=[ExternalUserTurnStopStrategy(timeout=user_turn_timeout, wait_for_transcript=True)],
         )
         user_params = LLMUserAggregatorParams(
             user_turn_strategies=turn_strategies
@@ -3129,11 +3118,12 @@ async def websocket_plivo_endpoint(
             turn_tracker.record_speech_stop()
             last_assistant_speech_end[0] = time.perf_counter()
             content = getattr(message, "content", "") if message else ""
-            content_str = f" | content='{content}'" if content else ""
+            cleaned_content = clean_asr_hallucinations(content)
+            content_str = f" | content='{cleaned_content}'" if cleaned_content else ""
             logger.info(f"[UserTurn] User turn stopped via strategy={strategy.__class__.__name__}{content_str}")
-            if content and transcript_collector:
+            if cleaned_content and transcript_collector:
                 transcript_collector.record_user_turn(
-                    transcript=content,
+                    transcript=cleaned_content,
                     detected_language=runtime_config.language.primary or "en-IN",
                 )
 

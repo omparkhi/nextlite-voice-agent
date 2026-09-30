@@ -46,8 +46,8 @@ SARVAM_API_KEY=${SARVAM_KEY}
 NVIDIA_API_KEY=${NVIDIA_KEY}
 EMBEDDING_PROVIDER=nvidia
 STT_MODEL=saaras:v3-realtime
-LLM_MODEL=sarvam-2b
-TTS_MODEL=bulbul:v2
+LLM_MODEL=sarvam-105b-conversations
+TTS_MODEL=bulbul:v3
 
 # URLs
 FRONTEND_URL=http://${PUBLIC_IP}

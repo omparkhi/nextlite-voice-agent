@@ -44,6 +44,7 @@ class CreateCallSessionRequest(BaseModel):
     tenant_id: str = Field(..., alias="tenantId")
     agent_id: str = Field(..., alias="agentId")
     deployment_id: str = Field(..., alias="deploymentId")
+    plivo_call_uuid: Optional[str] = Field(default=None, alias="plivoCallUuid")
     room_name: str = Field(..., alias="roomName")
     caller_number: Optional[str] = Field(default=None, alias="callerNumber")
     direction: Optional[str] = Field(default="INBOUND", alias="direction")
@@ -83,6 +84,7 @@ class CallSessionResponse(BaseModel):
     tenant_id: str = Field(..., alias="tenantId")
     agent_id: str = Field(..., alias="agentId")
     deployment_id: str = Field(..., alias="deploymentId")
+    plivo_call_uuid: Optional[str] = Field(default=None, alias="plivoCallUuid")
     room_name: str = Field(..., alias="roomName")
     caller_number: Optional[str] = Field(default=None, alias="callerNumber")
     direction: str = "INBOUND"

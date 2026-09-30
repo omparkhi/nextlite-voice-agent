@@ -127,6 +127,101 @@ async def get_call_transcript(
         "endedAt": call["endedAt"],
     }
 
+@router.get("/calls/{call_id}/recording")
+async def get_call_recording(
+    call_id: str,
+    tenant_id_param: Optional[str] = Query(None, alias="tenantId"),
+    payload: Dict[str, Any] = Depends(get_current_user_payload),
+    session: AsyncSession = Depends(get_db)
+):
+    """
+    Authoritative authenticated call recording lookup endpoint.
+    Strictly verifies tenant authorization and call ownership.
+    """
+    from sqlalchemy import select
+    from ..models import CallSession, CallRecording, CallStatus
+    from ..services.crm_service import to_utc_iso
+
+    tenant_id = resolve_tenant_id(payload, tenant_id_param)
+    call_uuid = uuid.UUID(call_id)
+
+    # 1. Verify CallSession exists and belongs to authenticated tenant
+    cs_stmt = select(CallSession).where(CallSession.id == call_uuid, CallSession.tenantId == tenant_id)
+    cs_res = await session.execute(cs_stmt)
+    call_session = cs_res.scalar_one_or_none()
+    if not call_session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call session not found")
+
+    # 2. Look up CallRecording strictly for this callSessionId and tenantId
+    rec_stmt = select(CallRecording).where(
+        CallRecording.callSessionId == call_uuid,
+        CallRecording.tenantId == tenant_id
+    )
+    rec_res = await session.execute(rec_stmt)
+    recording = rec_res.scalar_one_or_none()
+
+    if not recording:
+        # Check if call is active (pending recording callback)
+        if call_session.status == CallStatus.ACTIVE:
+            return {
+                "status": "PENDING",
+                "callSessionId": str(call_uuid),
+                "message": "Recording processing..."
+            }
+        return {
+            "status": "UNAVAILABLE",
+            "callSessionId": str(call_uuid),
+            "message": "Recording unavailable"
+        }
+
+    return {
+        "id": str(recording.id),
+        "callSessionId": str(recording.callSessionId),
+        "status": recording.status.value,
+        "durationSeconds": recording.durationSeconds,
+        "format": recording.recordingFormat,
+        "recordingUrl": recording.recordingUrl,
+        "streamUrl": f"/api/client/calls/{call_id}/recording/stream",
+        "createdAt": to_utc_iso(recording.createdAt)
+    }
+
+@router.get("/calls/{call_id}/recording/stream")
+async def stream_call_recording(
+    call_id: str,
+    tenant_id_param: Optional[str] = Query(None, alias="tenantId"),
+    payload: Dict[str, Any] = Depends(get_current_user_payload),
+    session: AsyncSession = Depends(get_db)
+):
+    """
+    Secure redirect/stream to Plivo recording URL for authorized client.
+    """
+    from sqlalchemy import select
+    from fastapi.responses import RedirectResponse
+    from ..models import CallSession, CallRecording
+
+    tenant_id = resolve_tenant_id(payload, tenant_id_param)
+    call_uuid = uuid.UUID(call_id)
+
+    # Verify tenant ownership of CallSession
+    cs_stmt = select(CallSession).where(CallSession.id == call_uuid, CallSession.tenantId == tenant_id)
+    cs_res = await session.execute(cs_stmt)
+    call_session = cs_res.scalar_one_or_none()
+    if not call_session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call session not found")
+
+    # Verify recording ownership
+    rec_stmt = select(CallRecording).where(
+        CallRecording.callSessionId == call_uuid,
+        CallRecording.tenantId == tenant_id
+    )
+    rec_res = await session.execute(rec_stmt)
+    recording = rec_res.scalar_one_or_none()
+    if not recording or not recording.recordingUrl:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not available")
+
+    # Safe redirect to provider URL
+    return RedirectResponse(url=recording.recordingUrl, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+
 # Leads
 @router.get("/leads")
 async def list_leads(

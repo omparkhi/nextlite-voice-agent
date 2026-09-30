@@ -191,6 +191,7 @@ class CallSessionResponse(CamelModel):
     tenant_id: str
     agent_id: Optional[str] = None
     deployment_id: Optional[str] = None
+    plivo_call_uuid: Optional[str] = None
     status: str
     direction: str
     caller_phone_number: Optional[str] = None

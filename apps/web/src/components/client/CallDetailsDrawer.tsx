@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { CallSession } from '../../types';
+import type { CallSession, CallRecordingResponse } from '../../types';
 import { TranscriptViewer } from './TranscriptViewer';
+import { CallAudioPlayer } from './CallAudioPlayer';
 import { formatPhoneNumber } from '@/utils/formatPhoneNumber';
 import { formatDateTimeDDMMYYYY } from '@/utils/dateFormatters';
+import { api } from '@/services/api';
 
 interface CallDetailsDrawerProps {
   call: CallSession | null;
@@ -22,6 +24,33 @@ export function CallDetailsDrawer({
   const [activeTab] = useState<TabType>('transcript');
   const [copied, setCopied] = useState(false);
 
+  // Recording State
+  const [recording, setRecording] = useState<CallRecordingResponse | null>(null);
+  const [loadingRecording, setLoadingRecording] = useState<boolean>(false);
+
+  const fetchRecording = async (callId: string) => {
+    setLoadingRecording(true);
+    try {
+      const res = await api.getClientCallRecording(callId);
+      setRecording(res);
+    } catch {
+      setRecording({
+        callSessionId: callId,
+        status: 'UNAVAILABLE',
+        message: 'Recording unavailable'
+      });
+    } finally {
+      setLoadingRecording(false);
+    }
+  };
+
+  useEffect(() => {
+    if (call?.id && isOpen) {
+      setRecording(null);
+      fetchRecording(call.id);
+    }
+  }, [call?.id, isOpen]);
+
   if (!isOpen || !call) return null;
 
   const handleCopyPhone = () => {
@@ -34,8 +63,8 @@ export function CallDetailsDrawer({
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
+    const secs = Math.floor(seconds % 60);
+    return `${mins}m ${secs < 10 ? '0' : ''}${secs}s`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -121,6 +150,17 @@ export function CallDetailsDrawer({
                   {formatDateTimeDDMMYYYY(call.startedAt || call.createdAt)}
                 </span>
               </div>
+            </div>
+
+            {/* Audio Recording Section */}
+            <div className="mt-3.5 pt-3 border-t border-[#f0efed]">
+              <CallAudioPlayer
+                recording={recording}
+                loading={loadingRecording}
+                totalDurationSeconds={call.durationSeconds}
+                callId={call.id}
+                onRefresh={() => fetchRecording(call.id)}
+              />
             </div>
           </div>
 

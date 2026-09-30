@@ -78,7 +78,29 @@ async def init_db():
         "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS place VARCHAR(255);",
         "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS walk_in BOOLEAN DEFAULT FALSE;",
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255);",
-        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;"
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;",
+        "ALTER TABLE call_sessions ALTER COLUMN agent_id DROP NOT NULL;",
+        "ALTER TABLE call_sessions ALTER COLUMN deployment_id DROP NOT NULL;",
+        "ALTER TABLE call_sessions ADD COLUMN IF NOT EXISTS plivo_call_uuid VARCHAR(100);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_call_sessions_plivo_call_uuid ON call_sessions (plivo_call_uuid) WHERE plivo_call_uuid IS NOT NULL;",
+        """CREATE TABLE IF NOT EXISTS call_recordings (
+            id UUID PRIMARY KEY,
+            tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+            call_session_id UUID REFERENCES call_sessions(id) ON DELETE SET NULL,
+            plivo_call_uuid VARCHAR(100) NOT NULL,
+            plivo_recording_id VARCHAR(100) NOT NULL,
+            recording_url TEXT NOT NULL,
+            recording_format VARCHAR(20) NOT NULL DEFAULT 'mp3',
+            duration_seconds INTEGER NOT NULL DEFAULT 0,
+            status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+            metadata JSONB DEFAULT '{}'::jsonb,
+            created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+        );""",
+        "CREATE INDEX IF NOT EXISTS idx_call_recordings_plivo_call_uuid ON call_recordings (plivo_call_uuid);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_call_recordings_plivo_recording_id ON call_recordings (plivo_recording_id);",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_call_recordings_call_session_id ON call_recordings (call_session_id) WHERE call_session_id IS NOT NULL;",
+        "CREATE INDEX IF NOT EXISTS idx_call_recordings_tenant_id ON call_recordings (tenant_id);"
     ]
     try:
         async with engine.begin() as conn:

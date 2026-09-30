@@ -92,6 +92,81 @@ def create_check_slots_tool_factory(
             "Content-Type": "application/json",
         }
 
+        # ⚡ FAST PATH 1: In-Worker Dynamic Schedule Engine + Redis (<2ms)
+        biz_hours = getattr(context, "business_hours", None)
+        slot_dur = getattr(context, "slot_duration", "30 mins")
+        capacity_val = max(1, int(getattr(context, "patients_per_slot", 1) or 1))
+
+        if biz_hours:
+            try:
+                from app.redis_client import get_booked_slots_for_date
+                booked_counts = await get_booked_slots_for_date(trusted_deployment_id, resolved_date)
+                available_slots = generate_dynamic_slots(
+                    business_hours=biz_hours,
+                    slot_duration=slot_dur,
+                    booking_date=resolved_date,
+                    time_zone=target_tz,
+                )
+                open_slots = [s for s in available_slots if booked_counts.get(s, 0) < capacity_val]
+                is_open = is_time_within_shifts(pref_time, biz_hours) if pref_time else True
+                is_pref_available = is_open and (pref_time in open_slots if pref_time else True)
+
+                logger.info(
+                    f"[SlotTool AdminConfig & FastPath] In-worker slot check in <2ms | "
+                    f"date={resolved_date} | prefTime={pref_time} | available={is_pref_available} | "
+                    f"adminCapacity={capacity_val} (patients_per_slot) | "
+                    f"adminBusinessHours='{biz_hours}' | adminSlotDuration='{slot_dur}' | "
+                    f"bookedCount={booked_counts.get(pref_time, 0) if pref_time else 0} | "
+                    f"totalOpenSlots={len(open_slots)}"
+                )
+
+                result_data = {
+                    "success": True,
+                    "status": "SLOT_AVAILABLE" if is_pref_available else "SLOT_UNAVAILABLE",
+                    "available": is_pref_available,
+                    "slotAvailable": is_pref_available,
+                    "date": resolved_date,
+                    "preferredTime": pref_time,
+                    "capacity": capacity_val,
+                    "bookedCount": booked_counts.get(pref_time, 0) if pref_time else 0,
+                    "remainingCapacity": capacity_val - booked_counts.get(pref_time, 0) if pref_time else capacity_val,
+                    "availableSlots": open_slots,
+                    "hasExistingBooking": False,
+                    "existingBooking": None,
+                }
+
+                if not is_pref_available and pref_time:
+                    if open_slots:
+                        result_data["guidance"] = (
+                            f"The requested slot {pref_time} is already booked on {resolved_date} and has reached maximum capacity ({capacity_val}/{capacity_val} patients) or is outside open operational shifts. "
+                            f"Politely inform the caller that {pref_time} is full/unavailable and offer available open slots such as {', '.join(open_slots[:3])}."
+                        )
+                    else:
+                        result_data["guidance"] = (
+                            f"The requested slot {pref_time} is not available on {resolved_date}, and no further open slots remain for this date. "
+                            f"Politely suggest booking for the next business day."
+                        )
+                elif not pref_time:
+                    result_data["guidance"] = (
+                        f"The following time slots on {resolved_date} are OPEN and ready for booking (clinic accommodates up to {capacity_val} patients per slot): "
+                        f"{', '.join(open_slots[:6])}. "
+                        f"Every slot in availableSlots has open capacity. If the caller asks for available times, mention these open times and let them choose."
+                    )
+                else:
+                    result_data["guidance"] = (
+                        f"Slot {pref_time} on {resolved_date} is 100% available and open for booking (capacity: {capacity_val} patients/slot). "
+                        f"Confidently tell the caller that {pref_time} is available and proceed to confirm their details (Name, reason, age) and book the appointment. "
+                        f"Do NOT say the slot is booked by someone else."
+                    )
+
+                await params.result_callback(
+                    result_data,
+                    properties=FunctionCallResultProperties(run_llm=True),
+                )
+                return
+            except Exception as fast_path_err:
+                logger.debug(f"[SlotTool] FastPath notice, falling back to HTTP: {fast_path_err}")
+
         try:
             if http_client:
                 resp = await http_client.get(api_endpoint, params=query_params, headers=headers)

@@ -72,6 +72,8 @@ async def get_active_deployments(
     active_ids = [str(d_id) for d_id in res.scalars().all()]
     return {"deployments": active_ids}
 
+from sqlalchemy.exc import IntegrityError
+
 @router.post("/call-sessions", status_code=status.HTTP_201_CREATED)
 async def create_call_session(
     payload: Dict[str, Any],
@@ -84,12 +86,16 @@ async def create_call_session(
     dep_id = uuid.UUID(payload["deploymentId"]) if payload.get("deploymentId") else None
 
     from ..models import CallSession
+    raw_plivo_uuid = payload.get("plivoCallUuid") or payload.get("plivo_call_uuid")
+    clean_plivo_uuid = str(raw_plivo_uuid).strip() if raw_plivo_uuid and str(raw_plivo_uuid).strip() else None
+
     caller_num = payload.get("callerNumber") or payload.get("callerPhoneNumber")
     now = datetime.utcnow()
     call = CallSession(
         tenantId=tenant_id,
         agentId=agent_id,
         deploymentId=dep_id,
+        plivoCallUuid=clean_plivo_uuid,
         roomName=payload.get("roomName", "default-room"),
         callerNumber=caller_num,
         direction=CallDirection(payload.get("direction", "INBOUND")),
@@ -98,13 +104,50 @@ async def create_call_session(
         startedAt=now,
         createdAt=now
     )
-    await repo.create(call)
-    await session.commit()
+    try:
+        await repo.create(call)
+        await session.commit()
+        # Safe reconciliation of pre-existing unmatched recordings
+        if clean_plivo_uuid:
+            from .webhooks import reconcile_unmatched_recording
+            await reconcile_unmatched_recording(session, call)
+    except IntegrityError as ie:
+        await session.rollback()
+        if clean_plivo_uuid:
+            logger.warning(f"[CallSession] Duplicate CallSession creation conflict for plivo_call_uuid={clean_plivo_uuid}: {ie}")
+            existing_stmt = select(CallSession).where(CallSession.plivoCallUuid == clean_plivo_uuid)
+            existing_res = await session.execute(existing_stmt)
+            existing_call = existing_res.scalar_one_or_none()
+            if existing_call:
+                logger.info(f"[CallSession] Returning existing CallSession {existing_call.id} for duplicate plivo_call_uuid={clean_plivo_uuid}")
+                return {
+                    "id": str(existing_call.id),
+                    "tenantId": str(existing_call.tenantId),
+                    "agentId": str(existing_call.agentId) if existing_call.agentId else str(tenant_id),
+                    "deploymentId": str(existing_call.deploymentId) if existing_call.deploymentId else str(tenant_id),
+                    "plivoCallUuid": existing_call.plivoCallUuid,
+                    "roomName": existing_call.roomName or "default-room",
+                    "callerNumber": existing_call.callerNumber,
+                    "direction": existing_call.direction.value if hasattr(existing_call.direction, "value") else str(existing_call.direction),
+                    "status": existing_call.status.value if hasattr(existing_call.status, "value") else str(existing_call.status),
+                    "durationSeconds": existing_call.durationSeconds or 0,
+                    "primaryLanguage": existing_call.primaryLanguage or "en-IN",
+                    "startedAt": to_utc_iso(existing_call.startedAt) or to_utc_iso(now),
+                    "endedAt": to_utc_iso(existing_call.endedAt),
+                    "transcriptText": existing_call.transcriptText,
+                    "turnsJson": existing_call.turnsJson or [],
+                    "toolsUsed": existing_call.toolsUsed or [],
+                    "metricsJson": existing_call.metricsJson or {},
+                    "createdAt": to_utc_iso(existing_call.createdAt) or to_utc_iso(now),
+                }
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Call session creation conflict")
+
     return {
         "id": str(call.id),
         "tenantId": str(call.tenantId),
         "agentId": str(call.agentId) if call.agentId else str(tenant_id),
         "deploymentId": str(call.deploymentId) if call.deploymentId else str(tenant_id),
+        "plivoCallUuid": call.plivoCallUuid,
         "roomName": call.roomName or "default-room",
         "callerNumber": call.callerNumber,
         "direction": call.direction.value if hasattr(call.direction, "value") else str(call.direction),
@@ -147,6 +190,14 @@ async def finalize_call_session(
     )
     if not finalized:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Call session not found")
+
+    # Safe reconciliation of unmatched recordings for this call
+    if finalized.plivoCallUuid:
+        try:
+            from .webhooks import reconcile_unmatched_recording
+            await reconcile_unmatched_recording(session, finalized)
+        except Exception as rec_err:
+            logger.debug(f"[CallSession] Finalize recording reconciliation notice: {rec_err}")
 
     # ── Auto-sync CRM Lead for 100% Lead Capture ───────────────────────────
     try:

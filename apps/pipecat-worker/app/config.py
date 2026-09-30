@@ -55,7 +55,14 @@ class Settings(BaseSettings):
 
     # Phase 1: LLM Cost & Prompt Optimization Flags
     ENABLE_LEAN_PROMPT_COMPRESSION: bool = True
-    ENABLE_LLM_PROMPT_WARMUP: bool = False
+    ENABLE_LLM_PROMPT_WARMUP: bool = True
+
+    # STT VAD & Endpointer Tuning Flags (Anti-Noise & Sub-500ms Latency)
+    STT_MODE: str = "verbatim"
+    STT_VAD_THRESHOLD: float = 0.68
+    STT_VAD_SILENCE_DURATION_MS: int = 180
+    STT_VAD_MIN_SPEECH_DURATION_MS: int = 200
+    USER_TURN_STOP_TIMEOUT: float = 0.08
 
     # Optional simple security token for POC endpoint
     POC_SECRET_KEY: str = ""

@@ -34,15 +34,24 @@ class WorkflowState:
         result = result or {}
 
         if tool_name in ("check_available_slots", "check_slots"):
-            if "date" in args and args["date"]:
+            if "bookingDate" in args and args["bookingDate"]:
+                self.appointment_date = str(args["bookingDate"]).strip()
+            elif "date" in args and args["date"]:
                 self.appointment_date = str(args["date"]).strip()
-            if "time" in args and args["time"]:
+
+            if "preferredTime" in args and args["preferredTime"]:
+                self.appointment_time = str(args["preferredTime"]).strip()
+            elif "time" in args and args["time"]:
                 self.appointment_time = str(args["time"]).strip()
+            elif "slot" in args and args["slot"]:
+                self.appointment_time = str(args["slot"]).strip()
+
             self.availability_checked = True
             is_avail = bool(
-                result.get("available")
+                result.get("slotAvailable")
+                or result.get("available")
                 or result.get("isAvailable")
-                or result.get("status") in ("available", "success")
+                or result.get("status") in ("SLOT_AVAILABLE", "available", "success")
             )
             self.availability_result = "AVAILABLE" if is_avail else "UNAVAILABLE"
             logger.info(
@@ -58,6 +67,12 @@ class WorkflowState:
 
             if "bookingTime" in args and args["bookingTime"]:
                 self.appointment_time = str(args["bookingTime"]).strip()
+            elif "preferredTime" in args and args["preferredTime"]:
+                self.appointment_time = str(args["preferredTime"]).strip()
+            elif "time" in args and args["time"]:
+                self.appointment_time = str(args["time"]).strip()
+            elif "slot" in args and args["slot"]:
+                self.appointment_time = str(args["slot"]).strip()
             elif "time" in args and args["time"]:
                 self.appointment_time = str(args["time"]).strip()
 

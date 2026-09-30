@@ -1,4 +1,4 @@
-import type { ReceptionistUser, Subscription, PlanTemplate } from '../types';
+import type { ReceptionistUser, Subscription, PlanTemplate, CallRecordingResponse } from '../types';
 
 const API_URL = import.meta.env.PROD
   ? (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost') ? import.meta.env.VITE_API_URL : '')
@@ -220,6 +220,14 @@ export const api = {
     const stringParams: Record<string, string> = {};
     if (tenantId) stringParams.tenantId = tenantId;
     return request<CallSession>(`/api/client/calls/${id}`, {
+      params: stringParams,
+    });
+  },
+
+  getClientCallRecording: (id: string, tenantId?: string) => {
+    const stringParams: Record<string, string> = {};
+    if (tenantId) stringParams.tenantId = tenantId;
+    return request<CallRecordingResponse>(`/api/client/calls/${id}/recording`, {
       params: stringParams,
     });
   },

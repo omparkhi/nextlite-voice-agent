@@ -99,6 +99,13 @@ class KnowledgeSourceStatus(str, enum.Enum):
     READY = "READY"
     FAILED = "FAILED"
 
+class RecordingStatus(str, enum.Enum):
+    AVAILABLE = "AVAILABLE"
+    PENDING = "PENDING"
+    UNMATCHED = "UNMATCHED"
+    FAILED = "FAILED"
+    EXPIRED = "EXPIRED"
+
 
 # ==========================================
 # 2. DATABASE MODELS (20 TABLES)
@@ -340,6 +347,7 @@ class CallSession(Base):
     tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     agentId: Mapped[Optional[uuid.UUID]] = mapped_column("agent_id", UUID(as_uuid=True), ForeignKey("agents.id", ondelete="SET NULL"), nullable=True)
     deploymentId: Mapped[Optional[uuid.UUID]] = mapped_column("deployment_id", UUID(as_uuid=True), ForeignKey("deployments.id", ondelete="SET NULL"), nullable=True)
+    plivoCallUuid: Mapped[Optional[str]] = mapped_column("plivo_call_uuid", String(100), nullable=True, unique=True, index=True)
     roomName: Mapped[Optional[str]] = mapped_column("room_name", String(255), nullable=True, default="default-room")
     callerNumber: Mapped[Optional[str]] = mapped_column("caller_number", String(50), nullable=True)
     direction: Mapped[CallDirection] = mapped_column(SQLEnum(CallDirection, name="call_direction", native_enum=False), nullable=False, default=CallDirection.INBOUND)
@@ -353,6 +361,23 @@ class CallSession(Base):
     toolsUsed: Mapped[Optional[list]] = mapped_column("tools_used", JSONB, nullable=True, default=list)
     metricsJson: Mapped[Optional[dict]] = mapped_column("metrics_json", JSONB, nullable=True, default=dict)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
+
+
+class CallRecording(Base):
+    __tablename__ = "call_recordings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenantId: Mapped[Optional[uuid.UUID]] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=True, index=True)
+    callSessionId: Mapped[Optional[uuid.UUID]] = mapped_column("call_session_id", UUID(as_uuid=True), ForeignKey("call_sessions.id", ondelete="SET NULL"), nullable=True, unique=True, index=True)
+    plivoCallUuid: Mapped[str] = mapped_column("plivo_call_uuid", String(100), nullable=False, index=True)
+    plivoRecordingId: Mapped[str] = mapped_column("plivo_recording_id", String(100), nullable=False, unique=True, index=True)
+    recordingUrl: Mapped[str] = mapped_column("recording_url", Text, nullable=False)
+    recordingFormat: Mapped[str] = mapped_column("recording_format", String(20), nullable=False, default="mp3")
+    durationSeconds: Mapped[int] = mapped_column("duration_seconds", Integer, default=0, nullable=False)
+    status: Mapped[RecordingStatus] = mapped_column(SQLEnum(RecordingStatus, name="recording_status", native_enum=False), nullable=False, default=RecordingStatus.PENDING, index=True)
+    metadataJson: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True, default=dict)
+    createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class Lead(Base):

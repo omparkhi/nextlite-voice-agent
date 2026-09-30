@@ -9,7 +9,7 @@ from sqlalchemy import text
 from .config import settings
 from .logging import logger
 from .db import init_db, close_db, get_redis, AsyncSessionLocal
-from .routers import auth, agents, internal, knowledge, client, receptionist, admin, whatsapp_integration
+from .routers import auth, agents, internal, knowledge, client, receptionist, admin, whatsapp_integration, webhooks
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -135,3 +135,4 @@ app.include_router(client.router)
 app.include_router(receptionist.router)
 app.include_router(admin.router)
 app.include_router(whatsapp_integration.router)
+app.include_router(webhooks.router)

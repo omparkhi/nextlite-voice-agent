@@ -205,7 +205,8 @@ class CallTranscriptCollector:
         created_at_iso: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Records a user speech turn."""
-        clean_text = (transcript or "").strip()
+        from app.language_processor import clean_asr_hallucinations
+        clean_text = clean_asr_hallucinations(transcript or "").strip()
         if not clean_text:
             return {}
 
@@ -248,6 +249,19 @@ class CallTranscriptCollector:
         clean_text = (response or "").strip()
         if not clean_text:
             return {}
+
+        # Deduplication Guard: If the most recent recorded turn already has the exact same agent response without a user turn in between, update it instead of creating a duplicate
+        if self._turns:
+            last_turn = self._turns[-1]
+            last_agent = last_turn.get("agent")
+            last_user = last_turn.get("user")
+            if last_agent and not last_user:
+                if (last_agent.get("response") or "").strip() == clean_text:
+                    if ttft_ms is not None:
+                        last_agent["ttftMs"] = round(ttft_ms, 1)
+                    if duration_ms is not None:
+                        last_agent["durationMs"] = round(duration_ms, 1)
+                    return last_turn
 
         now_iso = created_at_iso or datetime.now(timezone.utc).isoformat()
 

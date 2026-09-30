@@ -816,3 +816,250 @@ def test_dynamic_multi_tenant_session_isolation(client, monkeypatch):
     assert created_sessions[SAMPLE_SESSION_ID_B]["tenantId"] == SAMPLE_TENANT_ID_B
     assert created_sessions[SAMPLE_SESSION_ID_B]["agentId"] == SAMPLE_AGENT_ID_B
     assert updated_sessions[SAMPLE_SESSION_ID_B]["tenantId"] == SAMPLE_TENANT_ID_B
+
+
+# ============================================================================
+# Step 5: Phase 11A Call Identity Foundation Tests
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_client_create_call_session_with_plivo_call_uuid():
+    """Verify CreateCallSessionRequest and CallSessionResponse serialize/deserialize plivoCallUuid."""
+    test_plivo_uuid = "8d22c9e0-6e4b-488f-a18e-473d724ea243"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.read())
+        assert body["plivoCallUuid"] == test_plivo_uuid
+        assert body["roomName"] == "stream-plivo-test-1"
+
+        return httpx.Response(
+            status_code=201,
+            json={
+                "id": SAMPLE_SESSION_ID_A,
+                "tenantId": SAMPLE_TENANT_ID_A,
+                "agentId": SAMPLE_AGENT_ID_A,
+                "deploymentId": SAMPLE_DEPLOYMENT_ID_A,
+                "plivoCallUuid": test_plivo_uuid,
+                "roomName": "stream-plivo-test-1",
+                "callerNumber": "+919876543210",
+                "direction": "INBOUND",
+                "status": "ACTIVE",
+                "durationSeconds": 0,
+                "primaryLanguage": "en-IN",
+                "startedAt": "2026-09-09T18:00:00.000Z",
+                "createdAt": "2026-09-09T18:00:00.000Z",
+            },
+        )
+
+    mock_transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=mock_transport) as http_client:
+        client_instance = CallSessionClient(http_client=http_client)
+        resp = await client_instance.create_call_session(
+            CreateCallSessionRequest(
+                tenantId=SAMPLE_TENANT_ID_A,
+                agentId=SAMPLE_AGENT_ID_A,
+                deploymentId=SAMPLE_DEPLOYMENT_ID_A,
+                plivoCallUuid=test_plivo_uuid,
+                roomName="stream-plivo-test-1",
+                callerNumber="+919876543210",
+                direction="INBOUND",
+                status="ACTIVE",
+                startedAt="2026-09-09T18:00:00.000Z",
+            )
+        )
+
+        assert resp.id == SAMPLE_SESSION_ID_A
+        assert resp.plivo_call_uuid == test_plivo_uuid
+        assert resp.room_name == "stream-plivo-test-1"
+
+
+def test_websocket_inbound_passes_plivo_call_uuid(client, monkeypatch):
+    """Verify Inbound Plivo WebSocket start frame extracts callId and passes it to create_call_session."""
+    from pipecat.workers.runner import WorkerRunner
+
+    created_sessions: List[Dict[str, Any]] = []
+    inbound_call_uuid = "inbound-plivo-uuid-999"
+
+    async def mock_create(self, data: CreateCallSessionRequest) -> CallSessionResponse:
+        created_sessions.append(data.model_dump(by_alias=True))
+        return CallSessionResponse(
+            id=SAMPLE_SESSION_ID_A,
+            tenantId=data.tenant_id,
+            agentId=data.agent_id,
+            deploymentId=data.deployment_id,
+            plivoCallUuid=data.plivo_call_uuid,
+            roomName=data.room_name,
+            callerNumber=data.caller_number,
+            direction=data.direction or "INBOUND",
+            status="ACTIVE",
+            durationSeconds=0,
+            startedAt="2026-09-09T18:00:00Z",
+        )
+
+    mock_cfg = create_mock_runtime_config(
+        tenant_id=SAMPLE_TENANT_ID_A,
+        agent_id=SAMPLE_AGENT_ID_A,
+        deployment_id=SAMPLE_DEPLOYMENT_ID_A,
+    )
+
+    async def mock_get_cfg(self, deployment_id: str) -> RuntimeAgentConfig:
+        return mock_cfg
+
+    async def mock_runner_run(self):
+        return None
+
+    monkeypatch.setattr(RuntimeConfigClient, "get_runtime_agent_config", mock_get_cfg)
+    monkeypatch.setattr(CallSessionClient, "create_call_session", mock_create)
+    monkeypatch.setattr(CallSessionClient, "update_call_session", AsyncMock())
+    monkeypatch.setattr(WorkerRunner, "run", mock_runner_run)
+
+    with client.websocket_connect(f"/ws/plivo?deploymentId={SAMPLE_DEPLOYMENT_ID_A}") as ws:
+        ws.send_text(json.dumps({
+            "event": "start",
+            "start": {
+                "streamId": "stream-inbound-777",
+                "callId": inbound_call_uuid,
+                "from": "+919876543210",
+                "to": "+918031707681",
+            }
+        }))
+        ws.close()
+
+    assert len(created_sessions) == 1
+    assert created_sessions[0]["plivoCallUuid"] == inbound_call_uuid
+    assert created_sessions[0]["roomName"] == "stream-inbound-777"
+    assert created_sessions[0]["callerNumber"] == "+919876543210"
+    assert created_sessions[0]["direction"] == "INBOUND"
+
+
+def test_websocket_outbound_passes_plivo_call_uuid(client, monkeypatch):
+    """Verify Outbound Plivo WebSocket passes the answered call's CallUUID (not request_uuid)."""
+    from pipecat.workers.runner import WorkerRunner
+
+    created_sessions: List[Dict[str, Any]] = []
+    outbound_call_uuid = "answered-outbound-uuid-456"
+
+    async def mock_create(self, data: CreateCallSessionRequest) -> CallSessionResponse:
+        created_sessions.append(data.model_dump(by_alias=True))
+        return CallSessionResponse(
+            id=SAMPLE_SESSION_ID_A,
+            tenantId=data.tenant_id,
+            agentId=data.agent_id,
+            deploymentId=data.deployment_id,
+            plivoCallUuid=data.plivo_call_uuid,
+            roomName=data.room_name,
+            callerNumber=data.caller_number,
+            direction=data.direction or "OUTBOUND",
+            status="ACTIVE",
+            durationSeconds=0,
+            startedAt="2026-09-09T18:00:00Z",
+        )
+
+    mock_cfg = create_mock_runtime_config(
+        tenant_id=SAMPLE_TENANT_ID_A,
+        agent_id=SAMPLE_AGENT_ID_A,
+        deployment_id=SAMPLE_DEPLOYMENT_ID_A,
+    )
+
+    async def mock_get_cfg(self, deployment_id: str) -> RuntimeAgentConfig:
+        return mock_cfg
+
+    async def mock_runner_run(self):
+        return None
+
+    monkeypatch.setattr(RuntimeConfigClient, "get_runtime_agent_config", mock_get_cfg)
+    monkeypatch.setattr(CallSessionClient, "create_call_session", mock_create)
+    monkeypatch.setattr(CallSessionClient, "update_call_session", AsyncMock())
+    monkeypatch.setattr(WorkerRunner, "run", mock_runner_run)
+
+    # In outbound flow, Plivo dials answer_url which opens WebSocket with query param callId and direction=outbound
+    with client.websocket_connect(
+        f"/ws/plivo?deploymentId={SAMPLE_DEPLOYMENT_ID_A}&direction=outbound&to=%2B919657954641&callId={outbound_call_uuid}"
+    ) as ws:
+        ws.send_text(json.dumps({
+            "event": "start",
+            "start": {
+                "streamId": "stream-outbound-888",
+                "callId": outbound_call_uuid,
+                "from": "+918031707681",
+                "to": "+919657954641",
+            }
+        }))
+        ws.close()
+
+    assert len(created_sessions) == 1
+    assert created_sessions[0]["plivoCallUuid"] == outbound_call_uuid
+    assert created_sessions[0]["roomName"] == "stream-outbound-888"
+    assert created_sessions[0]["callerNumber"] == "+919657954641"
+    assert created_sessions[0]["direction"] == "OUTBOUND"
+
+
+def test_same_phone_number_different_plivo_call_uuids(client, monkeypatch):
+    """Verify two consecutive calls from the same phone number generate distinct CallSessions with their own CallUUIDs."""
+    from pipecat.workers.runner import WorkerRunner
+
+    created_sessions: List[Dict[str, Any]] = []
+
+    async def mock_create(self, data: CreateCallSessionRequest) -> CallSessionResponse:
+        created_sessions.append(data.model_dump(by_alias=True))
+        return CallSessionResponse(
+            id=f"session-{len(created_sessions)}",
+            tenantId=data.tenant_id,
+            agentId=data.agent_id,
+            deploymentId=data.deployment_id,
+            plivoCallUuid=data.plivo_call_uuid,
+            roomName=data.room_name,
+            callerNumber=data.caller_number,
+            direction=data.direction or "INBOUND",
+            status="ACTIVE",
+            durationSeconds=0,
+            startedAt="2026-09-09T18:00:00Z",
+        )
+
+    mock_cfg = create_mock_runtime_config()
+
+    async def mock_get_cfg(self, deployment_id: str) -> RuntimeAgentConfig:
+        return mock_cfg
+
+    async def mock_runner_run(self):
+        return None
+
+    monkeypatch.setattr(RuntimeConfigClient, "get_runtime_agent_config", mock_get_cfg)
+    monkeypatch.setattr(CallSessionClient, "create_call_session", mock_create)
+    monkeypatch.setattr(CallSessionClient, "update_call_session", AsyncMock())
+    monkeypatch.setattr(WorkerRunner, "run", mock_runner_run)
+
+    # Call 1 from +919657954641 with UUID-AAA
+    with client.websocket_connect(f"/ws/plivo?deploymentId={SAMPLE_DEPLOYMENT_ID_A}") as ws1:
+        ws1.send_text(json.dumps({
+            "event": "start",
+            "start": {
+                "streamId": "stream-call-1",
+                "callId": "plivo-uuid-AAA",
+                "from": "+919657954641",
+            }
+        }))
+        ws1.close()
+
+    # Call 2 from +919657954641 with UUID-BBB
+    with client.websocket_connect(f"/ws/plivo?deploymentId={SAMPLE_DEPLOYMENT_ID_A}") as ws2:
+        ws2.send_text(json.dumps({
+            "event": "start",
+            "start": {
+                "streamId": "stream-call-2",
+                "callId": "plivo-uuid-BBB",
+                "from": "+919657954641",
+            }
+        }))
+        ws2.close()
+
+    assert len(created_sessions) == 2
+    assert created_sessions[0]["callerNumber"] == "+919657954641"
+    assert created_sessions[0]["plivoCallUuid"] == "plivo-uuid-AAA"
+    assert created_sessions[0]["roomName"] == "stream-call-1"
+
+    assert created_sessions[1]["callerNumber"] == "+919657954641"
+    assert created_sessions[1]["plivoCallUuid"] == "plivo-uuid-BBB"
+    assert created_sessions[1]["roomName"] == "stream-call-2"
+    assert created_sessions[0]["plivoCallUuid"] != created_sessions[1]["plivoCallUuid"]
+

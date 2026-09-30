@@ -283,6 +283,26 @@ ENGLISH_WORDS_TOKENS = {
     "need", "like", "today", "tomorrow"
 }
 
+ENGLISH_FUNCTIONAL_CONVERSATIONAL_TOKENS = {
+    "i", "you", "he", "she", "it", "we", "they", "my", "your", "his", "her", "our", "their",
+    "what", "when", "where", "which", "who", "whom", "whose", "why", "how", "is", "am", "are",
+    "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will",
+    "would", "shall", "should", "can", "could", "may", "might", "must", "want", "need", "like",
+    "speak", "talk", "tell", "help", "give", "know", "think", "understand"
+}
+
+ROUTINE_SLOT_AND_ENTITY_ENGLISH_TOKENS = {
+    "tomorrow", "today", "yesterday", "morning", "afternoon", "evening", "night",
+    "am", "pm", "at", "on", "in", "to", "for", "from", "o'clock", "oclock",
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    "january", "february", "march", "april", "may", "june", "july", "august",
+    "september", "october", "november", "december",
+    "dr", "doctor", "clinic", "hospital", "patient", "name", "age", "years", "year",
+    "old", "yes", "no", "ok", "okay", "yeah", "sure", "fine", "thank", "thanks",
+    "hello", "hi", "hey", "sir", "madam", "mam", "appointment", "booking", "slot",
+    "schedule", "available", "time", "timing", "date"
+}
+
 HINDI_LATIN_MARKERS_REGEX = re.compile(
     r"\b(?:" + "|".join(sorted(HINDI_LATIN_TOKENS, key=len, reverse=True)) + r")\b",
     re.IGNORECASE
@@ -355,7 +375,22 @@ def is_reliable_automatic_switch(transcript: str, candidate_language: str, curre
             return False
         if scores["en"] == 0:
             return False
-        return len(words) >= 2
+            
+        # Distinguish natural Indian code-switching (dates, times, numbers, single names) from full English conversation
+        non_slot_words = [
+            w.lower().strip(".,?!:; \t\r\n") for w in words
+            if w.lower().strip(".,?!:; \t\r\n") not in ROUTINE_SLOT_AND_ENTITY_ENGLISH_TOKENS
+            and not w.strip(".,?!:; \t\r\n").isdigit()
+        ]
+        has_functional_english = any(w.lower().strip(".,?!:; \t\r\n") in ENGLISH_FUNCTIONAL_CONVERSATIONAL_TOKENS for w in words)
+
+        # For an Indian language conversation to switch to English automatically:
+        # Require genuine conversational English (at least 4 words, including functional/conversational grammar words, and not just routine slot entities)
+        if len(words) < 4:
+            return False
+        if not non_slot_words or not has_functional_english:
+            return False
+        return True
 
     if cand_base == "mr":
         if scores["mr"] > scores["hi"] and scores["mr"] >= 1:

@@ -28,6 +28,36 @@ PURE_NOISE_TOKENS: Set[str] = {
 }
 
 
+def clean_asr_hallucinations(text: str) -> str:
+    """
+    Cleans hallucinated repetitive token loops produced by realtime neural ASR models
+    (e.g., 'Hello, hello, hello, hello...' repeating 10-100 times during ambient pauses).
+    
+    Collapses 3+ consecutive repetitions of identical words or phrases down to 1-2 occurrences,
+    while carefully preserving natural human 2-word confirmations like 'हो हो' or '22 22'.
+    """
+    import re
+    if not text or not isinstance(text, str):
+        return ""
+    
+    cleaned = text.strip()
+    if not cleaned:
+        return ""
+
+    # 1. Collapse 3+ single word repetitions (e.g. "hello, hello, hello, hello..." -> "Hello")
+    pattern_word = re.compile(r'\b([^\W\d_]+(?:-[^\W\d_]+)?)\b(?:[\s,।॥!?-]+\b\1\b){2,}', re.IGNORECASE | re.UNICODE)
+    cleaned = pattern_word.sub(r'\1', cleaned)
+
+    # 2. Collapse 3+ repeated 2-word or 3-word n-gram phrases (e.g. "एक मिनिट एक मिनिट एक मिनिट" -> "एक मिनिट")
+    pattern_phrase = re.compile(r'\b(.{2,25}?)\b(?:[\s,।॥!?-]+\b\1\b){2,}', re.IGNORECASE | re.UNICODE)
+    cleaned = pattern_phrase.sub(r'\1', cleaned)
+
+    # 3. Clean any trailing commas or abnormal repeated punctuation left over
+    cleaned = re.sub(r'[,，\s]+$', '', cleaned)
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned)
+    return cleaned.strip()
+
+
 def is_pure_hesitation_noise(text: str) -> bool:
     """
     Returns True ONLY for pure single-syllable hesitation tokens, breathing artifacts,
@@ -73,6 +103,7 @@ class LanguageContextProcessor(FrameProcessor):
         await super().process_frame(frame, direction)
 
         if isinstance(frame, TranscriptionFrame):
+            frame.text = clean_asr_hallucinations(frame.text)
             transcript = frame.text.strip()
             detected_language = getattr(frame, "language", None)
 

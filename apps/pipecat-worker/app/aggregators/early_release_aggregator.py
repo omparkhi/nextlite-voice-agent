@@ -449,7 +449,9 @@ class EarlyReleaseTextAggregator(BaseTextAggregator):
             if char in UNAMBIGUOUS_SENTENCE_ENDING_PUNCTUATION:
                 candidate = text[: index + 1].strip()
 
-                if self._count_words(candidate) >= 1:
+                # Guard: Do not split single-word salutations/exclamations (e.g. "नमस्कार!" or "Hello!")
+                # into isolated micro-chunks when more text follows, preventing carrier buffer underrun pauses.
+                if self._count_words(candidate) >= 2 or index == len(text) - 1:
                     return index + 1
 
         # ---------------------------------------------------------------

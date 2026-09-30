@@ -18,13 +18,15 @@ class TelephonyService:
         return cleaned
 
     @staticmethod
-    def generate_plivo_answer_xml(websocket_url: str) -> str:
+    def generate_plivo_answer_xml(websocket_url: str, callback_url: Optional[str] = None) -> str:
         """
         Generates standard Plivo XML to bridge inbound PSTN call directly
-        to the Pipecat WebSocket media stream endpoint.
+        to the Pipecat WebSocket media stream endpoint with optional session recording.
         """
+        record_tag = f'<Record callbackUrl="{callback_url}" callbackMethod="POST" recordSession="true" maxLength="3600" fileFormat="mp3" />' if callback_url else ''
         return f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
+    {record_tag}
     <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=8000">
         {websocket_url}
     </Stream>

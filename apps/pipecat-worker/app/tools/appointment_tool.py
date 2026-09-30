@@ -293,6 +293,29 @@ def create_book_appointment_tool_factory(
                 resp_json = response.json() if response.content else {}
                 appointment_id = resp_json.get("id", "appointment-created")
                 appointment_number = resp_json.get("appointmentNumber", "A-001")
+                cap_val = max(1, int(getattr(context, "patients_per_slot", 1) or 1))
+                biz_hrs = getattr(context, "business_hours", "N/A")
+                slot_dur = getattr(context, "slot_duration", "N/A")
+
+                logger.info(
+                    f"[AppointmentTool AdminConfig & Booked] Appointment successfully created | "
+                    f"appointmentNumber={appointment_number} | date={booking_date} | time={booking_time} | "
+                    f"adminCapacity={cap_val} (patients_per_slot) | "
+                    f"adminBusinessHours='{biz_hrs}' | adminSlotDuration='{slot_dur}'"
+                )
+
+                # Sync local Redis slot cache immediately (<0.5ms)
+                try:
+                    from app.redis_client import record_atomic_slot_booking
+                    await record_atomic_slot_booking(
+                        trusted_deployment_id,
+                        booking_date,
+                        booking_time,
+                        capacity=cap_val
+                    )
+                except Exception as redis_sync_err:
+                    logger.debug(f"[AppointmentTool] Redis sync notice: {redis_sync_err}")
+
                 result = {
                     "success": True,
                     "appointmentId": appointment_id,

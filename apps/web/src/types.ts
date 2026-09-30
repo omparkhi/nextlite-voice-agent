@@ -534,11 +534,24 @@ export interface SafePhoneTraceInfo {
   boundary?: string;
 }
 
+export interface CallRecordingResponse {
+  id?: string;
+  callSessionId: string;
+  status: 'AVAILABLE' | 'PENDING' | 'UNAVAILABLE' | 'UNMATCHED' | 'FAILED' | 'EXPIRED';
+  durationSeconds?: number;
+  format?: string;
+  recordingUrl?: string;
+  streamUrl?: string;
+  createdAt?: string;
+  message?: string;
+}
+
 export interface CallSession {
   id: string;
   tenantId: string;
   agentId: string;
   deploymentId: string;
+  plivoCallUuid?: string | null;
   roomName: string;
   callerNumber?: string | null;
   direction: CallDirection;

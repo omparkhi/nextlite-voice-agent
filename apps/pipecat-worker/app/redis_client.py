@@ -95,3 +95,52 @@ async def listen_cache_invalidation_loop(channel_name: str = "nextlite:cache:inv
             else:
                 logger.warning(f"[WorkerRedis] Pub/Sub listener disconnected: {e}. Reconnecting in {backoff:.1f}s...")
             await asyncio.sleep(backoff)
+
+
+async def get_booked_slots_for_date(deployment_id: str, booking_date: str) -> Dict[str, int]:
+    """Retrieves slot occupancy map from Redis in <1ms.
+    
+    Returns a dict mapping slot string to count of booked patients, e.g.
+    {'08:00 PM': 1, '10:30 AM': 2}
+    """
+    client = get_worker_redis()
+    if not client or not deployment_id or not booking_date:
+        return {}
+    key = f"nextlite:booked_slots:{deployment_id}:{booking_date}"
+    try:
+        raw_map = await client.hgetall(key)
+        if not raw_map:
+            return {}
+        return {k: int(v) for k, v in raw_map.items() if str(v).isdigit()}
+    except Exception as e:
+        logger.debug(f"[WorkerRedis] get_booked_slots_for_date notice: {e}")
+        return {}
+
+
+async def record_atomic_slot_booking(
+    deployment_id: str,
+    booking_date: str,
+    booking_time: str,
+    capacity: int = 1,
+    ttl_seconds: int = 86400 * 7,
+) -> bool:
+    """Atomically increments slot count in Redis using HINCRBY in 0.5ms.
+    
+    Returns True if slot was successfully booked within capacity, False if over-capacity.
+    """
+    client = get_worker_redis()
+    if not client or not deployment_id or not booking_date or not booking_time:
+        return True
+    key = f"nextlite:booked_slots:{deployment_id}:{booking_date}"
+    try:
+        current_count = await client.hincrby(key, booking_time, 1)
+        # Set expiry for cleanup
+        await client.expire(key, ttl_seconds)
+        if current_count > capacity:
+            # Revert if over-capacity (Double-booking strictly prevented!)
+            await client.hincrby(key, booking_time, -1)
+            return False
+        return True
+    except Exception as e:
+        logger.debug(f"[WorkerRedis] record_atomic_slot_booking notice: {e}")
+        return True

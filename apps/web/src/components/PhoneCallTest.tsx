@@ -331,10 +331,17 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
     });
   }
 
+  // Deduplicate consecutive identical messages from the same role
+  const deduplicatedMessages = conversationMessages.filter((msg, idx, arr) => {
+    if (idx === 0) return true;
+    const prev = arr[idx - 1];
+    return !(prev.role === msg.role && prev.text.trim() === msg.text.trim());
+  });
+
   const handleCopyTranscript = () => {
     const textToCopy =
-      conversationMessages.length > 0
-        ? conversationMessages
+      deduplicatedMessages.length > 0
+        ? deduplicatedMessages
             .map((m) => `${m.role === 'user' ? 'Caller' : 'Agent'}${m.timeLabel ? ` [${m.timeLabel}]` : ''}: ${m.text}`)
             .join('\n\n')
         : callSession?.transcriptText || '';
@@ -753,9 +760,9 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
                 <div>
                   <h4 className="text-sm font-bold text-[#0c0a09] flex items-center gap-2">
                     <span>Call Conversation Transcript</span>
-                    {conversationMessages.length > 0 && (
+                    {deduplicatedMessages.length > 0 && (
                       <span className="text-[11px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-full font-mono">
-                        {conversationMessages.length} messages
+                        {deduplicatedMessages.length} messages
                       </span>
                     )}
                   </h4>
@@ -801,7 +808,7 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
 
             {/* Transcript Scrollable Dialogue Feed */}
             <div className="flex-1 overflow-y-auto p-4 my-3 bg-[#fafaf9] border border-[#e7e5e4] rounded-2xl space-y-4">
-              {conversationMessages.length === 0 ? (
+              {deduplicatedMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center p-8 text-[#777169] space-y-3">
                   <div className="w-14 h-14 bg-white border border-[#e7e5e4] rounded-2xl flex items-center justify-center text-2xl shadow-2xs">
                     💬
@@ -814,7 +821,7 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
                   </div>
                 </div>
               ) : (
-                conversationMessages.map((msg, idx) => {
+                deduplicatedMessages.map((msg, idx) => {
                   const isUser = msg.role === 'user';
 
                   return (
@@ -832,10 +839,10 @@ export default function PhoneCallTest({ clientId, agentId }: PhoneCallTestProps)
 
                       {/* Natural Speech Bubble */}
                       <div
-                        className={`max-w-[85%] p-4 text-sm leading-relaxed ${
+                        className={`max-w-[85%] px-3.5 py-2 text-xs leading-relaxed shadow-2xs ${
                           isUser
-                            ? 'bg-blue-600 text-white rounded-2xl rounded-tr-xs shadow-sm font-sans'
-                            : 'bg-white border border-[#e2e8f0] text-[#0f172a] rounded-2xl rounded-tl-xs shadow-xs font-sans'
+                            ? 'bg-[#0c0a09] text-white rounded-2xl rounded-tr-xs shadow-xs font-sans'
+                            : 'bg-[#f0efed] border border-[#e5e3df] text-[#0c0a09] rounded-2xl rounded-tl-xs font-sans'
                         }`}
                       >
                         <p className="whitespace-pre-wrap selection:bg-amber-200 selection:text-black">
