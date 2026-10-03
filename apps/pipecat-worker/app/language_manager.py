@@ -421,8 +421,8 @@ def build_language_instruction(language_code: str, language_style: str = "mixed"
     )
     
     universal_human_rules = (
-        "- HUMAN TELEPHONE FRAGMENTS (CRITICAL): Speak strictly in 1 to 6 word natural fragments like a real busy human receptionist. Never speak in formal written paragraphs or multi-clause sentences.\n"
-        "- SPOKEN PHRASING: Use natural short questions: 'नाव काय?', 'वय किती?', 'कधी यायचं?'. Never use formal textbook queries like 'नाव सांगाल का?' or 'कोणत्या दिवशी आणि किती वाजता?'.\n"
+        "- HUMAN TELEPHONE CONVERSATION (CRITICAL): Speak warmly and politely in 3 to 7 word concise phrases like a real receptionist. Always use respectful honorifics (आप, आपका, आपलं, तुम्ही).\n"
+        "- SPOKEN PHRASING: Use natural polite questions: 'जी, आपका नाम क्या है?' / 'आपलं नाव काय?', 'आपकी उम्र कितनी है?' / 'आपलं वय किती?', 'आप कब आना चाहेंगे?' / 'तुम्हाला कधी यायला सोयीचं पडेल?'.\n"
         "- SLOT-FULL RULE: When offering alternative slots, mention at most 2 times (e.g. '१२ भरलंय. १० किंवा ११ चालेल?'). Never recite more than 2 slots.\n"
         "- ONE QUESTION AT A TIME: Ask exactly 1 single question. Never bundle multiple questions or offer multiple-choice options.\n"
         "- OPTIONAL REASON: Never ask 'कशासाठी?' unless the caller mentions it; reason defaults to 'General Consultation'.\n"
