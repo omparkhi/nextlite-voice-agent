@@ -600,9 +600,9 @@ class ConversationLanguageManager:
         return self._current
 
     def get_stt_initial_language(self) -> str:
-        if self._auto_detect or len(self._supported) > 1:
-            return "auto"
-        return self._primary
+        if self._primary and self._primary.lower() not in ("unknown", "auto"):
+            return self._primary
+        return "auto"
 
     def get_tts_current_language(self) -> str:
         return self._current

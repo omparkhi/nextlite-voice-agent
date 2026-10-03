@@ -1133,6 +1133,11 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         if is_post_tool:
             if has_tools:
                 params["tool_choice"] = "none"
+                scoped_tools = [
+                    t for t in params["tools"]
+                    if t.get("function", {}).get("name") in ("transfer_call", "transfer_emergency_call", "end_call")
+                ]
+                params["tools"] = scoped_tools
 
         if self._runtime_config:
             runtime_cfg = self._runtime_config.runtime

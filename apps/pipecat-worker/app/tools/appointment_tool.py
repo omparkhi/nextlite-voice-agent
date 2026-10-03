@@ -57,7 +57,7 @@ APPOINTMENT_TOOL_PROPERTIES: Dict[str, Any] = {
     # },
 }
 
-APPOINTMENT_TOOL_REQUIRED = ["customerName", "bookingDate", "bookingTime"]
+APPOINTMENT_TOOL_REQUIRED = ["customerName", "title", "bookingDate", "bookingTime"]
 
 
 def create_book_appointment_tool_factory(
