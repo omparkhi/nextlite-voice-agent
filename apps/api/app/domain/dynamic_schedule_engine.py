@@ -177,8 +177,42 @@ def parse_business_shifts(business_hours: Optional[str]) -> List[Tuple[int, int]
     return default_shifts
 
 
-def is_time_within_shifts(time_str: str, business_hours: Optional[str]) -> bool:
-    """Checks if a given time slot falls within any of the configured open shift windows."""
+def is_day_closed(date_str: Optional[str], business_hours: Optional[str]) -> bool:
+    """Checks if the target date falls on a closed day based on business hours schedule.
+    
+    Operates strictly via ISO standard dates (YYYY-MM-DD) and standard English weekday names.
+    Zero regional language keywords.
+    """
+    if not date_str or not business_hours:
+        return False
+    try:
+        clean_date = str(date_str).strip()[:10]
+        dt = datetime.strptime(clean_date, "%Y-%m-%d")
+        day_name = dt.strftime("%A").lower()  # e.g., 'sunday', 'monday'
+        bh_lower = str(business_hours).lower()
+
+        # 1. Explicit closed rule for specific day (e.g. "Sunday: Closed", "Closed on Sunday", "Sunday Closed")
+        if f"{day_name}: closed" in bh_lower or f"{day_name} closed" in bh_lower or f"closed on {day_name}" in bh_lower:
+            return True
+
+        # 2. Monday to Friday range (Saturday and Sunday are closed unless explicitly marked open)
+        if ("monday to friday" in bh_lower or "mon to fri" in bh_lower or "mon - fri" in bh_lower) and day_name in ("saturday", "sunday"):
+            if f"{day_name}:" not in bh_lower and f"{day_name} open" not in bh_lower:
+                return True
+
+        # 3. Monday to Saturday range (Sunday is closed unless explicitly marked open)
+        if ("monday to saturday" in bh_lower or "mon to sat" in bh_lower or "mon - sat" in bh_lower) and day_name == "sunday":
+            if "sunday:" not in bh_lower and "sunday open" not in bh_lower:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def is_time_within_shifts(time_str: str, business_hours: Optional[str], booking_date: Optional[str] = None) -> bool:
+    """Checks if a given time slot falls within any of the configured open shift windows and open days."""
+    if booking_date and is_day_closed(booking_date, business_hours):
+        return False
     t_min = parse_time_to_minutes(time_str)
     if t_min is None:
         return False
@@ -203,6 +237,9 @@ def generate_dynamic_slots(
     - Break periods and closed hours are NEVER generated.
     - If booking_date is today, elapsed slots are filtered against the local clock.
     """
+    if booking_date and is_day_closed(booking_date, business_hours):
+        return []
+
     shifts = parse_business_shifts(business_hours)
     step = parse_slot_duration_minutes(slot_duration, default_minutes=30)
 
@@ -219,7 +256,7 @@ def generate_dynamic_slots(
     is_today = False
     if booking_date:
         b_clean = str(booking_date).strip().lower()
-        if b_clean in ("today", "aaj", "आज") or b_clean == today_iso:
+        if b_clean == "today" or b_clean == today_iso:
             is_today = True
 
     generated_slots: List[str] = []

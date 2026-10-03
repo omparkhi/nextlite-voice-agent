@@ -18,7 +18,7 @@ from ..domain.indic_normalizers import (
     sanitize_service_title,
     is_past_slot,
 )
-from ..domain.dynamic_schedule_engine import is_time_within_shifts, extract_business_schedule_from_version
+from ..domain.dynamic_schedule_engine import is_time_within_shifts, is_day_closed, extract_business_schedule_from_version
 
 router = APIRouter(prefix="/api/internal", tags=["internal"])
 
@@ -361,10 +361,10 @@ async def create_internal_appointment(
             b_h, _, _ = extract_business_schedule_from_version(cfg_json)
             business_hours = b_h
 
-    if business_hours and not is_time_within_shifts(apt_time, business_hours):
+    if business_hours and not is_time_within_shifts(apt_time, business_hours, booking_date=apt_date):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Requested slot '{apt_time}' falls during closed/break hours in configured schedule: {business_hours}."
+            detail=f"Requested slot '{apt_time}' on {apt_date} falls on a closed day or during closed/break hours in configured schedule: {business_hours}."
         )
 
     # Inherit caller phone number from active CallSession if phone is missing or dummy

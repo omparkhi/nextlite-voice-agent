@@ -21,6 +21,7 @@ from ..domain.indic_normalizers import (
 from ..domain.dynamic_schedule_engine import (
     generate_dynamic_slots,
     is_time_within_shifts,
+    is_day_closed,
     parse_business_shifts,
     parse_slot_duration_minutes,
     extract_business_schedule_from_version,
@@ -666,9 +667,9 @@ class CRMService:
 
         # Shift validation: Enforce business hours strictly for AI voice agent, never restrict human desk staff or walk-ins
         if not is_human_booking:
-            if business_hours and not is_time_within_shifts(norm_booking_time, business_hours):
+            if business_hours and not is_time_within_shifts(norm_booking_time, business_hours, booking_date=booking_date):
                 raise ValueError(
-                    f"Requested slot '{norm_booking_time}' falls during closed/break hours in configured schedule: {business_hours}."
+                    f"Requested slot '{norm_booking_time}' on {booking_date} falls on a closed day or during closed/break hours in configured schedule: {business_hours}."
                 )
 
         def _norm_time(t: str) -> str:
@@ -940,10 +941,13 @@ class CRMService:
             elif is_past_slot(booking_date, preferred_time, time_zone=timezone or "Asia/Kolkata", buffer_minutes=0):
                 is_past = True
                 slot_available = False
-            # Check 3: Is preferred time within tenant's open shifts?
-            elif business_hours and not is_time_within_shifts(preferred_time, business_hours):
+            # Check 3: Is preferred time within tenant's open shifts and open days?
+            elif business_hours and not is_time_within_shifts(preferred_time, business_hours, booking_date=booking_date):
                 is_outside_shift = True
                 slot_available = False
+        elif booking_date and business_hours and is_day_closed(booking_date, business_hours):
+            is_outside_shift = True
+            slot_available = False
 
         existing_booking = None
         if phone:

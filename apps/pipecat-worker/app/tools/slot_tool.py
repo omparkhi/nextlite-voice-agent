@@ -17,7 +17,7 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import FunctionCallResultProperties
 from pipecat.services.llm_service import FunctionCallParams
 from app.temporal_context import resolve_relative_or_absolute_date
-from app.dynamic_schedule_engine import generate_dynamic_slots, is_time_within_shifts
+from app.dynamic_schedule_engine import generate_dynamic_slots, is_time_within_shifts, is_day_closed
 
 if TYPE_CHECKING:
     from app.tools.tool_registry import ToolRuntimeContext
@@ -132,7 +132,16 @@ def create_check_slots_tool_factory(
                     "existingBooking": data.get("existingBooking"),
                 }
 
-                if not is_pref_available and pref_time:
+                if is_day_closed(resolved_date, biz_hours):
+                    result_data["status"] = "SLOT_UNAVAILABLE"
+                    result_data["available"] = False
+                    result_data["slotAvailable"] = False
+                    result_data["availableSlots"] = []
+                    result_data["guidance"] = (
+                        f"The clinic is CLOSED on {resolved_date} as per the operating schedule. "
+                        f"Politely and clearly inform the caller immediately in the active conversation language that the clinic is closed on this day, and suggest checking slots for the next open business day."
+                    )
+                elif not is_pref_available and pref_time:
                     if open_slots:
                         result_data["guidance"] = (
                             f"The requested slot {pref_time} is already booked on {resolved_date} and has reached maximum capacity ({capacity_val}/{capacity_val} patients) or is outside open operational shifts. "
@@ -188,7 +197,7 @@ def create_check_slots_tool_factory(
                     and booked_counts.get(s.lstrip("0"), 0) < capacity_val
                     and booked_counts.get(f"0{s}" if not s.startswith("0") else s, 0) < capacity_val
                 ]
-                is_open = is_time_within_shifts(pref_time, biz_hours) if pref_time else True
+                is_open = is_time_within_shifts(pref_time, biz_hours, booking_date=resolved_date) if pref_time else not is_day_closed(resolved_date, biz_hours)
                 is_pref_available = is_open and (
                     any(_norm_t(s) == norm_pref for s in open_slots) if norm_pref else True
                 )
@@ -222,7 +231,16 @@ def create_check_slots_tool_factory(
                     "existingBooking": None,
                 }
 
-                if not is_pref_available and pref_time:
+                if is_day_closed(resolved_date, biz_hours):
+                    result_data["status"] = "SLOT_UNAVAILABLE"
+                    result_data["available"] = False
+                    result_data["slotAvailable"] = False
+                    result_data["availableSlots"] = []
+                    result_data["guidance"] = (
+                        f"The clinic is CLOSED on {resolved_date} as per the operating schedule. "
+                        f"Politely and clearly inform the caller immediately in the active conversation language that the clinic is closed on this day, and suggest checking slots for the next open business day."
+                    )
+                elif not is_pref_available and pref_time:
                     if open_slots:
                         result_data["guidance"] = (
                             f"The requested slot {pref_time} is already booked on {resolved_date} and has reached maximum capacity ({capacity_val}/{capacity_val} patients) or is outside open operational shifts. "
