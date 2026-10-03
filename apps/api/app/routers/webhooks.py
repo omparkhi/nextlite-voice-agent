@@ -9,6 +9,7 @@ from ..db import get_db
 from ..models import CallSession, CallRecording, RecordingStatus, CallStatus
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
+root_router = APIRouter(tags=["webhooks_root"])
 
 async def extract_webhook_payload(request: Request) -> Dict[str, Any]:
     """Safely extracts payload from form data, JSON, or query parameters."""
@@ -73,6 +74,9 @@ async def reconcile_unmatched_recording(
 
 @router.api_route("/plivo/recordings", methods=["GET", "POST"])
 @router.api_route("/telephony/plivo/recordings", methods=["GET", "POST"])
+@root_router.api_route("/api/v1/telephony/plivo/recordings", methods=["GET", "POST"])
+@root_router.api_route("/plivo/recordings", methods=["GET", "POST"])
+@root_router.api_route("/telephony/plivo/recordings", methods=["GET", "POST"])
 async def plivo_recording_webhook(
     request: Request,
     session: AsyncSession = Depends(get_db)
@@ -254,6 +258,9 @@ async def plivo_recording_webhook(
 
 @router.api_route("/plivo/hangup", methods=["GET", "POST"])
 @router.api_route("/telephony/plivo/hangup", methods=["GET", "POST"])
+@root_router.api_route("/api/v1/telephony/plivo/hangup", methods=["GET", "POST"])
+@root_router.api_route("/plivo/hangup", methods=["GET", "POST"])
+@root_router.api_route("/telephony/plivo/hangup", methods=["GET", "POST"])
 async def plivo_hangup_webhook(
     request: Request,
     session: AsyncSession = Depends(get_db)

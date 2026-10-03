@@ -160,6 +160,22 @@ async def get_call_recording(
     rec_res = await session.execute(rec_stmt)
     recording = rec_res.scalar_one_or_none()
 
+    # Dynamic fallback reconciliation by plivoCallUuid if not yet linked
+    if not recording and call_session.plivoCallUuid:
+        unmatched_stmt = select(CallRecording).where(
+            CallRecording.plivoCallUuid == str(call_session.plivoCallUuid).strip(),
+            (CallRecording.tenantId == tenant_id) | (CallRecording.tenantId.is_(None))
+        )
+        unmatched_res = await session.execute(unmatched_stmt)
+        unmatched_rec = unmatched_res.scalar_one_or_none()
+        if unmatched_rec:
+            unmatched_rec.callSessionId = call_uuid
+            unmatched_rec.tenantId = tenant_id
+            unmatched_rec.status = RecordingStatus.AVAILABLE
+            unmatched_rec.updatedAt = datetime.utcnow()
+            await session.commit()
+            recording = unmatched_rec
+
     if not recording:
         # Check if call is active (pending recording callback)
         if call_session.status == CallStatus.ACTIVE:
@@ -216,6 +232,22 @@ async def stream_call_recording(
     )
     rec_res = await session.execute(rec_stmt)
     recording = rec_res.scalar_one_or_none()
+
+    if not recording and call_session.plivoCallUuid:
+        unmatched_stmt = select(CallRecording).where(
+            CallRecording.plivoCallUuid == str(call_session.plivoCallUuid).strip(),
+            (CallRecording.tenantId == tenant_id) | (CallRecording.tenantId.is_(None))
+        )
+        unmatched_res = await session.execute(unmatched_stmt)
+        unmatched_rec = unmatched_res.scalar_one_or_none()
+        if unmatched_rec:
+            unmatched_rec.callSessionId = call_uuid
+            unmatched_rec.tenantId = tenant_id
+            unmatched_rec.status = RecordingStatus.AVAILABLE
+            unmatched_rec.updatedAt = datetime.utcnow()
+            await session.commit()
+            recording = unmatched_rec
+
     if not recording or not recording.recordingUrl:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recording not available")
 
