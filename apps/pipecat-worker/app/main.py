@@ -453,9 +453,11 @@ async def plivo_inbound_xml(
     http_scheme = "https" if scheme == "wss" else "http"
     callback_url = f"{http_scheme}://{server_host}/api/v1/telephony/plivo/recordings"
     xml_callback_url = xml.sax.saxutils.escape(callback_url)
+    hangup_callback_url = f"{http_scheme}://{server_host}/api/v1/telephony/plivo/hangup"
+    xml_hangup_callback_url = xml.sax.saxutils.escape(hangup_callback_url)
 
     xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<Response>
+<Response hangupUrl="{xml_hangup_callback_url}" hangupMethod="POST">
     <Record callbackUrl="{xml_callback_url}" callbackMethod="POST" recordSession="true" maxLength="3600" fileFormat="mp3" />
     <Stream bidirectional="true" keepCallAlive="true" contentType="audio/x-l16;rate=8000">{xml_ws_url}</Stream>
 </Response>"""
@@ -495,6 +497,42 @@ async def plivo_recordings_webhook_proxy(request: Request):
     except Exception as e:
         logger.warning(f"[Recording Webhook Proxy] Error forwarding callback: {e}")
         return PlainResponse(content="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response/>", media_type="application/xml")
+
+
+@app.api_route("/api/v1/telephony/plivo/hangup", methods=["GET", "POST"])
+@app.api_route("/plivo/hangup", methods=["GET", "POST"])
+@app.api_route("/telephony/plivo/hangup", methods=["GET", "POST"])
+async def plivo_hangup_webhook_proxy(request: Request):
+    """Proxies authoritative Plivo carrier hangup callbacks to the NextLite Control Plane API."""
+    target_url = f"{settings.NEXTLITE_API_URL}/api/webhooks/plivo/hangup"
+    try:
+        params = dict(request.query_params)
+        if request.method == "POST":
+            try:
+                form_data = await request.form()
+                form_dict = dict(form_data)
+                if form_dict:
+                    params.update(form_dict)
+            except Exception:
+                pass
+            try:
+                raw_json = await request.json()
+                if isinstance(raw_json, dict):
+                    params.update(raw_json)
+            except Exception:
+                pass
+
+        client = getattr(request.app.state, "http_client", None)
+        if client:
+            await client.post(target_url, json=params, timeout=10.0)
+        else:
+            async with httpx.AsyncClient(timeout=10.0) as temp_client:
+                await temp_client.post(target_url, json=params)
+        return PlainResponse(content="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response/>", media_type="application/xml")
+    except Exception as e:
+        logger.warning(f"[Hangup Webhook Proxy] Error forwarding callback: {e}")
+        return PlainResponse(content="<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response/>", media_type="application/xml")
+
 
 
 @app.api_route("/api/v1/telephony/plivo/transfer-xml", methods=["GET", "POST"])

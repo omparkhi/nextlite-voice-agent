@@ -11,6 +11,11 @@ from .logging import logger
 from .db import init_db, close_db, get_redis, AsyncSessionLocal
 from .routers import auth, agents, internal, knowledge, client, receptionist, admin, whatsapp_integration, webhooks
 
+import asyncio
+from datetime import timedelta
+from sqlalchemy import select
+from .models import CallSession, CallStatus
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting NextLite Python Control Plane...")
@@ -29,10 +34,49 @@ async def lifespan(app: FastAPI):
         logger.info("Redis connection established.")
     except Exception as e:
         logger.warning(f"Redis ping notice: {e}. Running without Redis cache.")
+
+    # 4. Background Stale Call Session Reaper (every 5 minutes)
+    reaper_stop_event = asyncio.Event()
+
+    async def _stale_call_reaper_loop():
+        while not reaper_stop_event.is_set():
+            try:
+                await asyncio.sleep(300)
+                if reaper_stop_event.is_set():
+                    break
+                async with AsyncSessionLocal() as session:
+                    cutoff = datetime.utcnow() - timedelta(minutes=15)
+                    stmt = (
+                        select(CallSession)
+                        .where(
+                            CallSession.status == CallStatus.ACTIVE,
+                            CallSession.createdAt < cutoff
+                        )
+                    )
+                    res = await session.execute(stmt)
+                    stale_calls = res.scalars().all()
+                    if stale_calls:
+                        now_utc = datetime.utcnow()
+                        for call in stale_calls:
+                            call.status = CallStatus.COMPLETED
+                            if not call.durationSeconds or call.durationSeconds == 0:
+                                diff = now_utc - (call.startedAt or call.createdAt)
+                                call.durationSeconds = max(0, int(diff.total_seconds()))
+                            call.endedAt = call.endedAt or now_utc
+                        await session.commit()
+                        logger.info(f"[StaleCallReaper] Auto-closed {len(stale_calls)} orphaned ACTIVE call sessions")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug(f"[StaleCallReaper] Notice: {e}")
+
+    reaper_task = asyncio.create_task(_stale_call_reaper_loop())
         
     yield
     
     logger.info("Shutting down NextLite Python Control Plane...")
+    reaper_stop_event.set()
+    reaper_task.cancel()
     await close_db()
     logger.info("Cleanup completed.")
 

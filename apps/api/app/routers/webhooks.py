@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from ..logging import logger
 from ..db import get_db
-from ..models import CallSession, CallRecording, RecordingStatus
+from ..models import CallSession, CallRecording, RecordingStatus, CallStatus
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
@@ -201,6 +201,17 @@ async def plivo_recording_webhook(
             updatedAt=now
         )
         session.add(new_rec)
+        
+        # Auto-reconcile and complete stuck ACTIVE CallSession if recording has duration
+        if call_session.status == CallStatus.ACTIVE and duration_secs > 0:
+            call_session.status = CallStatus.COMPLETED
+            call_session.durationSeconds = max(duration_secs, call_session.durationSeconds or 0)
+            call_session.endedAt = now
+            logger.info(
+                f"[Recording Webhook] Auto-completed ACTIVE CallSession {call_session.id} "
+                f"with recording duration={duration_secs}s"
+            )
+
         await session.commit()
         logger.info(
             f"[Recording Webhook] Created & attached CallRecording {new_rec.id} (Plivo REC={clean_recording_id}) "
@@ -239,3 +250,102 @@ async def plivo_recording_webhook(
             "recordingId": str(new_rec.id),
             "recordingStatus": "UNMATCHED"
         }
+
+
+@router.api_route("/plivo/hangup", methods=["GET", "POST"])
+@router.api_route("/telephony/plivo/hangup", methods=["GET", "POST"])
+async def plivo_hangup_webhook(
+    request: Request,
+    session: AsyncSession = Depends(get_db)
+):
+    """
+    Authoritative Plivo Carrier-Level Hangup Webhook Receiver.
+    
+    Guarantees that even if the WebSocket stream disconnects abruptly or the worker pod crashes,
+    Plivo PSTN gateway directly informs NextLite Control Plane of the final call duration and completion.
+    """
+    payload = await extract_webhook_payload(request)
+    logger.info(f"[Hangup Webhook] Received Plivo carrier hangup callback: {payload}")
+
+    raw_call_uuid = (
+        payload.get("CallUUID")
+        or payload.get("call_uuid")
+        or payload.get("callId")
+        or payload.get("call_id")
+        or payload.get("ALegUUID")
+    )
+    raw_duration = (
+        payload.get("Duration")
+        or payload.get("duration")
+        or payload.get("CallDuration")
+        or payload.get("call_duration")
+        or payload.get("BillDuration")
+    )
+    hangup_cause = (
+        payload.get("HangupCause")
+        or payload.get("hangup_cause")
+        or payload.get("HangupSource")
+        or "carrier_hangup"
+    )
+
+    clean_call_uuid = str(raw_call_uuid).strip() if raw_call_uuid else None
+    duration_secs = 0
+    if raw_duration:
+        try:
+            duration_secs = int(float(str(raw_duration).strip()))
+        except (ValueError, TypeError):
+            duration_secs = 0
+
+    if not clean_call_uuid:
+        logger.warning("[Hangup Webhook] Ignored callback missing CallUUID")
+        return {"status": "ignored", "message": "Missing CallUUID"}
+
+    cs_stmt = select(CallSession).where(CallSession.plivoCallUuid == clean_call_uuid)
+    cs_res = await session.execute(cs_stmt)
+    call_session = cs_res.scalar_one_or_none()
+
+    now = datetime.utcnow()
+    if call_session:
+        if call_session.status == CallStatus.ACTIVE:
+            call_session.status = CallStatus.COMPLETED if duration_secs >= 5 else CallStatus.MISSED
+            call_session.durationSeconds = max(duration_secs, call_session.durationSeconds or 0)
+            call_session.endedAt = now
+            
+            # Attach carrier hangup metadata to metricsJson
+            existing_metrics = dict(call_session.metricsJson or {})
+            existing_metrics["carrierHangup"] = {
+                "cause": hangup_cause,
+                "duration": duration_secs,
+                "timestamp": now.isoformat(),
+            }
+            call_session.metricsJson = existing_metrics
+            
+            await session.commit()
+            logger.info(
+                f"[Hangup Webhook] Authoritative carrier hangup finalized CallSession {call_session.id} "
+                f"status={call_session.status.value} duration={duration_secs}s cause={hangup_cause}"
+            )
+            return {
+                "status": "finalized",
+                "callSessionId": str(call_session.id),
+                "callStatus": call_session.status.value,
+                "durationSeconds": duration_secs
+            }
+        else:
+            # Session already completed by worker, ensure duration is at least carrier duration
+            if duration_secs > (call_session.durationSeconds or 0):
+                call_session.durationSeconds = duration_secs
+                await session.commit()
+            logger.info(
+                f"[Hangup Webhook] CallSession {call_session.id} was already finalized ({call_session.status.value})."
+            )
+            return {
+                "status": "already_finalized",
+                "callSessionId": str(call_session.id),
+                "callStatus": call_session.status.value,
+                "durationSeconds": call_session.durationSeconds
+            }
+
+    logger.warning(f"[Hangup Webhook] No matching CallSession found for plivo_call_uuid={clean_call_uuid}")
+    return {"status": "unmatched", "plivoCallUuid": clean_call_uuid}
+
