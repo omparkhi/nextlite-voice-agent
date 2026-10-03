@@ -1091,26 +1091,10 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         is_post_tool = bool(messages and messages[-1].get("role") == "tool")
         has_tools = bool(params.get("tools"))
 
-        # Phase 1: Tool Schema Scoping on post-tool turns when lean prompt compression is enabled
-        if is_post_tool and getattr(settings, "ENABLE_LEAN_PROMPT_COMPRESSION", True) and has_tools:
-            orig_tools = params.get("tools", [])
-            # Retain only terminal/emergency tools if present, or suppress schemas to save ~450-650 tokens.
-            lean_tools = [
-                t for t in orig_tools
-                if (isinstance(t, dict) and t.get("function", {}).get("name") in ("transfer_call", "end_call"))
-                or getattr(t, "name", "") in ("transfer_call", "end_call")
-            ]
-            if lean_tools:
-                params["tools"] = lean_tools
-            else:
-                params.pop("tools", None)
-                has_tools = False
-
-        if is_post_tool and has_tools:
-            # On post-tool turns, the model must synthesize natural spoken dialogue to the caller.
-            # Setting tool_choice="none" guarantees the LLM generates conversational text rather
-            # than entering a function-calling sampling loop or emitting empty deltas.
-            params["tool_choice"] = "none"
+        # On post-tool turns, ensure the model synthesizes natural spoken dialogue without entering function-calling loops or emitting empty responses
+        if is_post_tool:
+            if has_tools:
+                params["tool_choice"] = "none"
 
         if self._runtime_config:
             runtime_cfg = self._runtime_config.runtime

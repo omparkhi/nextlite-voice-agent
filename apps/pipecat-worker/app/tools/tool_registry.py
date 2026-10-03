@@ -541,6 +541,18 @@ class ToolRegistry:
                     success=True,
                 )
 
+            captured_result: Dict[str, Any] = {}
+            orig_cb = getattr(params, "result_callback", None)
+            if orig_cb:
+                async def _intercepting_result_cb(cb_result, *cb_args, **cb_kwargs):
+                    nonlocal captured_result
+                    if isinstance(cb_result, dict):
+                        captured_result = cb_result
+                    elif hasattr(cb_result, "dict"):
+                        captured_result = cb_result.dict()
+                    return await orig_cb(cb_result, *cb_args, **cb_kwargs)
+                params.result_callback = _intercepting_result_cb
+
             try:
                 if original_handler:
                     res = await original_handler(params)
@@ -558,10 +570,11 @@ class ToolRegistry:
                     )
                 if context.workflow_state and hasattr(context.workflow_state, "update_from_tool"):
                     try:
+                        final_res = captured_result or (res if isinstance(res, dict) else {})
                         context.workflow_state.update_from_tool(
                             llm_name,
                             args if isinstance(args, dict) else {},
-                            res if isinstance(res, dict) else {},
+                            final_res,
                         )
                     except Exception as ws_err:
                         logger.debug(f"[WorkflowState] Notice: {ws_err}")

@@ -107,6 +107,43 @@ class CRMService:
 
         return b_h, s_d, p_s
 
+    async def _sync_slot_to_redis(
+        self,
+        tenant_id: uuid.UUID,
+        booking_date: str,
+        booking_time: str,
+        delta: int = 1,
+    ):
+        """Synchronizes slot occupancy increments/decrements to Redis in real time."""
+        if not tenant_id or not booking_date or not booking_time:
+            return
+        try:
+            from ..db import redis_client
+            if not redis_client:
+                return
+            dep_stmt = select(Deployment.id).where(
+                Deployment.tenantId == tenant_id,
+                Deployment.status == DeploymentStatus.ACTIVE,
+            )
+            dep_res = await self.session.execute(dep_stmt)
+            dep_ids = dep_res.scalars().all()
+            if not dep_ids:
+                dep_res = await self.session.execute(select(Deployment.id).where(Deployment.tenantId == tenant_id))
+                dep_ids = dep_res.scalars().all()
+
+            norm_t = normalize_indic_time(booking_time).strip().upper()
+            for dep_id in dep_ids:
+                key = f"nextlite:booked_slots:{dep_id}:{booking_date}"
+                if delta > 0:
+                    await redis_client.hincrby(key, norm_t, delta)
+                    await redis_client.expire(key, 86400 * 7)
+                elif delta < 0:
+                    cur = await redis_client.hget(key, norm_t)
+                    if cur and int(cur) > 0:
+                        await redis_client.hincrby(key, norm_t, delta)
+        except Exception as e:
+            logger.debug(f"[CRMService] Redis slot sync notice: {e}")
+
     # Profile
     async def get_client_profile(self, tenant_id: uuid.UUID) -> Optional[Dict[str, Any]]:
         tenant_res = await self.session.execute(select(Tenant).where(Tenant.id == tenant_id))
@@ -578,6 +615,11 @@ class CRMService:
         a.updatedAt = datetime.utcnow()
 
         await self.session.commit()
+
+        # If status changed to CANCELLED, decrement Redis slot count
+        if status_val and str(status_val).upper() in ("CANCELLED", "CANCELED"):
+            await self._sync_slot_to_redis(tenant_id, a.bookingDate, a.bookingTime, delta=-1)
+
         return await self.get_appointment(appt_id, tenant_id)
 
     async def create_appointment(
@@ -721,6 +763,9 @@ class CRMService:
         self.session.add(appt)
         await self.session.commit()
 
+        # Real-time sync to Redis slot cache for voice worker instant availability
+        await self._sync_slot_to_redis(tenant_id, booking_date, norm_booking_time, delta=1)
+
         result = await self.get_appointment(appt.id, tenant_id)
         return result or {
             "id": str(appt.id),
@@ -844,6 +889,23 @@ class CRMService:
             norm_k = _norm_time(a.bookingTime)
             if norm_k:
                 slot_occupancy[norm_k] = slot_occupancy.get(norm_k, 0) + 1
+
+        # Refresh Redis slot cache with authoritative DB occupancy
+        try:
+            from ..db import redis_client
+            if redis_client:
+                dep_res = await self.session.execute(
+                    select(Deployment.id).where(Deployment.tenantId == tenant_id)
+                )
+                for d_id in dep_res.scalars().all():
+                    r_key = f"nextlite:booked_slots:{d_id}:{booking_date}"
+                    if slot_occupancy:
+                        await redis_client.hset(r_key, mapping={k: str(v) for k, v in slot_occupancy.items()})
+                        await redis_client.expire(r_key, 86400 * 7)
+                    else:
+                        await redis_client.delete(r_key)
+        except Exception as r_err:
+            logger.debug(f"[CRMService] Redis cache populate notice: {r_err}")
 
         # A candidate slot is available if active bookings are strictly less than capacity
         available_slots = [
@@ -978,6 +1040,9 @@ class CRMService:
         if is_past_slot(new_date, norm_new_time, time_zone="Asia/Kolkata", buffer_minutes=0):
             raise ValueError(f"Cannot reschedule appointment to past time slot '{norm_new_time}' on {new_date}.")
 
+        old_date = appt.bookingDate
+        old_time = appt.bookingTime
+
         appt.bookingDate = new_date
         appt.bookingTime = norm_new_time
         appt.status = AppointmentStatus.SCHEDULED
@@ -988,6 +1053,11 @@ class CRMService:
         appt.metadataJson = current_meta
         appt.updatedAt = datetime.utcnow()
         await self.session.commit()
+
+        # Real-time sync to Redis: decrement old slot, increment new slot
+        await self._sync_slot_to_redis(tenant_id, old_date, old_time, delta=-1)
+        await self._sync_slot_to_redis(tenant_id, new_date, norm_new_time, delta=1)
+
         return await self.get_appointment(appt.id, tenant_id)
 
     # Phone Numbers

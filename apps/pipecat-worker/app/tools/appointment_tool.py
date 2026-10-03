@@ -57,7 +57,7 @@ APPOINTMENT_TOOL_PROPERTIES: Dict[str, Any] = {
     # },
 }
 
-APPOINTMENT_TOOL_REQUIRED = ["customerName", "title", "bookingDate", "bookingTime"]
+APPOINTMENT_TOOL_REQUIRED = ["customerName", "bookingDate", "bookingTime"]
 
 
 def create_book_appointment_tool_factory(
@@ -338,15 +338,44 @@ def create_book_appointment_tool_factory(
                     logger.warning(
                         f"[AppointmentTool] Slot capacity full for {booking_time} on {booking_date}: {raw_detail}"
                     )
+                    # Dynamically generate valid future open slots so LLM never suggests past times or full slots
+                    available_future_slots = []
+                    biz_hours = getattr(context, "business_hours", None)
+                    if biz_hours:
+                        try:
+                            from app.dynamic_schedule_engine import generate_dynamic_slots
+                            candidate_slots = generate_dynamic_slots(
+                                business_hours=biz_hours,
+                                slot_duration=getattr(context, "slot_duration", "30 mins"),
+                                booking_date=booking_date,
+                                time_zone=getattr(context, "timezone", "Asia/Kolkata") or "Asia/Kolkata",
+                                filter_past=True,
+                            )
+                            norm_failed = normalize_indic_time(booking_time).strip().upper().lstrip("0")
+                            available_future_slots = [
+                                s for s in candidate_slots
+                                if normalize_indic_time(s).strip().upper().lstrip("0") != norm_failed
+                            ]
+                        except Exception as slot_err:
+                            logger.debug(f"[AppointmentTool] Dynamic slot generation notice: {slot_err}")
+
+                    guidance_msg = (
+                        f"The requested slot {booking_time} on {booking_date} has reached full capacity. "
+                        f"Politely inform the caller immediately in the active conversation language that {booking_time} is full. "
+                    )
+                    if available_future_slots:
+                        guidance_msg += f"Suggest these available open slots: {', '.join(available_future_slots[:3])}."
+                    else:
+                        guidance_msg += "Politely suggest booking for the next business day."
+
                     result = {
                         "success": False,
                         "error": "SLOT_CAPACITY_FULL",
                         "slot": booking_time,
                         "date": booking_date,
-                        "message": (
-                            f"The requested slot {booking_time} on {booking_date} has reached maximum capacity. "
-                            "Please inform the caller that this slot is full and offer alternative open slots."
-                        ),
+                        "availableSlots": available_future_slots,
+                        "message": guidance_msg,
+                        "guidance": guidance_msg,
                     }
                 else:
                     error_code = err_data.get("code") or (
