@@ -45,7 +45,7 @@ APPOINTMENT_TOOL_PROPERTIES: Dict[str, Any] = {
     },
     "title": {
         "type": "string",
-        "description": "Reason for visit or service type (e.g. 'Dental Checkup', 'General Consultation')",
+        "description": "Optional reason for visit or service type (defaults to 'General Consultation'). Do NOT ask the caller for this unless they volunteer it.",
     },
     "age": {
         "type": "string",
@@ -57,7 +57,7 @@ APPOINTMENT_TOOL_PROPERTIES: Dict[str, Any] = {
     # },
 }
 
-APPOINTMENT_TOOL_REQUIRED = ["customerName", "title", "bookingDate", "bookingTime"]
+APPOINTMENT_TOOL_REQUIRED = ["customerName", "bookingDate", "bookingTime"]
 
 
 def create_book_appointment_tool_factory(
@@ -133,8 +133,8 @@ def create_book_appointment_tool_factory(
         missing_fields = []
         if not raw_name or not isinstance(raw_name, str) or not raw_name.strip():
             missing_fields.append("customerName")
-        if not raw_title or not isinstance(raw_title, str) or not raw_title.strip():
-            missing_fields.append("title")
+        # if not raw_title or not isinstance(raw_title, str) or not raw_title.strip():
+        #     missing_fields.append("title")
         if not raw_date or not isinstance(raw_date, str) or not raw_date.strip():
             missing_fields.append("bookingDate")
         if not raw_time or not isinstance(raw_time, str) or not raw_time.strip():

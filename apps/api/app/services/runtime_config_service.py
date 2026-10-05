@@ -261,11 +261,17 @@ class RuntimeAgentConfigService:
                     ))
 
         from ..domain.variable_resolver import resolve_prompt_variables
-        from ..domain.greeting_localizer import localize_greeting
+        g = (cfg.get("identity") or {}).get("greeting") or cfg.get("greeting")
+        if isinstance(g, dict):
+            base = primary_lang or "en-IN"
+            greeting_text = (g.get(base) or g.get(base.split("-")[0]) or g.get("en-IN")
+                     or next((v for v in g.values() if v), ""))
+        else:
+            greeting_text = g or ""
         resolved_greeting = resolve_prompt_variables(
-            raw_greeting,
-            variables=raw_input_vars,
-            runtime_context=runtime_ctx_map,
+            greeting_text, 
+            variables=raw_input_vars, 
+            runtime_context=runtime_ctx_map, 
             config=cfg
         )
 
@@ -276,15 +282,6 @@ class RuntimeAgentConfigService:
         a_name = identity_cfg.get("agentName")
 
         language_style = lang_cfg.get("languageStyle", lang_cfg.get("language_style", "mixed"))
-
-        resolved_greeting = localize_greeting(
-            resolved_greeting,
-            primary_lang=primary_lang,
-            business_name=b_name,
-            agent_name=a_name,
-            is_male=is_male,
-            language_style=language_style,
-        )
 
         # Build tools list dynamically from canonical tool registry and agent bindings
         tools_enabled = tools_cfg.get("enabled", True) if isinstance(tools_cfg, dict) else (tools_cfg is not None)
@@ -337,7 +334,9 @@ class RuntimeAgentConfigService:
                 supported_languages=supported_langs,
                 auto_detect_enabled=bool(auto_detect_val),
                 language_switching_enabled=bool(lang_switch_val),
-                language_style=lang_cfg.get("languageStyle", lang_cfg.get("language_style", "mixed"))
+                language_style=lang_cfg.get("languageStyle", lang_cfg.get("language_style", "mixed")),
+                switch_after_turns=int(lang_cfg.get("switchAfterTurns", lang_cfg.get("switch_after_turns", 1))),
+                min_words_for_switch=int(lang_cfg.get("minWordsForSwitch", lang_cfg.get("min_words_for_switch", 3)))
             ),
             runtime=RuntimeBehaviorConfig(
                 model_provider=runtime_cfg.get("modelProvider", "sarvam"),

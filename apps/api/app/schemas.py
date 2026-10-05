@@ -49,6 +49,8 @@ class RuntimeLanguageConfig(CamelModel):
     supported_languages: List[str] = Field(default_factory=lambda: ["en-IN"])
     auto_detect_enabled: Optional[bool] = True
     language_switching_enabled: Optional[bool] = True
+    switch_after_turns: int = 1
+    min_words_for_switch: int = 1
 
 class RuntimeNudgeConfig(CamelModel):
     enabled: bool = True

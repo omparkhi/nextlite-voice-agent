@@ -68,6 +68,8 @@ class RuntimeLanguageConfig(BaseContractModel):
     auto_detect_enabled: Optional[bool] = Field(default=None, alias="autoDetectEnabled")
     language_switching_enabled: Optional[bool] = Field(default=None, alias="languageSwitchingEnabled")
     language_style: Optional[str] = Field(default="mixed", alias="languageStyle")
+    switch_after_turns: int = Field(default=1, alias="switchAfterTurns")
+    min_words_for_switch: int = Field(default=3, alias="minWordsForSwitch")
 
 
 class RuntimeNudgeConfig(BaseContractModel):

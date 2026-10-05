@@ -922,49 +922,19 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             return
         self._early_tool_ack_sent_turn_id = current_turn_id
 
-        # Resolve active language prioritizing primary agent language
-        primary_lang = (
-            self._runtime_config.language.primary
-            if self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary
-            else "mr-IN"
-        )
-        active_lang = primary_lang
+        # Resolve active language from authoritative language manager
+        active_lang = "en-IN"
         if self._language_manager and getattr(self._language_manager, "current_language", None):
             active_lang = self._language_manager.current_language
+        elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
+            active_lang = self._runtime_config.language.primary
 
-        # Accurate user text matching
-        if self._language_manager:
-            user_text = getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or ""
-            if user_text:
-                from app.language_manager import (
-                    DEVANAGARI_REGEX,
-                    HINDI_LATIN_MARKERS_REGEX,
-                    MARATHI_LATIN_MARKERS_REGEX,
-                    MARATHI_MARKERS_REGEX,
-                    match_supported_language,
-                )
-                supported = self._language_manager.supported_languages
-                if any(l.startswith("mr") for l in supported) and (
-                    MARATHI_MARKERS_REGEX.search(user_text) or MARATHI_LATIN_MARKERS_REGEX.search(user_text)
-                ):
-                    active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
-                elif any(l.startswith("hi") for l in supported) and (
-                    HINDI_LATIN_MARKERS_REGEX.search(user_text)
-                ):
-                    active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
-                elif any(l.startswith("mr") for l in supported) and DEVANAGARI_REGEX.search(user_text) and primary_lang.startswith("mr"):
-                    active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
-                elif any(l.startswith("hi") for l in supported) and DEVANAGARI_REGEX.search(user_text):
-                    active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
-
-        base_code = active_lang.split("-")[0]
+        base_code = active_lang.split("-")[0].lower()
         filler_phrase = (
             DEFAULT_EARLY_TOOL_ACK_PHRASES.get(active_lang)
             or DEFAULT_EARLY_TOOL_ACK_PHRASES.get(base_code)
-            or DEFAULT_EARLY_TOOL_ACK_PHRASES.get(primary_lang)
-            or DEFAULT_EARLY_TOOL_ACK_PHRASES.get(primary_lang.split("-")[0])
-            or DEFAULT_EARLY_TOOL_ACK_PHRASES.get("mr-IN")
-            or "एक मिनिट, मी लगेच तपासतो."
+            or DEFAULT_EARLY_TOOL_ACK_PHRASES.get("en-IN")
+            or "Just a minute, let me check that for you."
         )
 
         now = time.perf_counter()
@@ -1197,13 +1167,33 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         adapter = self.get_llm_adapter()
         params_from_context = adapter.get_llm_invocation_params(
             context,
-            system_instruction=assert_given(self._settings.system_instruction),
+            system_instruction=None,
             convert_developer_to_user=not self.supports_developer_role,
         )
         params = self.build_chat_completion_params(params_from_context)
 
-        # Phase 1: Non-PII Token Metrics Telemetry
+        # Dynamic turn-level language directive so Sarvam LLM attention binds directly to caller's language
         msgs = params.get("messages", [])
+        if self._language_manager and getattr(self._language_manager, "current_language", None):
+            active_lang = self._language_manager.current_language
+            from app.language_manager import get_language_display_name
+            lang_display = get_language_display_name(active_lang)
+            directive = {
+                "role": "system",
+                "content": f"The active conversation language is {lang_display} ({active_lang}). Formulate your response in {lang_display}, unless the caller explicitly asks to speak in a different language."
+            }
+            # Find the latest user message in msgs and insert directive immediately before it
+            user_idx = None
+            for idx in range(len(msgs) - 1, -1, -1):
+                if msgs[idx].get("role") == "user":
+                    user_idx = idx
+                    break
+            if user_idx is not None:
+                msgs.insert(user_idx, directive)
+            elif msgs:
+                msgs.insert(1, directive)
+
+        # Phase 1: Non-PII Token Metrics Telemetry
         content_chars = sum(len(str(m.get("content", ""))) for m in msgs)
         est_tokens = content_chars // 4
         tools_list = params.get("tools") or []
@@ -2520,8 +2510,9 @@ async def websocket_plivo_endpoint(
         @tts_service.event_handler("on_tts_request")
         async def on_tts_request(service, context_id: str, text: str):
             now_mono = time.perf_counter()
-            from app.indic_sanitizer import sanitize_indic_tts_text
-            sanitized_text = sanitize_indic_tts_text(text, language_manager.current_language)
+            # from app.indic_sanitizer import sanitize_indic_tts_text
+            # sanitized_text = sanitize_indic_tts_text(text, language_manager.current_language)
+            sanitized_text = text
             # Isolate early tool filler from assistant text release timing
             is_early_filler = bool(
                 turn_tracker.early_ack_sent is not None
@@ -2790,11 +2781,12 @@ async def websocket_plivo_endpoint(
 
         # 8. Instantiate Sarvam Realtime STT Service
         startup_tracker.record_stage("stt_service_create_start")
-        initial_stt_lang = language_manager.get_stt_initial_language()
-        stt_mode = getattr(settings, "STT_MODE", "verbatim")
-        stt_threshold = getattr(settings, "STT_VAD_THRESHOLD", 0.68)
-        stt_silence_duration_ms = getattr(settings, "STT_VAD_SILENCE_DURATION_MS", 180)
-        stt_min_speech_duration_ms = getattr(settings, "STT_VAD_MIN_SPEECH_DURATION_MS", 200)
+        # initial_stt_lang = language_manager.get_stt_initial_language()
+        initial_stt_lang = "auto" if len(language_manager.supported_languages) > 1 else language_manager.primary_language
+        stt_mode = getattr(settings, "STT_MODE", "codemix")
+        stt_threshold = getattr(settings, "STT_VAD_THRESHOLD", 0.42)
+        stt_silence_duration_ms = getattr(settings, "STT_VAD_SILENCE_DURATION_MS", 260)
+        stt_min_speech_duration_ms = getattr(settings, "STT_VAD_MIN_SPEECH_DURATION_MS", 120)
 
         logger.info(
             f"[SarvamRealtimeSTT Config] Initializing SarvamRealtimeSTTService | model={stt_model} | "
@@ -3089,18 +3081,17 @@ async def websocket_plivo_endpoint(
             if is_lean_compression:
                 call_end_instructions = (
                     "\n\n=== CALL TERMINATION ===\n"
-                    "- When user says goodbye, thanks you, or is done (e.g. 'बाय', 'bye', 'goodbye', 'थँक्यू', 'धन्यवाद', 'माझं काम झालं', 'nothing else', 'that is all'):\n"
-                    "  1. Speak one short authentic closing in active language (Marathi: 'धन्यवाद, काळजी घ्या!' or 'नक्की, धन्यवाद, नमस्कार!'). NEVER use 'तुमचा दिवस चांगला जावो'.\n"
+                    "- When user says goodbye, thanks you, or indicates they are done:\n"
+                    "  1. Speak exactly one short, warm closing farewell in the active conversation language.\n"
                     "  2. Call `end_call` tool immediately to hang up. Do NOT ask follow-up questions."
                 )
             else:
                 call_end_instructions = (
                     "\n\n=== CALL TERMINATION & HANGUP POLICY ===\n"
-                    "- MANDATORY CALL ENDING RULE: When the user says goodbye, expresses that they are done, thanks you, or states they will call later "
-                    "(for example: 'बाय', 'bye', 'goodbye', 'थँक्यू नंतर कॉल करेन', 'बाद में बात करेंगे', 'धन्यवाद', 'माझं काम झालं', 'nothing else', 'that is all', 'नाही काही नाही'):\n"
-                    "  1. Speak one short, context-appropriate closing farewell in the active language (in Marathi use authentic phrasing like 'धन्यवाद, काळजी घ्या!' or 'नक्की, धन्यवाद, नमस्कार!'. FORBIDDEN: NEVER use literal translations like 'तुमचा दिवस चांगला जावो').\n"
+                    "- MANDATORY CALL ENDING RULE: When the user says goodbye, expresses that they are done, thanks you, or states they will call later:\n"
+                    "  1. Speak exactly one short, warm, context-appropriate closing farewell strictly in the caller's active conversation language.\n"
                     "  2. You MUST invoke the `end_call` tool in that exact turn to hang up the phone call.\n"
-                    "  3. NEVER ask any follow-up question or offer additional help when the user is saying goodbye or trying to leave."
+                    "  3. NEVER ask any follow-up question or offer additional help when the user is saying goodbye or ending the call."
                 )
             base_system_prompt_with_temporal = f"{base_system_prompt_with_temporal}{call_end_instructions}"
 
@@ -3181,6 +3172,7 @@ async def websocket_plivo_endpoint(
             conversation_context=conversation_context,
             base_system_prompt=base_system_prompt_with_temporal,
             tts_service=tts_service,
+            stt_service=stt_service,
         )
 
         # 10. Instantiate Sarvam LLM Service (Phase 21B: Worker-Lifetime Shared Connection Pool)

@@ -7,6 +7,7 @@ from ..models import (
     Agent, AgentVersion, Deployment, AgentTemplate, AgentTool,
     AgentStatus, VersionStatus, DeploymentStatus, DeploymentEnvironment
 )
+from .greeting_service import ensure_localized_greeting
 from ..logging import logger
 
 class AgentService:
@@ -235,6 +236,14 @@ class AgentService:
         latest_v = v_res.scalar_one_or_none()
         next_version_num = (latest_v.versionNumber + 1) if latest_v else 1
 
+               # derive target languages + voice gender from the configuration
+        lang_cfg = (configuration or {}).get("language") or {}
+        supported = lang_cfg.get("supported") or lang_cfg.get("supportedLanguages") or [lang_cfg.get("primary", "en-IN")]
+        voice_id = str(((configuration or {}).get("voice") or {}).get("voiceId", "")).lower()
+        gender = "Female" if voice_id in ("priya","neha","pooja","simran","kavya","ritu") else "Male"
+
+        configuration = await ensure_localized_greeting(configuration, supported, speaker_gender=gender)
+
         version = AgentVersion(
             agentId=agent_id,
             versionNumber=next_version_num,
@@ -243,6 +252,10 @@ class AgentService:
             createdBy=created_by,
             notes=notes
         )
+
+ 
+
+
         self.session.add(version)
         await self.session.flush()
 
