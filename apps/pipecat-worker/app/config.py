@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     ENABLE_LLM_PROMPT_WARMUP: bool = True
 
     # STT VAD & Endpointer Tuning Flags (Clean Multi-Language & Anti-Noise)
-    STT_MODE: str = "codemix"
+    STT_MODE: str = "transcribe"
     STT_VAD_THRESHOLD: float = 0.42
     STT_VAD_SILENCE_DURATION_MS: int = 260
     STT_VAD_MIN_SPEECH_DURATION_MS: int = 120

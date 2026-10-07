@@ -49,7 +49,9 @@ from app.runtime_config_client import (
     RuntimeConfigClientError,
     extract_deployment_id,
 )
-from app.language_manager import ConversationLanguageManager, build_full_instructions
+# [LS-OLD] from app.language_manager import ConversationLanguageManager, build_full_instructions
+# [LS-NEW]
+from app.language_manager import normalize_language_code, get_language_display_name, script_family, LANGUAGE_MIRROR_DIRECTIVE
 from app.language_processor import LanguageContextProcessor, clean_asr_hallucinations
 from app.temporal_context import (
     DEFAULT_TIMEZONE,
@@ -847,6 +849,8 @@ class InstrumentedSarvamTTSService(SarvamTTSService):
         *args,
         tenant_id: Optional[str] = None,
         language: Optional[str] = None,
+        # [LS-NEW]
+        primary_indic_lang: Optional[str] = None,
         voice_id: Optional[str] = None,
         model_name: Optional[str] = None,
         **kwargs,
@@ -854,6 +858,8 @@ class InstrumentedSarvamTTSService(SarvamTTSService):
         super().__init__(*args, **kwargs)
         self._tenant_id = tenant_id or "default"
         self._active_language = language or "en-IN"
+        # [LS-NEW]
+        self._primary_indic_lang = primary_indic_lang or self._active_language
         self._voice_id = voice_id or "shubh"
         self._model_name = model_name or "bulbul:v3"
 
@@ -869,10 +875,29 @@ class InstrumentedSarvamTTSService(SarvamTTSService):
             except Exception as e:
                 logger.warning(f"[TTS] Failed to resend config on language update: {e}")
 
+    # [LS-NEW]
+    def sync_language_from_text(self, text: str):
+        """Set the TTS voice from the LLM's OWN output script (Devanagari -> Indic,
+        Latin -> English). Reliable because the output is unambiguous."""
+        from app.language_manager import script_family
+        fam = script_family(text)
+        mapping = {
+            "devanagari": self._primary_indic_lang,
+            "latin": "en-IN",
+            "tamil": "ta-IN", "telugu": "te-IN", "kannada": "kn-IN",
+            "malayalam": "ml-IN", "bengali": "bn-IN", "gurmukhi": "pa-IN",
+            "gujarati": "gu-IN", "arabic": "ur-IN",
+        }
+        target = mapping.get(fam)
+        if target and target != self._active_language:
+            self.update_language_context(target)
+
     @traced_tts
     async def run_tts(self, text: str, context_id: str):
         # Stream text directly to Sarvam Bulbul WebSocket to guarantee 100% sentence
         # continuity, natural neural inflection, and prevent premature TTSStoppedFrame cutoff.
+        # [LS-NEW]
+        self.sync_language_from_text(text)
         async for frame in super().run_tts(text, context_id):
             yield frame
 
@@ -888,7 +913,9 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         http_client: Optional[httpx.AsyncClient] = None,
         is_call_terminating_fn: Optional[Any] = None,
         runtime_config: Optional[RuntimeAgentConfig] = None,
-        language_manager: Optional[ConversationLanguageManager] = None,
+        # [LS-OLD] language_manager: Optional[ConversationLanguageManager] = None,
+        # [LS-NEW]
+        language_manager: Optional[Any] = None,
         tts_service: Optional[Any] = None,
         workflow_state: Optional[Any] = None,
         **kwargs,
@@ -923,11 +950,13 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         self._early_tool_ack_sent_turn_id = current_turn_id
 
         # Resolve active language from authoritative language manager
-        active_lang = "en-IN"
-        if self._language_manager and getattr(self._language_manager, "current_language", None):
-            active_lang = self._language_manager.current_language
-        elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
-            active_lang = self._runtime_config.language.primary
+        # [LS-OLD] active_lang = "en-IN"
+        # [LS-OLD] if self._language_manager and getattr(self._language_manager, "current_language", None):
+        # [LS-OLD]     active_lang = self._language_manager.current_language
+        # [LS-OLD] elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
+        # [LS-OLD]     active_lang = self._runtime_config.language.primary
+        # [LS-NEW]
+        active_lang = (self._runtime_config.language.primary if self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary else "en-IN")
 
         base_code = active_lang.split("-")[0].lower()
         filler_phrase = (
@@ -975,11 +1004,13 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             return
         self._early_tool_ack_sent_turn_id = current_turn_id
 
-        active_lang = "en-IN"
-        if self._language_manager and getattr(self._language_manager, "current_language", None):
-            active_lang = self._language_manager.current_language
-        elif self._runtime_config and self._runtime_config.language:
-            active_lang = self._runtime_config.language.primary or active_lang
+        # [LS-OLD] active_lang = "en-IN"
+        # [LS-OLD] if self._language_manager and getattr(self._language_manager, "current_language", None):
+        # [LS-OLD]     active_lang = self._language_manager.current_language
+        # [LS-OLD] elif self._runtime_config and self._runtime_config.language:
+        # [LS-OLD]     active_lang = self._runtime_config.language.primary or active_lang
+        # [LS-NEW]
+        active_lang = (self._runtime_config.language.primary if self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary else "en-IN")
 
         phrase = (
             APPOINTMENT_INTENT_ACK_PHRASES.get(active_lang)
@@ -1010,28 +1041,30 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         self._early_conv_ack_sent_turn_id = current_turn_id
 
         # Resolve active language
-        active_lang = "en-IN"
-        if self._language_manager and getattr(self._language_manager, "current_language", None):
-            active_lang = self._language_manager.current_language
-        elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
-            active_lang = self._runtime_config.language.primary
+        # [LS-OLD] active_lang = "en-IN"
+        # [LS-OLD] if self._language_manager and getattr(self._language_manager, "current_language", None):
+        # [LS-OLD]     active_lang = self._language_manager.current_language
+        # [LS-OLD] elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
+        # [LS-OLD]     active_lang = self._runtime_config.language.primary
+        # [LS-NEW]
+        active_lang = (self._runtime_config.language.primary if self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary else "en-IN")
 
         # Fallback check against current user transcript if active_lang is still English
-        user_text = user_transcript or (getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or "")
-        if (active_lang.startswith("en") or active_lang == "en-IN") and user_text:
-            from app.language_manager import (
-                DEVANAGARI_REGEX,
-                HINDI_LATIN_MARKERS_REGEX,
-                MARATHI_LATIN_MARKERS_REGEX,
-                match_supported_language,
-            )
-            supported = self._language_manager.supported_languages if self._language_manager else ["en-IN", "hi-IN", "mr-IN"]
-            if MARATHI_LATIN_MARKERS_REGEX.search(user_text):
-                active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
-            elif any(l.startswith("mr") for l in supported) and not any(l.startswith("hi") for l in supported) and DEVANAGARI_REGEX.search(user_text):
-                active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
-            elif DEVANAGARI_REGEX.search(user_text) or HINDI_LATIN_MARKERS_REGEX.search(user_text):
-                active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
+        # [LS-OLD] user_text = user_transcript or (getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or "")
+        # [LS-OLD] if (active_lang.startswith("en") or active_lang == "en-IN") and user_text:
+        # [LS-OLD]     from app.language_manager import (
+        # [LS-OLD]         DEVANAGARI_REGEX,
+        # [LS-OLD]         HINDI_LATIN_MARKERS_REGEX,
+        # [LS-OLD]         MARATHI_LATIN_MARKERS_REGEX,
+        # [LS-OLD]         match_supported_language,
+        # [LS-OLD]     )
+        # [LS-OLD]     supported = self._language_manager.supported_languages if self._language_manager else ["en-IN", "hi-IN", "mr-IN"]
+        # [LS-OLD]     if MARATHI_LATIN_MARKERS_REGEX.search(user_text):
+        # [LS-OLD]         active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
+        # [LS-OLD]     elif any(l.startswith("mr") for l in supported) and not any(l.startswith("hi") for l in supported) and DEVANAGARI_REGEX.search(user_text):
+        # [LS-OLD]         active_lang = match_supported_language("mr-IN", supported) or "mr-IN"
+        # [LS-OLD]     elif DEVANAGARI_REGEX.search(user_text) or HINDI_LATIN_MARKERS_REGEX.search(user_text):
+        # [LS-OLD]         active_lang = match_supported_language("hi-IN", supported) or "hi-IN"
 
         base_code = active_lang.split("-")[0]
         filler_phrase = (
@@ -1173,25 +1206,35 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         params = self.build_chat_completion_params(params_from_context)
 
         # Dynamic turn-level language directive so Sarvam LLM attention binds directly to caller's language
+        # [LS-OLD] msgs = params.get("messages", [])
+        # [LS-OLD] if self._language_manager and getattr(self._language_manager, "current_language", None):
+        # [LS-OLD]     active_lang = self._language_manager.current_language
+        # [LS-OLD]     from app.language_manager import get_language_display_name
+        # [LS-OLD]     lang_display = get_language_display_name(active_lang)
+        # [LS-OLD]     directive = {
+        # [LS-OLD]         "role": "system",
+        # [LS-OLD]         "content": f"The active conversation language is {lang_display} ({active_lang}). Formulate your response in {lang_display}, unless the caller explicitly asks to speak in a different language."
+        # [LS-OLD]     }
+        # [LS-OLD]     # Find the latest user message in msgs and insert directive immediately before it
+        # [LS-OLD]     user_idx = None
+        # [LS-OLD]     for idx in range(len(msgs) - 1, -1, -1):
+        # [LS-OLD]         if msgs[idx].get("role") == "user":
+        # [LS-OLD]             user_idx = idx
+        # [LS-OLD]             break
+        # [LS-OLD]     if user_idx is not None:
+        # [LS-OLD]         msgs.insert(user_idx, directive)
+        # [LS-OLD]     elif msgs:
+        # [LS-OLD]         msgs.insert(1, directive)
+        # [LS-NEW]
         msgs = params.get("messages", [])
-        if self._language_manager and getattr(self._language_manager, "current_language", None):
-            active_lang = self._language_manager.current_language
-            from app.language_manager import get_language_display_name
-            lang_display = get_language_display_name(active_lang)
-            directive = {
-                "role": "system",
-                "content": f"The active conversation language is {lang_display} ({active_lang}). Formulate your response in {lang_display}, unless the caller explicitly asks to speak in a different language."
-            }
-            # Find the latest user message in msgs and insert directive immediately before it
+        if msgs:
+            reminder = {"role": "system", "content": "Respond in the language of the caller's latest turn."}
             user_idx = None
             for idx in range(len(msgs) - 1, -1, -1):
                 if msgs[idx].get("role") == "user":
                     user_idx = idx
                     break
-            if user_idx is not None:
-                msgs.insert(user_idx, directive)
-            elif msgs:
-                msgs.insert(1, directive)
+            msgs.insert(user_idx if user_idx is not None else 1, reminder)
 
         # Phase 1: Non-PII Token Metrics Telemetry
         content_chars = sum(len(str(m.get("content", ""))) for m in msgs)
@@ -1212,11 +1255,13 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         if self._nextlite_timing_tracker:
             self._nextlite_timing_tracker.record_llm_first_provider_response(t1)
 
-        active_lang = "en-IN"
-        if self._language_manager and getattr(self._language_manager, "current_language", None):
-            active_lang = self._language_manager.current_language
-        elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
-            active_lang = self._runtime_config.language.primary
+        # [LS-OLD] active_lang = "en-IN"
+        # [LS-OLD] if self._language_manager and getattr(self._language_manager, "current_language", None):
+        # [LS-OLD]     active_lang = self._language_manager.current_language
+        # [LS-OLD] elif self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary:
+        # [LS-OLD]     active_lang = self._runtime_config.language.primary
+        # [LS-NEW]
+        active_lang = (self._runtime_config.language.primary if self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary else "en-IN")
 
         return InstrumentedAsyncStream(
             raw_stream,
@@ -2381,13 +2426,15 @@ async def websocket_plivo_endpoint(
         )
 
         # 5. Create ACTIVE CallSession in NextLite Control Plane concurrently (Phase 17B optimization)
-        language_manager = ConversationLanguageManager(
-            primary=runtime_config.language.primary,
-            supported_languages=runtime_config.language.supported_languages,
-            auto_detect_enabled=runtime_config.language.auto_detect_enabled,
-            language_switching_enabled=runtime_config.language.language_switching_enabled,
-            language_style=runtime_config.language.language_style,
-        )
+        # [LS-OLD] language_manager = ConversationLanguageManager(
+        # [LS-OLD]     primary=runtime_config.language.primary,
+        # [LS-OLD]     supported_languages=runtime_config.language.supported_languages,
+        # [LS-OLD]     auto_detect_enabled=runtime_config.language.auto_detect_enabled,
+        # [LS-OLD]     language_switching_enabled=runtime_config.language.language_switching_enabled,
+        # [LS-OLD]     language_style=runtime_config.language.language_style,
+        # [LS-OLD] )
+        # [LS-NEW]
+        primary_language = runtime_config.language.primary or "en-IN"
 
         # Resolve a static greeting asset as soon as its tenant-scoped runtime
         # identity is known.  This deliberately happens before STT, tools, and
@@ -2406,7 +2453,9 @@ async def websocket_plivo_endpoint(
                     deployment_id=resolved_deployment_id,
                     model=tts_model,
                     voice=voice_id,
-                    language=language_manager.current_language,
+                    # [LS-OLD] language=language_manager.current_language,
+                    # [LS-NEW]
+                    language=primary_language,
                     greeting_text=greeting,
                 )
                 cached_greeting_chunks = global_greeting_cache.get(greeting_cache_key)
@@ -2425,7 +2474,9 @@ async def websocket_plivo_endpoint(
                         callerNumber=caller_number,
                         direction=direction,
                         status="ACTIVE",
-                        primaryLanguage=language_manager.current_language,
+                        # [LS-OLD] primaryLanguage=language_manager.current_language,
+                        # [LS-NEW]
+                        primaryLanguage=primary_language,
                         startedAt=started_at_iso,
                     )
                 )
@@ -2456,7 +2507,9 @@ async def websocket_plivo_endpoint(
         tts_settings_kwargs = {
             "model": tts_model,
             "voice": voice_id,
-            "language": language_manager.current_language,
+            # [LS-OLD] "language": language_manager.current_language,
+            # [LS-NEW]
+            "language": primary_language,
             # This provider/account rejects lower values with a generic config
             # error. Keep the proven production value; cached greetings bypass
             # this path entirely, so their startup latency is unaffected.
@@ -2468,12 +2521,23 @@ async def websocket_plivo_endpoint(
         if runtime_config.voice.pitch is not None and tts_model == "bulbul:v2":
             tts_settings_kwargs["pitch"] = runtime_config.voice.pitch
 
+        # [LS-OLD] tts_service = InstrumentedSarvamTTSService(
+        # [LS-OLD]     api_key=settings.SARVAM_API_KEY,
+        # [LS-OLD]     sample_rate=stream_sample_rate,
+        # [LS-OLD]     settings=SarvamTTSService.Settings(**tts_settings_kwargs),
+        # [LS-OLD]     tenant_id=runtime_config.tenant.tenant_id,
+        # [LS-OLD]     language=language_manager.current_language,
+        # [LS-OLD]     voice_id=voice_id,
+        # [LS-OLD]     model_name=tts_model,
+        # [LS-OLD] )
+        # [LS-NEW]
         tts_service = InstrumentedSarvamTTSService(
             api_key=settings.SARVAM_API_KEY,
             sample_rate=stream_sample_rate,
             settings=SarvamTTSService.Settings(**tts_settings_kwargs),
             tenant_id=runtime_config.tenant.tenant_id,
-            language=language_manager.current_language,
+            language=primary_language,
+            primary_indic_lang=primary_language,
             voice_id=voice_id,
             model_name=tts_model,
         )
@@ -2510,8 +2574,8 @@ async def websocket_plivo_endpoint(
         @tts_service.event_handler("on_tts_request")
         async def on_tts_request(service, context_id: str, text: str):
             now_mono = time.perf_counter()
-            # from app.indic_sanitizer import sanitize_indic_tts_text
-            # sanitized_text = sanitize_indic_tts_text(text, language_manager.current_language)
+            # [LS-OLD] # from app.indic_sanitizer import sanitize_indic_tts_text
+            # [LS-OLD] # sanitized_text = sanitize_indic_tts_text(text, language_manager.current_language)
             sanitized_text = text
             # Isolate early tool filler from assistant text release timing
             is_early_filler = bool(
@@ -2781,9 +2845,17 @@ async def websocket_plivo_endpoint(
 
         # 8. Instantiate Sarvam Realtime STT Service
         startup_tracker.record_stage("stt_service_create_start")
-        # initial_stt_lang = language_manager.get_stt_initial_language()
-        initial_stt_lang = "auto" if len(language_manager.supported_languages) > 1 else language_manager.primary_language
-        stt_mode = getattr(settings, "STT_MODE", "codemix")
+        # [LS-OLD] initial_stt_lang = "auto" if len(language_manager.supported_languages) > 1 else language_manager.primary_language
+        # [LS-OLD] logger.info(
+        # [LS-OLD]     f"[SarvamRealtimeSTT Config] Initializing SarvamRealtimeSTTService | model={stt_model} | "
+        # [LS-OLD]     f"stream_type=fast | mode={stt_mode} | sample_rate={stream_sample_rate} | language={initial_stt_lang} "
+        # [LS-OLD]     f"(primary={language_manager.primary_language}) | threshold={stt_threshold} | "
+        # [LS-OLD]     f"silence_duration_ms={stt_silence_duration_ms} | min_speech_duration_ms={stt_min_speech_duration_ms}"
+        # [LS-OLD] )
+        # [LS-NEW]
+        supported_langs = (runtime_config.language.supported_languages if runtime_config and runtime_config.language and runtime_config.language.supported_languages else [primary_language])
+        initial_stt_lang = "auto" if len(supported_langs) > 1 else primary_language
+        stt_mode = getattr(settings, "STT_MODE", "transcribe")
         stt_threshold = getattr(settings, "STT_VAD_THRESHOLD", 0.42)
         stt_silence_duration_ms = getattr(settings, "STT_VAD_SILENCE_DURATION_MS", 260)
         stt_min_speech_duration_ms = getattr(settings, "STT_VAD_MIN_SPEECH_DURATION_MS", 120)
@@ -2791,7 +2863,7 @@ async def websocket_plivo_endpoint(
         logger.info(
             f"[SarvamRealtimeSTT Config] Initializing SarvamRealtimeSTTService | model={stt_model} | "
             f"stream_type=fast | mode={stt_mode} | sample_rate={stream_sample_rate} | language={initial_stt_lang} "
-            f"(primary={language_manager.primary_language}) | threshold={stt_threshold} | "
+            f"(primary={primary_language}) | threshold={stt_threshold} | "
             f"silence_duration_ms={stt_silence_duration_ms} | min_speech_duration_ms={stt_min_speech_duration_ms}"
         )
         stt_service = SarvamRealtimeSTTService(
@@ -2974,8 +3046,13 @@ async def websocket_plivo_endpoint(
         def _on_assistant_speech_stopped():
             last_assistant_speech_end[0] = time.perf_counter()
 
+        # [LS-OLD] workflow_state = WorkflowState(
+        # [LS-OLD]     active_language=language_manager.current_language,
+        # [LS-OLD]     caller_phone=caller_number,
+        # [LS-OLD] )
+        # [LS-NEW]
         workflow_state = WorkflowState(
-            active_language=language_manager.current_language,
+            active_language=primary_language,
             caller_phone=caller_number,
         )
 
@@ -3095,12 +3172,15 @@ async def websocket_plivo_endpoint(
                 )
             base_system_prompt_with_temporal = f"{base_system_prompt_with_temporal}{call_end_instructions}"
 
-        initial_system_prompt = build_full_instructions(
-            base_system_prompt_with_temporal,
-            language_manager.current_language,
-            language_style=language_manager.language_style,
-            lean_mode=is_lean_compression,
-        )
+        # [LS-OLD] initial_system_prompt = build_full_instructions(
+        # [LS-OLD]     base_system_prompt_with_temporal,
+        # [LS-OLD]     language_manager.current_language,
+        # [LS-OLD]     language_style=language_manager.language_style,
+        # [LS-OLD]     lean_mode=is_lean_compression,
+        # [LS-OLD] )
+        # [LS-NEW]
+        initial_system_prompt = f"{base_system_prompt_with_temporal}{LANGUAGE_MIRROR_DIRECTIVE}"
+
         initial_messages = [{"role": "system", "content": initial_system_prompt}]
         if greeting:
             initial_messages.append({"role": "assistant", "content": greeting})
@@ -3167,13 +3247,15 @@ async def websocket_plivo_endpoint(
                 pre_stt_processor.set_greeting_active()
 
         # Instantiate Language Context Processor (Boundary D) preserving authoritative temporal prompt
-        language_processor = LanguageContextProcessor(
-            language_manager=language_manager,
-            conversation_context=conversation_context,
-            base_system_prompt=base_system_prompt_with_temporal,
-            tts_service=tts_service,
-            stt_service=stt_service,
-        )
+        # [LS-OLD] language_processor = LanguageContextProcessor(
+        # [LS-OLD]     language_manager=language_manager,
+        # [LS-OLD]     conversation_context=conversation_context,
+        # [LS-OLD]     base_system_prompt=base_system_prompt_with_temporal,
+        # [LS-OLD]     tts_service=tts_service,
+        # [LS-OLD]     stt_service=stt_service,
+        # [LS-OLD] )
+        # [LS-NEW]
+        language_processor = LanguageContextProcessor()
 
         # 10. Instantiate Sarvam LLM Service (Phase 21B: Worker-Lifetime Shared Connection Pool)
         startup_tracker.record_stage("llm_service_create_start")
@@ -3197,7 +3279,9 @@ async def websocket_plivo_endpoint(
             http_client=sarvam_llm_pool,
             is_call_terminating_fn=is_terminating,
             runtime_config=runtime_config,
-            language_manager=language_manager,
+            # [LS-OLD] language_manager=language_manager,
+            # [LS-NEW]
+            language_manager=None,
             tts_service=tts_service,
             workflow_state=workflow_state,
         )

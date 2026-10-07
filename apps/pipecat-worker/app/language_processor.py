@@ -7,7 +7,7 @@ try:
     from pipecat.frames.frames import (
         Frame,
         TranscriptionFrame,
-        LLMMessagesUpdateFrame,
+        # [LS-OLD] LLMMessagesUpdateFrame,
     )
     from pipecat.processors.aggregators.llm_response_universal import LLMContext
 except ImportError:
@@ -15,11 +15,13 @@ except ImportError:
     FrameDirection = None
     Frame = object
     TranscriptionFrame = object
-    LLMMessagesUpdateFrame = object
+    # [LS-OLD] LLMMessagesUpdateFrame = object
     LLMContext = object
 
 from app.config import settings
-from app.language_manager import ConversationLanguageManager, build_full_instructions
+# [LS-OLD] from app.language_manager import ConversationLanguageManager, build_full_instructions
+# [LS-NEW]
+from app.language_manager import script_family, normalize_language_code
 
 # Pure hesitation noise tokens that contain 0 semantic content or intent
 PURE_NOISE_TOKENS: Set[str] = {
@@ -87,7 +89,9 @@ class LanguageContextProcessor(FrameProcessor):
 
     def __init__(
         self,
-        language_manager: Optional[ConversationLanguageManager] = None,
+        # [LS-OLD] language_manager: Optional[ConversationLanguageManager] = None,
+        # [LS-NEW]
+        language_manager: Optional[Any] = None,
         conversation_context: Optional[LLMContext] = None,
         base_system_prompt: Optional[str] = None,
         tts_service: Optional[Any] = None,
@@ -114,35 +118,36 @@ class LanguageContextProcessor(FrameProcessor):
                 )
                 return
 
-            # Synchronize STT-identified language code with language_manager
-            stt_lang = getattr(frame, "language", None)
-            if hasattr(stt_lang, "value"):
-                stt_lang = stt_lang.value
-            if not stt_lang and hasattr(frame, "result") and isinstance(frame.result, dict):
-                stt_lang = frame.result.get("language_code") or frame.result.get("language")
-
-            if self._language_manager:
-                turn_result = self._language_manager.process_user_turn(transcript, stt_lang)
-                if turn_result.switched:
-                    logger.info(
-                        f"[LanguageContextProcessor] Language switched {turn_result.previous_language} -> {turn_result.current_language} | reason={turn_result.reason}"
-                    )
-                    # 1. Update TTS active language
-                    if self._tts_service and hasattr(self._tts_service, "update_language_context"):
-                        self._tts_service.update_language_context(turn_result.current_language)
-                    # 2. Update conversation context system prompt
-                    if self._conversation_context and self._base_system_prompt:
-                        updated_prompt = build_full_instructions(
-                            self._base_system_prompt,
-                            turn_result.current_language,
-                            language_style=self._language_manager.language_style,
-                        )
-                        if self._conversation_context.messages:
-                            self._conversation_context.messages[0]["content"] = updated_prompt
-                        await self.push_frame(
-                            LLMMessagesUpdateFrame(messages=self._conversation_context.messages),
-                            direction,
-                        )
+            # [LS-OLD] # Synchronize STT-identified language code with language_manager
+            # [LS-OLD] stt_lang = getattr(frame, "language", None)
+            # [LS-OLD] if hasattr(stt_lang, "value"):
+            # [LS-OLD]     stt_lang = stt_lang.value
+            # [LS-OLD] if not stt_lang and hasattr(frame, "result") and isinstance(frame.result, dict):
+            # [LS-OLD]     stt_lang = frame.result.get("language_code") or frame.result.get("language")
+            # [LS-OLD] 
+            # [LS-OLD] if self._language_manager:
+            # [LS-OLD]     turn_result = self._language_manager.process_user_turn(transcript, stt_lang)
+            # [LS-OLD]     if turn_result.switched:
+            # [LS-OLD]         logger.info(
+            # [LS-OLD]             f"[LanguageContextProcessor] Language switched {turn_result.previous_language} -> {turn_result.current_language} | reason={turn_result.reason}"
+            # [LS-OLD]         )
+            # [LS-OLD] 
+            # [LS-OLD] # 1. Update TTS active language
+            # [LS-OLD] if self._tts_service and hasattr(self._tts_service, "update_language_context"):
+            # [LS-OLD]     self._tts_service.update_language_context(turn_result.current_language)
+            # [LS-OLD] # 2. Update conversation context system prompt
+            # [LS-OLD] if self._conversation_context and self._base_system_prompt:
+            # [LS-OLD]     updated_prompt = build_full_instructions(
+            # [LS-OLD]         self._base_system_prompt,
+            # [LS-OLD]         turn_result.current_language,
+            # [LS-OLD]         language_style=self._language_manager.language_style,
+            # [LS-OLD]     )
+            # [LS-OLD]     if self._conversation_context.messages:
+            # [LS-OLD]         self._conversation_context.messages[0]["content"] = updated_prompt
+            # [LS-OLD]     await self.push_frame(
+            # [LS-OLD]         LLMMessagesUpdateFrame(messages=self._conversation_context.messages),
+            # [LS-OLD]         direction,
+            # [LS-OLD]     )
 
         # Forward the cleaned frame downstream
         await self.push_frame(frame, direction)
