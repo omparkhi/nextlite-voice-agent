@@ -17,7 +17,12 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import FunctionCallResultProperties
 from pipecat.services.llm_service import FunctionCallParams
 from app.temporal_context import resolve_relative_or_absolute_date
-from app.dynamic_schedule_engine import generate_dynamic_slots, is_time_within_shifts, is_day_closed
+from app.dynamic_schedule_engine import (
+    generate_dynamic_slots,
+    is_time_within_shifts,
+    is_day_closed,
+    get_holiday_closure_info,
+)
 
 if TYPE_CHECKING:
     from app.tools.tool_registry import ToolRuntimeContext
@@ -96,6 +101,34 @@ def create_check_slots_tool_factory(
         slot_dur = getattr(context, "slot_duration", "30 mins")
         capacity_val = max(1, int(getattr(context, "patients_per_slot", 1) or 1))
 
+        # ⚡ 0. Check scheduled holiday / blackout closure (0ms fast path)
+        holidays_list = getattr(context, "holidays", None)
+        holiday_info = get_holiday_closure_info(resolved_date, holidays_list)
+        if holiday_info:
+            h_name = holiday_info.get("name", "Scheduled Closure")
+            reopen_str = holiday_info.get("reopening_date", "")
+            logger.info(f"[SlotTool Holiday Closure] date={resolved_date} | holiday='{h_name}' | reopen='{reopen_str}'")
+            result_data = {
+                "success": True,
+                "status": "DATE_CLOSED_HOLIDAY",
+                "available": False,
+                "slotAvailable": False,
+                "date": resolved_date,
+                "holidayName": h_name,
+                "reopeningDate": reopen_str,
+                "availableSlots": [],
+                "guidance": (
+                    f"The establishment is CLOSED on {resolved_date} for '{h_name}'. "
+                    f"Politely and clearly inform the caller immediately in the active conversation language that the business is closed on {resolved_date} due to {h_name}. "
+                    f"Proactively offer to book their appointment on or after the reopening date ({reopen_str}). Do not ask for their preferred time on this closed date."
+                ),
+            }
+            await params.result_callback(
+                result_data,
+                properties=FunctionCallResultProperties(run_llm=True),
+            )
+            return
+
         # ⚡ 1. Query Authoritative DB Check-Slots Endpoint (5-10ms)
         try:
             if http_client:
@@ -132,14 +165,14 @@ def create_check_slots_tool_factory(
                     "existingBooking": data.get("existingBooking"),
                 }
 
-                if is_day_closed(resolved_date, biz_hours):
+                if is_day_closed(resolved_date, biz_hours, holidays=holidays_list):
                     result_data["status"] = "SLOT_UNAVAILABLE"
                     result_data["available"] = False
                     result_data["slotAvailable"] = False
                     result_data["availableSlots"] = []
                     result_data["guidance"] = (
-                        f"The clinic is CLOSED on {resolved_date} as per the operating schedule. "
-                        f"Politely and clearly inform the caller immediately in the active conversation language that the clinic is closed on this day, and suggest checking slots for the next open business day."
+                        f"The business is CLOSED on {resolved_date} as per the operating schedule. "
+                        f"Politely and clearly inform the caller immediately in the active conversation language that the business is closed on this day, and suggest checking slots for the next open business day."
                     )
                 elif not is_pref_available and pref_time:
                     if open_slots:
@@ -182,6 +215,7 @@ def create_check_slots_tool_factory(
                     slot_duration=slot_dur,
                     booking_date=resolved_date,
                     time_zone=target_tz,
+                    holidays=holidays_list,
                 )
 
                 def _norm_t(t_val: Optional[str]) -> str:
@@ -197,7 +231,11 @@ def create_check_slots_tool_factory(
                     and booked_counts.get(s.lstrip("0"), 0) < capacity_val
                     and booked_counts.get(f"0{s}" if not s.startswith("0") else s, 0) < capacity_val
                 ]
-                is_open = is_time_within_shifts(pref_time, biz_hours, booking_date=resolved_date) if pref_time else not is_day_closed(resolved_date, biz_hours)
+                is_open = (
+                    is_time_within_shifts(pref_time, biz_hours, booking_date=resolved_date, holidays=holidays_list)
+                    if pref_time
+                    else not is_day_closed(resolved_date, biz_hours, holidays=holidays_list)
+                )
                 is_pref_available = is_open and (
                     any(_norm_t(s) == norm_pref for s in open_slots) if norm_pref else True
                 )
@@ -231,14 +269,14 @@ def create_check_slots_tool_factory(
                     "existingBooking": None,
                 }
 
-                if is_day_closed(resolved_date, biz_hours):
+                if is_day_closed(resolved_date, biz_hours, holidays=holidays_list):
                     result_data["status"] = "SLOT_UNAVAILABLE"
                     result_data["available"] = False
                     result_data["slotAvailable"] = False
                     result_data["availableSlots"] = []
                     result_data["guidance"] = (
-                        f"The clinic is CLOSED on {resolved_date} as per the operating schedule. "
-                        f"Politely and clearly inform the caller immediately in the active conversation language that the clinic is closed on this day, and suggest checking slots for the next open business day."
+                        f"The business is CLOSED on {resolved_date} as per the operating schedule. "
+                        f"Politely and clearly inform the caller immediately in the active conversation language that the business is closed on this day, and suggest checking slots for the next open business day."
                     )
                 elif not is_pref_available and pref_time:
                     if open_slots:

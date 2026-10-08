@@ -144,6 +144,15 @@ class RuntimeVariableConfig(BaseContractModel):
     runtime_context: Optional[Dict[str, str]] = Field(default=None, alias="runtimeContext")
 
 
+class RuntimeHolidayDefinition(BaseContractModel):
+    id: Optional[str] = None
+    name: str
+    start_date: str = Field(alias="startDate")
+    end_date: str = Field(alias="endDate")
+    is_entire_day: bool = Field(default=True, alias="isEntireDay")
+    notes: Optional[str] = None
+
+
 class RuntimeAgentConfig(BaseContractModel):
     tenant: RuntimeTenantConfig
     agent: RuntimeAgentMetadata
@@ -155,6 +164,8 @@ class RuntimeAgentConfig(BaseContractModel):
     knowledge: RuntimeKnowledgeConfig
     tools: RuntimeToolConfig
     variables: RuntimeVariableConfig
+    holidays: List[RuntimeHolidayDefinition] = Field(default_factory=list, alias="holidays")
+
 
 
 class KnowledgeRetrieveResultItem(BaseContractModel):

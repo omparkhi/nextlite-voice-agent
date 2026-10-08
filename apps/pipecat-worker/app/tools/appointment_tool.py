@@ -18,7 +18,7 @@ from pipecat.processors.frame_processor import FrameDirection
 from pipecat.services.llm_service import FunctionCallParams
 from app.temporal_context import is_past_date, is_past_slot, resolve_relative_or_absolute_date
 from app.turn_timing import log_phone_trace
-from app.dynamic_schedule_engine import is_time_within_shifts
+from app.dynamic_schedule_engine import is_time_within_shifts, get_holiday_closure_info
 from app.tools.indic_normalizers import (
     normalize_indic_age,
     normalize_indic_time,
@@ -169,9 +169,34 @@ def create_book_appointment_tool_factory(
             }
             return await deliver_result(params, failure_result)
 
+        # Normalize relative/natural date to standard YYYY-MM-DD
+        normalized_date = resolve_relative_or_absolute_date(raw_booking_date, time_zone=tz_name)
+        booking_date = normalized_date if normalized_date else raw_booking_date
+
+        # Check against scheduled holidays / closures (0ms fast path hard rejection)
+        holidays_list = getattr(context, "holidays", None)
+        holiday_info = get_holiday_closure_info(booking_date, holidays_list)
+        if holiday_info:
+            h_name = holiday_info.get("name", "Scheduled Closure")
+            reopen_str = holiday_info.get("reopening_date", "")
+            logger.warning(
+                f"[AppointmentTool] Rejected appointment booking on closed holiday: date='{booking_date}', holiday='{h_name}', reopen='{reopen_str}'"
+            )
+            failure_result = {
+                "success": False,
+                "error": "DATE_CLOSED_HOLIDAY",
+                "holidayName": h_name,
+                "reopeningDate": reopen_str,
+                "message": (
+                    f"The requested appointment date '{booking_date}' is closed for '{h_name}'. "
+                    f"The business reopens on {reopen_str}. Please inform the caller and offer them an appointment on or after the reopening date."
+                ),
+            }
+            return await deliver_result(params, failure_result)
+
         # Check against shift boundaries / break hours
         biz_hours = getattr(context, "business_hours", None)
-        if biz_hours and not is_time_within_shifts(booking_time, biz_hours):
+        if biz_hours and not is_time_within_shifts(booking_time, biz_hours, booking_date=booking_date, holidays=holidays_list):
             logger.warning(
                 f"[AppointmentTool] Rejected appointment slot during break/closed hours: time='{booking_time}', business_hours='{biz_hours}'"
             )
@@ -179,15 +204,11 @@ def create_book_appointment_tool_factory(
                 "success": False,
                 "error": "SLOT_OUTSIDE_BUSINESS_HOURS",
                 "message": (
-                    f"The requested appointment slot '{booking_time}' falls during closed or afternoon break hours in configured clinic schedule. "
-                    "Please offer the caller an open time slot during clinic operating hours."
+                    f"The requested appointment slot '{booking_time}' falls during closed or break hours in configured schedule. "
+                    "Please offer the caller an open time slot during regular operating hours."
                 ),
             }
             return await deliver_result(params, failure_result)
-
-        # Normalize relative/natural date to standard YYYY-MM-DD
-        normalized_date = resolve_relative_or_absolute_date(raw_booking_date, time_zone=tz_name)
-        booking_date = normalized_date if normalized_date else raw_booking_date
 
         # 2. Resolve caller phone: ALWAYS prioritize trusted telephony callerPhone metadata
         raw_phone = raw_args.get("customerPhone") or raw_args.get("phone")
@@ -350,6 +371,7 @@ def create_book_appointment_tool_factory(
                                 booking_date=booking_date,
                                 time_zone=getattr(context, "timezone", "Asia/Kolkata") or "Asia/Kolkata",
                                 filter_past=True,
+                                holidays=holidays_list,
                             )
                             norm_failed = normalize_indic_time(booking_time).strip().upper().lstrip("0")
                             available_future_slots = [
@@ -469,6 +491,24 @@ def create_reschedule_appointment_tool_factory(
 
         tz_name = getattr(context, "timezone", None)
         normalized_date = resolve_relative_or_absolute_date(raw_date, time_zone=tz_name)
+
+        holidays_list = getattr(context, "holidays", None)
+        holiday_info = get_holiday_closure_info(normalized_date or raw_date, holidays_list)
+        if holiday_info:
+            h_name = holiday_info.get("name", "Scheduled Closure")
+            reopen_str = holiday_info.get("reopening_date", "")
+            result = {
+                "success": False,
+                "error": "DATE_CLOSED_HOLIDAY",
+                "holidayName": h_name,
+                "reopeningDate": reopen_str,
+                "message": (
+                    f"The requested reschedule date '{normalized_date or raw_date}' is closed for '{h_name}'. "
+                    f"The business reopens on {reopen_str}. Please offer the caller an appointment on or after the reopening date."
+                ),
+            }
+            await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=True))
+            return
 
         if is_past_slot(normalized_date or raw_date, normalized_time, time_zone=tz_name):
             result = {

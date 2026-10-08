@@ -8,7 +8,8 @@ from ..schemas import (
     RuntimeAgentConfig, RuntimeTenantConfig, RuntimeAgentMetadata,
     RuntimeDeploymentMetadata, RuntimePromptConfig, RuntimeVoiceConfig,
     RuntimeLanguageConfig, RuntimeBehaviorConfig, RuntimeNudgeConfig, RuntimeKnowledgeConfig,
-    RuntimeToolConfig, RuntimeToolDefinition, RuntimeVariableConfig, RuntimeVariableDefinition
+    RuntimeToolConfig, RuntimeToolDefinition, RuntimeVariableConfig, RuntimeVariableDefinition,
+    RuntimeHolidayDefinition
 )
 from .prompt_compiler_service import prompt_compiler
 from ..domain.tool_registry import (
@@ -295,6 +296,22 @@ class RuntimeAgentConfigService:
         lang_switch_raw = lang_cfg.get("languageSwitchEnabled", lang_cfg.get("languageSwitchingEnabled"))
         lang_switch_val = lang_switch_raw if lang_switch_raw is not None else (len(supported_langs) > 1 or True)
 
+        # Query active tenant holidays
+        from ..repositories.repositories import ClinicHolidayRepository
+        holiday_repo = ClinicHolidayRepository(self.session)
+        raw_holidays = await holiday_repo.list_for_tenant(deployment.tenantId)
+        holiday_defs: List[RuntimeHolidayDefinition] = [
+            RuntimeHolidayDefinition(
+                id=str(h.id),
+                name=h.name,
+                start_date=h.startDate,
+                end_date=h.endDate,
+                is_entire_day=h.isEntireDay,
+                notes=h.notes
+            )
+            for h in raw_holidays
+        ]
+
         return RuntimeAgentConfig(
             tenant=RuntimeTenantConfig(tenant_id=str(deployment.tenantId)),
             agent=RuntimeAgentMetadata(
@@ -372,5 +389,6 @@ class RuntimeAgentConfigService:
                 input_variables=normalized_input_vars,
                 output_variables=normalized_output_vars,
                 runtime_context=runtime_ctx_map
-            )
+            ),
+            holidays=holiday_defs
         )

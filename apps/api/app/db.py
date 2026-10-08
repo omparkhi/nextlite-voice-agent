@@ -100,7 +100,24 @@ async def init_db():
         "CREATE INDEX IF NOT EXISTS idx_call_recordings_plivo_call_uuid ON call_recordings (plivo_call_uuid);",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_call_recordings_plivo_recording_id ON call_recordings (plivo_recording_id);",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_call_recordings_call_session_id ON call_recordings (call_session_id) WHERE call_session_id IS NOT NULL;",
-        "CREATE INDEX IF NOT EXISTS idx_call_recordings_tenant_id ON call_recordings (tenant_id);"
+        "CREATE INDEX IF NOT EXISTS idx_call_recordings_tenant_id ON call_recordings (tenant_id);",
+        """CREATE TABLE IF NOT EXISTS clinic_holidays (
+            id UUID PRIMARY KEY,
+            tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
+            name VARCHAR(255) NOT NULL,
+            start_date VARCHAR(50) NOT NULL,
+            end_date VARCHAR(50) NOT NULL,
+            is_entire_day BOOLEAN NOT NULL DEFAULT TRUE,
+            notes TEXT,
+            metadata JSONB DEFAULT '{}'::jsonb,
+            created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+        );""",
+        "ALTER TABLE clinic_holidays ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;",
+        "ALTER TABLE clinic_holidays ADD COLUMN IF NOT EXISTS is_entire_day BOOLEAN DEFAULT TRUE;",
+        "ALTER TABLE clinic_holidays ADD COLUMN IF NOT EXISTS notes TEXT;",
+        "CREATE INDEX IF NOT EXISTS idx_clinic_holidays_tenant_id ON clinic_holidays (tenant_id);",
+        "CREATE INDEX IF NOT EXISTS idx_clinic_holidays_start_date ON clinic_holidays (start_date);"
     ]
     try:
         async with engine.begin() as conn:

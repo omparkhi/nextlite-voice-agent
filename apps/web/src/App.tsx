@@ -22,6 +22,7 @@ import { ClientFollowUps } from './pages/client/FollowUps';
 import { ClientAnalytics } from './pages/client/Analytics';
 import { ClientPhoneAgents } from './pages/client/PhoneAgents';
 import { ClientReceptionists } from './pages/client/Receptionists';
+import { ClientSettings } from './pages/client/Settings';
 import { ClientPlan } from './pages/client/ClientPlan';
 import { ReceptionistDashboard } from './pages/receptionist/ReceptionistDashboard';
 import Home from './pages/Home';
@@ -76,6 +77,7 @@ function App() {
           <Route path="analytics" element={<ClientAnalytics />} />
           <Route path="phone-agents" element={<ClientPhoneAgents />} />
           <Route path="receptionists" element={<ClientReceptionists />} />
+          <Route path="settings" element={<ClientSettings />} />
           <Route path="plan" element={<ClientPlan />} />
         </Route>
         

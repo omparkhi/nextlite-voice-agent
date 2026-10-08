@@ -67,6 +67,7 @@ class ToolRuntimeContext:
     business_hours: Optional[str] = None
     slot_duration: Optional[str] = None
     patients_per_slot: Optional[int] = None
+    holidays: Optional[List[Any]] = None
     transcript_collector: Optional["CallTranscriptCollector"] = None
     timing_tracker: Optional[Any] = None
     _call_session_task: Optional[Any] = None
@@ -408,12 +409,18 @@ class ToolRegistry:
 
         resolved_context: ToolRuntimeContext
         if isinstance(context, str):
-            resolved_context = ToolRuntimeContext(deployment_id=context)
+            resolved_context = ToolRuntimeContext(
+                deployment_id=context,
+                holidays=getattr(runtime_config, "holidays", None),
+            )
         elif isinstance(context, ToolRuntimeContext):
             resolved_context = context
+            if resolved_context.holidays is None and getattr(runtime_config, "holidays", None):
+                resolved_context.holidays = runtime_config.holidays
         else:
             resolved_context = ToolRuntimeContext(
-                deployment_id=runtime_config.deployment.deployment_id or ""
+                deployment_id=runtime_config.deployment.deployment_id or "",
+                holidays=getattr(runtime_config, "holidays", None),
             )
 
         resolved_tools: List[FunctionSchema] = []

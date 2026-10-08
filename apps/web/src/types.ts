@@ -97,6 +97,45 @@ export interface ApiError {
   details?: Record<string, string[]>;
 }
 
+export interface ClinicHoliday {
+  id: string;
+  tenantId: string;
+  name: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  isEntireDay: boolean;
+  notes?: string | null;
+  metadataJson?: Record<string, any> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClinicHolidayCreatePayload {
+  name: string;
+  startDate: string;
+  endDate?: string;
+  isEntireDay?: boolean;
+  notes?: string;
+  metadataJson?: Record<string, any>;
+}
+
+export interface ClinicHolidayUpdatePayload {
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  isEntireDay?: boolean;
+  notes?: string;
+  metadataJson?: Record<string, any>;
+}
+
+export interface ClinicScheduleConfig {
+  businessHours: string;
+  slotDuration: string;
+  patientsPerSlot: number;
+  shifts: Array<{ start: string; end: string; label: string }>;
+  timezone: string;
+}
+
 // --- Dynamic Agent Builder Types ---
 
 export interface InputVariable {

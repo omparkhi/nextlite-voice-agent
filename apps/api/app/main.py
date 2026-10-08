@@ -9,7 +9,7 @@ from sqlalchemy import text
 from .config import settings
 from .logging import logger
 from .db import init_db, close_db, get_redis, AsyncSessionLocal
-from .routers import auth, agents, internal, knowledge, client, receptionist, admin, whatsapp_integration, webhooks
+from .routers import auth, agents, internal, knowledge, client, receptionist, admin, whatsapp_integration, webhooks, holidays
 
 import asyncio
 from datetime import timedelta
@@ -179,5 +179,6 @@ app.include_router(client.router)
 app.include_router(receptionist.router)
 app.include_router(admin.router)
 app.include_router(whatsapp_integration.router)
+app.include_router(holidays.router)
 app.include_router(webhooks.router)
 app.include_router(webhooks.root_router)

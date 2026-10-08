@@ -55,6 +55,7 @@ from app.temporal_context import (
     DEFAULT_TIMEZONE,
     build_temporal_and_calendar_instructions,
     build_compact_temporal_anchor,
+    build_holiday_instructions,
     get_temporal_context,
 )
 from app.workflow_state import WorkflowState
@@ -2991,6 +2992,7 @@ async def websocket_plivo_endpoint(
             business_hours=biz_hours_val,
             slot_duration=slot_duration_val,
             patients_per_slot=patients_per_slot_val,
+            holidays=getattr(runtime_config, "holidays", None),
             transcript_collector=transcript_collector,
             timing_tracker=turn_tracker,
             _call_session_task=call_session_task,
@@ -3075,6 +3077,16 @@ async def websocket_plivo_endpoint(
             base_system_prompt_with_temporal = f"{compiled_system_prompt}\n\n{temporal_instructions}"
         else:
             base_system_prompt_with_temporal = compiled_system_prompt
+
+        # Universal Scheduled Closures & Holidays Prompt Injection (0ms Fast-Path Grounding)
+        holidays_list = getattr(runtime_config, "holidays", None)
+        if holidays_list and "=== SCHEDULED CLOSURES & HOLIDAYS ===" not in base_system_prompt_with_temporal:
+            holiday_instructions = build_holiday_instructions(
+                holidays=holidays_list,
+                time_zone=tz_name,
+            )
+            if holiday_instructions:
+                base_system_prompt_with_temporal = f"{base_system_prompt_with_temporal}\n\n{holiday_instructions}"
 
         # Universal Telephony Call Termination Boundary Grounding
         if any(t.name == "end_call" for t in resolved_tools):
