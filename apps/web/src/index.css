@@ -19,7 +19,7 @@
   --surface-card: #ffffff;
   --surface-strong: #f0efed;
   --surface-dark: #0c0a09;
-  
+
   --orb-mint: #a7e5d3;
   --orb-peach: #f4c5a8;
   --orb-lavender: #c8b8e0;
@@ -221,9 +221,11 @@ body {
   0% {
     transform: translate(0, 0) scale(1);
   }
+
   50% {
     transform: translate(30px, -20px) scale(1.1);
   }
+
   100% {
     transform: translate(-20px, 20px) scale(0.95);
   }
@@ -249,8 +251,13 @@ body {
 }
 
 @keyframes wavePulse {
-  0% { transform: scaleY(0.3); }
-  100% { transform: scaleY(1); }
+  0% {
+    transform: scaleY(0.3);
+  }
+
+  100% {
+    transform: scaleY(1);
+  }
 }
 
 /* Custom Radial Gradient Utility */
