@@ -86,7 +86,8 @@ jobs:
             cd /opt/nextlite
             git fetch origin
             git checkout ${{ github.ref_name }}
-            git pull origin ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
+            git clean -fd
 
             echo "[Deploy] Building frontend assets (apps/web)..."
             if [ -d "apps/web" ]; then
