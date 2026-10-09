@@ -111,7 +111,7 @@ async def create_clinic_holiday(
     await session.refresh(holiday)
 
     # Invalidate runtime config cache so voice worker picks up new holidays immediately
-    await invalidate_worker_cache(tenant_id)
+    await invalidate_worker_cache(tenant_id=str(tenant_id))
 
     return ClinicHolidayResponse(
         id=str(holiday.id),
@@ -156,7 +156,7 @@ async def update_clinic_holiday(
     await session.commit()
     await session.refresh(holiday)
 
-    await invalidate_worker_cache(tenant_id)
+    await invalidate_worker_cache(tenant_id=str(tenant_id))
 
     return ClinicHolidayResponse(
         id=str(holiday.id),
@@ -189,5 +189,5 @@ async def delete_clinic_holiday(
     await repo.delete(holiday)
     await session.commit()
 
-    await invalidate_worker_cache(tenant_id)
+    await invalidate_worker_cache(tenant_id=str(tenant_id))
     return None

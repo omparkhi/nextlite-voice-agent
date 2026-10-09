@@ -105,8 +105,13 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
     throw new Error(error.error || error.detail || 'Request failed');
   }
-  
-  return response.json();
+
+  if (response.status === 204) {
+    return { success: true } as T;
+  }
+
+  const text = await response.text();
+  return (text ? JSON.parse(text) : { success: true }) as T;
 }
 
 import type {

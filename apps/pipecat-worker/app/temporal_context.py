@@ -183,8 +183,9 @@ def build_temporal_and_calendar_instructions(
         f"   - 'today' / 'आज' -> strictly {cal_ctx.today.iso_date}",
         f"   - 'tomorrow' / 'कल' / 'उद्या' -> strictly {cal_ctx.tomorrow.iso_date}",
         f"   - 'day after tomorrow' / 'परसों' / 'परवा' -> strictly {cal_ctx.day_after_tomorrow.iso_date}",
-        f"4. APPOINTMENT BOOKING: When invoking `book_appointment`, you MUST provide `bookingDate` formatted as YYYY-MM-DD using the calendar above. Never submit a past date.",
-        f"5. CLARIFICATION: If the user provides an ambiguous date or an invalid weekday/date combination, ask politely for clarification.",
+        f"4. AFTER-HOURS AWARENESS: If the current time is past today's business closing hours, do not offer today for appointments — proactively offer tomorrow or the next open business day.",
+        f"5. APPOINTMENT BOOKING: When invoking `book_appointment`, you MUST provide `bookingDate` formatted as YYYY-MM-DD using the calendar above. Never submit a past date.",
+        f"6. CLARIFICATION: If the user provides an ambiguous date or an invalid weekday/date combination, ask politely for clarification.",
     ])
 
     return "\n".join(lines)
@@ -204,6 +205,7 @@ def build_compact_temporal_anchor(
         f"- Date: {temporal_ctx.current_date} ({temporal_ctx.iso_date}) | Day: {temporal_ctx.current_day}\n"
         f"- Time: {temporal_ctx.current_time} ({temporal_ctx.timezone})\n"
         f"- Grounding: Today is strictly {temporal_ctx.iso_date}. In tool arguments, format bookingDate as YYYY-MM-DD."
+        f"- Operating Hours Rule: If the current time is past today's business closing hours, do not offer today for appointments — proactively offer tomorrow or the next open business day."
     )
 
 

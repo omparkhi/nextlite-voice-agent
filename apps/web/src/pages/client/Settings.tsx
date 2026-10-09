@@ -319,15 +319,15 @@ export function ClientSettings() {
       </div>
 
       {/* Settings Navigation Tabs */}
-      <div className="flex items-center gap-2 pb-px overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-1 sm:gap-2 pb-px border-b border-[#e7e5e4] overflow-x-auto scrollbar-none no-scrollbar">
         <button
           onClick={() => setActiveTab('holidays')}
-          className={`px-3.5 py-2 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${activeTab === 'holidays'
+          className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 sm:gap-2 ${activeTab === 'holidays'
             ? 'border-[#0c0a09] text-[#0c0a09]'
             : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
             }`}
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="4" />
             <line x1="16" y1="2" x2="16" y2="6" />
             <line x1="8" y1="2" x2="8" y2="6" />
@@ -343,12 +343,12 @@ export function ClientSettings() {
 
         <button
           onClick={() => setActiveTab('hours')}
-          className={`px-3.5 py-2 text-xs font-medium border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${activeTab === 'hours'
+          className={`px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 sm:gap-2 ${activeTab === 'hours'
             ? 'border-[#0c0a09] text-[#0c0a09]'
             : 'border-transparent text-[#777169] hover:text-[#0c0a09]'
             }`}
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
@@ -450,26 +450,26 @@ export function ClientSettings() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2">
                 <button
                   onClick={handleQuickCloseToday}
-                  className="px-3 py-1.5 bg-white border border-[#e7e5e4] text-[#0c0a09] hover:bg-[#f5f5f4] rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-white border border-[#e7e5e4] text-[#0c0a09] hover:bg-[#f5f5f4] rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
                   <span>Close Today</span>
                 </button>
 
                 <button
                   onClick={handleQuickCloseTomorrow}
-                  className="px-3 py-1.5 bg-white border border-[#e7e5e4] text-[#0c0a09] hover:bg-[#f5f5f4] rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-white border border-[#e7e5e4] text-[#0c0a09] hover:bg-[#f5f5f4] rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-stone-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-500 shrink-0" />
                   <span>Close Tomorrow</span>
                 </button>
 
                 <button
                   onClick={() => handleOpenAddModal(todayIso, todayIso, 'Clinic Holiday')}
-                  className="px-3 py-1.5 bg-white border border-[#e7e5e4] text-[#0c0a09] hover:bg-[#f5f5f4] rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="col-span-2 sm:col-span-1 px-3 py-1.5 bg-white border border-[#e7e5e4] text-[#0c0a09] hover:bg-[#f5f5f4] rounded-xl text-xs font-medium transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <span>Custom Range</span>
                 </button>
@@ -477,7 +477,7 @@ export function ClientSettings() {
             </div>
           )}
 
-          {/* Holidays & Closures Table */}
+          {/* Holidays & Closures Table / Cards */}
           <div className="bg-white border border-[#e7e5e4] rounded-2xl overflow-hidden shadow-2xs">
             <div className="p-4 border-b border-[#e7e5e4] flex items-center justify-between">
               <div>
@@ -527,16 +527,16 @@ export function ClientSettings() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto scrollbar-none no-scrollbar">
+                <table className="min-w-[720px] w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-[#fafaf9] border-b border-[#e7e5e4] text-[10px] text-[#777169] uppercase tracking-wider font-medium">
-                      <th className="py-2.5 px-4">Occasion / Reason</th>
-                      <th className="py-2.5 px-4">Date Range</th>
-                      <th className="py-2.5 px-4">Duration</th>
-                      <th className="py-2.5 px-4">AI Informs Callers</th>
-                      <th className="py-2.5 px-4 text-center">Status</th>
-                      {!isViewer && <th className="py-2.5 px-4 text-right">Actions</th>}
+                      <th className="py-2.5 px-4 min-w-[220px]">Occasion / Reason</th>
+                      <th className="py-2.5 px-4 min-w-[160px]">Date Range</th>
+                      <th className="py-2.5 px-4 min-w-[90px]">Duration</th>
+                      <th className="py-2.5 px-4 min-w-[200px]">AI Informs Callers</th>
+                      <th className="py-2.5 px-4 min-w-[110px] text-center">Status</th>
+                      {!isViewer && <th className="py-2.5 px-4 min-w-[80px] text-right">Actions</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#f5f5f4] text-xs">
@@ -547,8 +547,8 @@ export function ClientSettings() {
 
                       return (
                         <tr key={h.id} className="hover:bg-[#fafaf9]/70 transition-colors">
-                          <td className="py-3 px-4 font-medium text-[#0c0a09]">
-                            <div className="flex items-center gap-2">
+                          <td className="py-3 px-4 font-medium text-[#0c0a09] whitespace-nowrap">
+                            <div className="flex items-center gap-2.5">
                               <div className="w-6 h-6 rounded-md bg-[#fafaf9] border border-[#e7e5e4] flex items-center justify-center text-[#777169] shrink-0">
                                 <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <circle cx="12" cy="12" r="10" />
@@ -556,9 +556,9 @@ export function ClientSettings() {
                                   <line x1="12" y1="16" x2="12.01" y2="16" />
                                 </svg>
                               </div>
-                              <div>
-                                <span className="text-[#0c0a09]">{h.name}</span>
-                                {h.notes && <p className="text-[10px] text-[#777169] truncate max-w-xs">{h.notes}</p>}
+                              <div className="flex flex-col">
+                                <span className="text-[#0c0a09] font-medium">{h.name}</span>
+                                {h.notes && <p className="text-[10px] text-[#777169]">{h.notes}</p>}
                               </div>
                             </div>
                           </td>
@@ -579,13 +579,13 @@ export function ClientSettings() {
                             </span>
                           </td>
 
-                          <td className="py-3 px-4 text-[#777169] text-[11px]">
+                          <td className="py-3 px-4 text-[#777169] text-[11px] whitespace-nowrap">
                             <div className="flex items-center gap-1.5 text-[#57534e]">
                               <svg className="w-3 h-3 text-emerald-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
                                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                               </svg>
-                              <span className="truncate max-w-xs">
+                              <span>
                                 Reopens on <span className="text-[#0c0a09] font-medium">{reopenDay}</span>
                               </span>
                             </div>

@@ -299,6 +299,14 @@ class RuntimeConfigClient:
         """Clears in-memory runtime configuration cache."""
         self._cache.invalidate(deployment_id)
 
+    async def get_runtime_config(
+        self,
+        deployment_id: str,
+        use_cache: bool = True,
+    ) -> RuntimeAgentConfig:
+        """Backward-compatible alias for get_runtime_agent_config."""
+        return await self.get_runtime_agent_config(deployment_id, use_cache=use_cache)
+
     async def get_runtime_agent_config(
         self,
         deployment_id: str,

@@ -312,7 +312,7 @@ async def invalidate_cache(
                 timeout_seconds=5.0,
                 http_client=app.state.http_client,
             )
-            config = await client.get_runtime_config(clean_id)
+            config = await client.get_runtime_agent_config(clean_id, use_cache=False)
             if config:
                 rewarmed = True
                 logger.info(f"[Cache Invalidate] Atomically pre-warmed fresh config for deploymentId={clean_id}")
@@ -895,7 +895,7 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         **kwargs,
     ):
         self._shared_http_client = http_client
-        self._nextlite_timing_tracker = timing_tracker
+        self._timing_tracker = timing_tracker
         self._transcript_collector = transcript_collector
         self._is_call_terminating_fn = is_call_terminating_fn
         self._runtime_config = runtime_config
@@ -907,20 +907,35 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         super().__init__(*args, **kwargs)
 
     async def _dispatch_early_tool_ack(self):
-        """Dispatches an immediate non-committal filler phrase to TTS in the active language."""
+        """Dispatches an non-committal filler phrase to TTS only if tool execution actually experiences delay (>1.2s)."""
         if self._is_call_terminating_fn and self._is_call_terminating_fn():
             return
         if self._runtime_config and not getattr(self._runtime_config.runtime, "enable_early_tool_ack", True):
             return
 
-        user_text = getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or ""
-        if user_text and is_farewell_or_terminal_intent(user_text):
-            logger.info(f"[EarlyToolAck] Suppressed early tool ack for farewell user utterance: '{user_text}'")
-            return
-
-        current_turn_id = self._nextlite_timing_tracker.active_turn_id if self._nextlite_timing_tracker else None
+        current_turn_id = self._timing_tracker.active_turn_id if self._timing_tracker else None
         if current_turn_id and self._early_tool_ack_sent_turn_id == current_turn_id:
             return
+
+        user_text = getattr(self._timing_tracker, "last_user_transcript", None) or ""
+        if user_text and is_farewell_or_terminal_intent(user_text):
+            return
+
+        # 1.2-second Watchdog Delay: If tool completes quickly (<1.2s), cancellation avoids unnecessary filler
+        delay_seconds = 1.2
+        await asyncio.sleep(delay_seconds)
+
+        # Check if the turn is still active and waiting on tool results
+        if self._timing_tracker:
+            if (
+                self._timing_tracker.active_turn_id != current_turn_id
+                or self._timing_tracker.first_post_tool_llm_output is not None
+                or self._timing_tracker.first_llm_output is not None
+                or self._timing_tracker.text_released_to_tts is not None
+                or (self._is_call_terminating_fn and self._is_call_terminating_fn())
+            ):
+                return
+
         self._early_tool_ack_sent_turn_id = current_turn_id
 
         # Resolve active language from authoritative language manager
@@ -939,17 +954,17 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         )
 
         now = time.perf_counter()
-        if self._nextlite_timing_tracker:
-            self._nextlite_timing_tracker.record_early_ack_sent(now)
+        if self._timing_tracker:
+            self._timing_tracker.record_early_ack_sent(now)
 
         logger.info(
-            f"[EarlyToolAck] Dispatched early safe filler phrase to TTS: '{filler_phrase}' "
+            f"[DelayedToolAckWatchdog] Tool execution took > {delay_seconds}s; dispatched filler phrase to TTS: '{filler_phrase}' "
             f"(lang={active_lang}, turn_id={current_turn_id})"
         )
         try:
             await self.push_frame(TTSSpeakFrame(text=filler_phrase), FrameDirection.DOWNSTREAM)
         except Exception as e:
-            logger.warning(f"[EarlyToolAck] Failed to push early filler TTSSpeakFrame: {e}")
+            logger.warning(f"[DelayedToolAckWatchdog] Failed to push delayed filler TTSSpeakFrame: {e}")
 
     def _appointment_tool_is_available(self) -> bool:
         """Only acknowledge an appointment action that this deployment can do."""
@@ -971,7 +986,7 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         if self._is_call_terminating_fn and self._is_call_terminating_fn():
             return
 
-        current_turn_id = self._nextlite_timing_tracker.active_turn_id if self._nextlite_timing_tracker else None
+        current_turn_id = self._timing_tracker.active_turn_id if self._timing_tracker else None
         if current_turn_id and self._early_tool_ack_sent_turn_id == current_turn_id:
             return
         self._early_tool_ack_sent_turn_id = current_turn_id
@@ -987,8 +1002,8 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             or APPOINTMENT_INTENT_ACK_PHRASES.get(active_lang.split("-")[0])
             or APPOINTMENT_INTENT_ACK_PHRASES["en-IN"]
         )
-        if self._nextlite_timing_tracker:
-            self._nextlite_timing_tracker.record_early_ack_sent(time.perf_counter())
+        if self._timing_tracker:
+            self._timing_tracker.record_early_ack_sent(time.perf_counter())
         logger.info(
             f"[AppointmentIntentAck] Dispatched before LLM request "
             f"(lang={active_lang}, turn_id={current_turn_id})"
@@ -1005,7 +1020,7 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         if self._runtime_config and not getattr(self._runtime_config.runtime, "enable_conversational_early_ack", False):
             return
 
-        current_turn_id = self._nextlite_timing_tracker.active_turn_id if self._nextlite_timing_tracker else None
+        current_turn_id = self._timing_tracker.active_turn_id if self._timing_tracker else None
         if current_turn_id and self._early_conv_ack_sent_turn_id == current_turn_id:
             return
         self._early_conv_ack_sent_turn_id = current_turn_id
@@ -1018,7 +1033,7 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             active_lang = self._runtime_config.language.primary
 
         # Fallback check against current user transcript if active_lang is still English
-        user_text = user_transcript or (getattr(self._nextlite_timing_tracker, "last_user_transcript", None) or "")
+        user_text = user_transcript or (getattr(self._timing_tracker, "last_user_transcript", None) or "")
         if (active_lang.startswith("en") or active_lang == "en-IN") and user_text:
             from app.language_manager import (
                 DEVANAGARI_REGEX,
@@ -1042,8 +1057,8 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         )
 
         now = time.perf_counter()
-        if self._nextlite_timing_tracker:
-            self._nextlite_timing_tracker.record_early_ack_sent(now)
+        if self._timing_tracker:
+            self._timing_tracker.record_early_ack_sent(now)
 
         # Notify text aggregator to deduplicate repeated affirmative particle from LLM stream
         if self._tts_service and hasattr(self._tts_service, "_text_aggregator") and self._tts_service._text_aggregator:
@@ -1133,7 +1148,7 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             async def _empty_gen():
                 if False:
                     yield
-            return InstrumentedAsyncStream(_empty_gen(), timing_tracker=self._nextlite_timing_tracker, is_call_terminating_fn=self._is_call_terminating_fn)
+            return InstrumentedAsyncStream(_empty_gen(), timing_tracker=self._timing_tracker, is_call_terminating_fn=self._is_call_terminating_fn)
 
         messages = []
         if hasattr(context, "get_messages"):
@@ -1145,8 +1160,8 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
 
         is_post_tool = bool(messages and messages[-1].get("role") == "tool")
         is_greeting = bool(
-            self._nextlite_timing_tracker
-            and (self._nextlite_timing_tracker.turn_type == "greeting" or getattr(self._nextlite_timing_tracker, "turn_count", 0) == 0)
+            self._timing_tracker
+            and (self._timing_tracker.turn_type == "greeting" or getattr(self._timing_tracker, "turn_count", 0) == 0)
         )
 
         if not is_post_tool:
@@ -1161,9 +1176,9 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             await self._dispatch_appointment_intent_ack(last_user_message)
 
         t0 = time.perf_counter()
-        if self._nextlite_timing_tracker:
-            self._nextlite_timing_tracker.record_llm_request_created(t0)
-            self._nextlite_timing_tracker.record_llm_request(t0)
+        if self._timing_tracker:
+            self._timing_tracker.record_llm_request_created(t0)
+            self._timing_tracker.record_llm_request(t0)
 
         adapter = self.get_llm_adapter()
         params_from_context = adapter.get_llm_invocation_params(
@@ -1210,8 +1225,8 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         raw_stream = await self._client.chat.completions.create(**params)
 
         t1 = time.perf_counter()
-        if self._nextlite_timing_tracker:
-            self._nextlite_timing_tracker.record_llm_first_provider_response(t1)
+        if self._timing_tracker:
+            self._timing_tracker.record_llm_first_provider_response(t1)
 
         active_lang = "en-IN"
         if self._language_manager and getattr(self._language_manager, "current_language", None):
@@ -1221,7 +1236,7 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
 
         return InstrumentedAsyncStream(
             raw_stream,
-            timing_tracker=self._nextlite_timing_tracker,
+            timing_tracker=self._timing_tracker,
             transcript_collector=self._transcript_collector,
             active_language=active_lang,
             is_call_terminating_fn=self._is_call_terminating_fn,
