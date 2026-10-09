@@ -47,10 +47,10 @@ APPOINTMENT_TOOL_PROPERTIES: Dict[str, Any] = {
         "type": "string",
         "description": "Optional reason for visit or service type (defaults to 'General Consultation'). Do NOT ask the caller for this unless they volunteer it.",
     },
-    "age": {
-        "type": "string",
-        "description": "Age of the person as numeric digits (e.g. '22')",
-    },
+    # "age": {
+    #     "type": "string",
+    #     "description": "Age of the person as numeric digits (e.g. '22')",
+    # },
     # "place": {
     #     "type": "string",
     #     "description": "Place, city, or location (e.g. 'Nagpur')",
