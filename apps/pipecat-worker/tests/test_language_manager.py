@@ -1,13 +1,11 @@
 import pytest
+from unittest.mock import AsyncMock
 from app.language_manager import (
-    ConversationLanguageManager,
     normalize_language_code,
     get_language_display_name,
-    match_supported_language,
-    detect_explicit_language_request,
-    is_reliable_automatic_switch,
-    build_language_instruction,
+    LANGUAGE_MIRROR_DIRECTIVE,
 )
+from app.language_processor import LanguageContextProcessor
 
 def test_normalize_language_code():
     assert normalize_language_code("hi") == "hi-IN"
@@ -15,140 +13,49 @@ def test_normalize_language_code():
     assert normalize_language_code("mr") == "mr-IN"
     assert normalize_language_code("unknown") == "unknown"
     assert normalize_language_code("en-us") == "en-US"
+    assert normalize_language_code(None) == "en-IN"
 
 def test_get_language_display_name():
     assert get_language_display_name("hi-IN") == "Hindi"
     assert get_language_display_name("en-IN") == "English"
     assert get_language_display_name("mr-IN") == "Marathi"
+    assert get_language_display_name("ta-IN") == "Tamil"
+    assert get_language_display_name(None) == "English"
 
-def test_match_supported_language():
-    supported = ["en-IN", "hi-IN", "mr-IN"]
-    assert match_supported_language("hi", supported) == "hi-IN"
-    assert match_supported_language("mr-IN", supported) == "mr-IN"
-    assert match_supported_language("ta-IN", supported) is None
-    assert match_supported_language("en-US", supported) == "en-IN"
+def test_language_mirror_directive():
+    assert "Always respond in the language of the caller's LATEST utterance" in LANGUAGE_MIRROR_DIRECTIVE
 
-def test_detect_explicit_language_request():
-    assert detect_explicit_language_request("speak in hindi") == "hi-IN"
-    assert detect_explicit_language_request("hindi mein baat karo") == "hi-IN"
-    assert detect_explicit_language_request("मराठीत बोला") == "mr-IN"
-    assert detect_explicit_language_request("switch to english please") == "en-IN"
-    assert detect_explicit_language_request("what is your name") is None
+class MockTTSService:
+    def __init__(self, initial="en-IN"):
+        self._active_language = initial
+    def update_language_context(self, code):
+        self._active_language = code
 
-def test_is_reliable_automatic_switch():
-    # 1. Hindi -> English with Hinglish
-    assert is_reliable_automatic_switch("Sir appointment book karna hai", "en-IN", "hi-IN") is False
-    assert is_reliable_automatic_switch("I want to book an appointment please", "en-IN", "hi-IN") is True
-    # 2. Marathi -> English with Minglish
-    assert is_reliable_automatic_switch("Mala appointment book karaychi ahe", "en-IN", "mr-IN") is False
-    # 3. Short utterance
-    assert is_reliable_automatic_switch("okay", "en-IN", "hi-IN") is False
-    # 4. English -> Hindi
-    assert is_reliable_automatic_switch("मुझे appointment चाहिए", "hi-IN", "en-IN") is True
+from pipecat.frames.frames import TranscriptionFrame
 
-def test_manager_initialization():
-    manager = ConversationLanguageManager(
-        primary="en",
-        supported_languages=["en", "hi"],
-        auto_detect_enabled=True,
-        language_switching_enabled=True,
-    )
-    assert manager.primary_language == "en-IN"
-    assert manager.supported_languages == ["en-IN", "hi-IN"]
-    assert manager.current_language == "en-IN"
+class MockTranscriptionFrame(TranscriptionFrame):
+    def __init__(self, text: str, detected_language: str, finalized: bool = True):
+        super().__init__(text=text, user_id="user", timestamp="2026-10-11T00:00:00Z")
+        self.finalized = finalized
+        self.result = {"language": detected_language}
 
-def test_single_language_never_switches():
-    manager = ConversationLanguageManager(primary="hi")
-    res = manager.process_user_turn("speak in english")
-    assert res.switched is False
-    assert manager.current_language == "hi-IN"
-    assert res.decision == "REJECTED"
+@pytest.mark.asyncio
+async def test_language_context_processor_dynamic_switch():
+    tts = MockTTSService(initial="mr-IN")
+    processor = LanguageContextProcessor(tts_service=tts)
+    processor.push_frame = AsyncMock()
 
-def test_explicit_supported_switch():
-    manager = ConversationLanguageManager(primary="en", supported_languages=["en", "hi"])
-    res = manager.process_user_turn("hindi mein baat karo")
-    assert res.switched is True
-    assert res.current_language == "hi-IN"
-    assert res.reason == "explicit"
-    assert manager.current_language == "hi-IN"
+    # Finalized frame with hi-IN from Saaras STT
+    frame = MockTranscriptionFrame("नमस्ते", "hi-IN", finalized=True)
+    await processor.process_frame(frame, None)
+    assert tts._active_language == "hi-IN"
 
-def test_explicit_unsupported_does_not_switch():
-    manager = ConversationLanguageManager(primary="en", supported_languages=["en", "hi"])
-    res = manager.process_user_turn("मराठीत बोला") # Marathi not supported
-    assert res.switched is False
-    assert manager.current_language == "en-IN"
+    # Finalized frame with en-IN
+    frame2 = MockTranscriptionFrame("Hello", "en-IN", finalized=True)
+    await processor.process_frame(frame2, None)
+    assert tts._active_language == "en-IN"
 
-def test_automatic_reliable_switch():
-    manager = ConversationLanguageManager(primary="en", supported_languages=["en", "hi"])
-    res = manager.process_user_turn("मुझे appointment चाहिए", detected_language_code="hi-IN")
-    assert res.switched is True
-    assert res.current_language == "hi-IN"
-
-def test_automatic_unreliable_switch_hinglish():
-    manager = ConversationLanguageManager(primary="hi", supported_languages=["en", "hi"])
-    res = manager.process_user_turn("Sir appointment book karna hai", detected_language_code="en-IN")
-    assert res.switched is False
-    assert res.decision == "REJECTED"
-    assert manager.current_language == "hi-IN"
-
-def test_latest_explicit_wins():
-    manager = ConversationLanguageManager(primary="hi", supported_languages=["en", "hi", "mr"])
-    manager.process_user_turn("मराठीत बोला")
-    assert manager.current_language == "mr-IN"
-    manager.process_user_turn("switch to english")
-    assert manager.current_language == "en-IN"
-
-def test_disabled_auto_detect():
-    manager = ConversationLanguageManager(
-        primary="en", 
-        supported_languages=["en", "hi"], 
-        auto_detect_enabled=False
-    )
-    res = manager.process_user_turn("मुझे appointment चाहिए", detected_language_code="hi-IN")
-    assert res.switched is False
-    assert res.decision == "REJECTED"
-
-def test_disabled_switching():
-    manager = ConversationLanguageManager(
-        primary="en", 
-        supported_languages=["en", "hi"], 
-        language_switching_enabled=False
-    )
-    res = manager.process_user_turn("मुझे appointment चाहिए", detected_language_code="hi-IN")
-    assert res.switched is False
-    assert res.decision == "REJECTED"
-
-def test_marathi_primary_switches_to_hindi_explicit_and_natural():
-    manager = ConversationLanguageManager(
-        primary="mr-IN",
-        supported_languages=["mr-IN", "hi-IN", "en-IN"],
-        auto_detect_enabled=True,
-        language_switching_enabled=True,
-    )
-    assert manager.current_language == "mr-IN"
-
-    # 1. Explicit switch via colloquial Hindi request
-    res = manager.process_user_turn("kya aap hindi me baat kar sakte ho")
-    assert res.switched is True
-    assert res.current_language == "hi-IN"
-    assert res.reason == "explicit"
-    assert manager.current_language == "hi-IN"
-
-    # 2. Natural Marathi switch back
-    res2 = manager.process_user_turn("मराठीत बोला")
-    assert res2.switched is True
-    assert res2.current_language == "mr-IN"
-    assert manager.current_language == "mr-IN"
-
-    # 3. Explicit switch via colloquial English request
-    res3 = manager.process_user_turn("can you speak in english")
-    assert res3.switched is True
-    assert res3.current_language == "en-IN"
-    assert manager.current_language == "en-IN"
-
-    # 4. Natural speech switch from English to Hindi
-    res4 = manager.process_user_turn("mujhe doctor se milna hai")
-    assert res4.switched is True
-    assert res4.current_language == "hi-IN"
-    assert manager.current_language == "hi-IN"
-
+    # Non-finalized frame should NOT trigger switch
+    frame_interim = MockTranscriptionFrame("हो", "mr-IN", finalized=False)
+    await processor.process_frame(frame_interim, None)
+    assert tts._active_language == "en-IN"

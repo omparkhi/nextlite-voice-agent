@@ -1,154 +1,45 @@
-import time
-from typing import Any, Optional, Set
+from typing import Any, Optional
 from loguru import logger
 
 try:
     from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
-    from pipecat.frames.frames import (
-        Frame,
-        TranscriptionFrame,
-        # [LS-OLD] LLMMessagesUpdateFrame,
-    )
-    from pipecat.processors.aggregators.llm_response_universal import LLMContext
+    from pipecat.frames.frames import Frame, TranscriptionFrame
 except ImportError:
     FrameProcessor = object
     FrameDirection = None
     Frame = object
     TranscriptionFrame = object
-    # [LS-OLD] LLMMessagesUpdateFrame = object
-    LLMContext = object
 
-from app.config import settings
-# [LS-OLD] from app.language_manager import ConversationLanguageManager, build_full_instructions
-# [LS-NEW]
-from app.language_manager import script_family, normalize_language_code
-
-# Pure hesitation noise tokens that contain 0 semantic content or intent
-PURE_NOISE_TOKENS: Set[str] = {
-    "हं", "हं.", "अ", "अ.", "...", "..", ".", "hmm", "hm", "uh", "um", "mhm", "ah", "ahh",
-    "ह", "ह.", "आ", "आ.", "ऊ", "ऊ."
-}
-
-
-def clean_asr_hallucinations(text: str) -> str:
-    """
-    Cleans hallucinated repetitive token loops produced by realtime neural ASR models
-    (e.g., 'Hello, hello, hello, hello...' repeating 10-100 times during ambient pauses).
-    
-    Collapses 3+ consecutive repetitions of identical words or phrases down to 1-2 occurrences,
-    while carefully preserving natural human 2-word confirmations like 'हो हो' or '22 22'.
-    """
-    import re
-    if not text or not isinstance(text, str):
-        return ""
-    
-    cleaned = text.strip()
-    if not cleaned:
-        return ""
-
-    # 1. Collapse 3+ single word repetitions (e.g. "hello, hello, hello, hello..." -> "Hello")
-    pattern_word = re.compile(r'\b([^\W\d_]+(?:-[^\W\d_]+)?)\b(?:[\s,।॥!?-]+\b\1\b){2,}', re.IGNORECASE | re.UNICODE)
-    cleaned = pattern_word.sub(r'\1', cleaned)
-
-    # 2. Collapse 3+ repeated 2-word or 3-word n-gram phrases (e.g. "एक मिनिट एक मिनिट एक मिनिट" -> "एक मिनिट")
-    pattern_phrase = re.compile(r'\b(.{2,25}?)\b(?:[\s,।॥!?-]+\b\1\b){2,}', re.IGNORECASE | re.UNICODE)
-    cleaned = pattern_phrase.sub(r'\1', cleaned)
-
-    # 3. Clean any trailing commas or abnormal repeated punctuation left over
-    cleaned = re.sub(r'[,，\s]+$', '', cleaned)
-    cleaned = re.sub(r'\s{2,}', ' ', cleaned)
-    return cleaned.strip()
-
-
-def is_pure_hesitation_noise(text: str) -> bool:
-    """
-    Returns True ONLY for pure single-syllable hesitation tokens, breathing artifacts,
-    or ambient line static punctuation.
-    
-    Explicitly preserves semantic single-word queries, clarifications, and answers:
-    - Questions / Clarifications: "काय", "काय?", "काय म्हटलं", "kya", "kya?", "what", "what?", "sorry", "कळलं नाही"
-    - Confirmations / Negations: "हो", "नाही", "yes", "no", "haan", "nahi", "ok", "okay"
-    - Action verbs: "बोल", "सांग", "करा", "द्या"
-    """
-    if not text:
-        return True
-    cleaned = text.strip().lower()
-    if cleaned in PURE_NOISE_TOKENS:
-        return True
-    stripped = cleaned.strip(".,?!:; \t\r\n")
-    if stripped in PURE_NOISE_TOKENS:
-        return True
-    return False
+from app.language_manager import normalize_language_code
 
 
 class LanguageContextProcessor(FrameProcessor):
     """
-    Observes TranscriptionFrames, cleans ASR hallucination loops,
-    and filters pure hesitation/static line noise tokens before LLM context aggregation.
+    Synchronizes Sarvam Saaras STT's detected language directly to the Bulbul TTS service.
+    Zero-overhead, zero regex. Driven 100% natively by Sarvam's neural language identification.
     """
 
-    def __init__(
-        self,
-        # [LS-OLD] language_manager: Optional[ConversationLanguageManager] = None,
-        # [LS-NEW]
-        language_manager: Optional[Any] = None,
-        conversation_context: Optional[LLMContext] = None,
-        base_system_prompt: Optional[str] = None,
-        tts_service: Optional[Any] = None,
-        stt_service: Optional[Any] = None,
-    ):
+    def __init__(self, tts_service: Optional[Any] = None, **kwargs):
         super().__init__()
-        self._language_manager = language_manager
-        self._conversation_context = conversation_context
-        self._base_system_prompt = base_system_prompt
         self._tts_service = tts_service
-        self._stt_service = stt_service
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
 
-        if isinstance(frame, TranscriptionFrame):
-            frame.text = clean_asr_hallucinations(frame.text)
-            transcript = frame.text.strip()
+        if isinstance(frame, TranscriptionFrame) and getattr(frame, "finalized", False):
+            result = getattr(frame, "result", None) or {}
+            stt_lang = result.get("language")
+            if not stt_lang:
+                frame_lang = getattr(frame, "language", None)
+                if hasattr(frame_lang, "value"):
+                    stt_lang = frame_lang.value
+                elif frame_lang:
+                    stt_lang = str(frame_lang)
 
-            # Suppress pure line noise / breath hesitation from triggering LLM turns
-            if is_pure_hesitation_noise(transcript):
-                logger.info(
-                    f"[LanguageContextProcessor] Suppressed standalone hesitation noise token: '{transcript}'"
-                )
-                return
+            if stt_lang and self._tts_service and hasattr(self._tts_service, "update_language_context"):
+                norm_lang = normalize_language_code(stt_lang)
+                if norm_lang != getattr(self._tts_service, "_active_language", None):
+                    logger.info(f"[LanguageContextProcessor] Dynamic language switch to {norm_lang}")
+                    self._tts_service.update_language_context(norm_lang)
 
-            # [LS-OLD] # Synchronize STT-identified language code with language_manager
-            # [LS-OLD] stt_lang = getattr(frame, "language", None)
-            # [LS-OLD] if hasattr(stt_lang, "value"):
-            # [LS-OLD]     stt_lang = stt_lang.value
-            # [LS-OLD] if not stt_lang and hasattr(frame, "result") and isinstance(frame.result, dict):
-            # [LS-OLD]     stt_lang = frame.result.get("language_code") or frame.result.get("language")
-            # [LS-OLD] 
-            # [LS-OLD] if self._language_manager:
-            # [LS-OLD]     turn_result = self._language_manager.process_user_turn(transcript, stt_lang)
-            # [LS-OLD]     if turn_result.switched:
-            # [LS-OLD]         logger.info(
-            # [LS-OLD]             f"[LanguageContextProcessor] Language switched {turn_result.previous_language} -> {turn_result.current_language} | reason={turn_result.reason}"
-            # [LS-OLD]         )
-            # [LS-OLD] 
-            # [LS-OLD] # 1. Update TTS active language
-            # [LS-OLD] if self._tts_service and hasattr(self._tts_service, "update_language_context"):
-            # [LS-OLD]     self._tts_service.update_language_context(turn_result.current_language)
-            # [LS-OLD] # 2. Update conversation context system prompt
-            # [LS-OLD] if self._conversation_context and self._base_system_prompt:
-            # [LS-OLD]     updated_prompt = build_full_instructions(
-            # [LS-OLD]         self._base_system_prompt,
-            # [LS-OLD]         turn_result.current_language,
-            # [LS-OLD]         language_style=self._language_manager.language_style,
-            # [LS-OLD]     )
-            # [LS-OLD]     if self._conversation_context.messages:
-            # [LS-OLD]         self._conversation_context.messages[0]["content"] = updated_prompt
-            # [LS-OLD]     await self.push_frame(
-            # [LS-OLD]         LLMMessagesUpdateFrame(messages=self._conversation_context.messages),
-            # [LS-OLD]         direction,
-            # [LS-OLD]     )
-
-        # Forward the cleaned frame downstream
         await self.push_frame(frame, direction)
-
