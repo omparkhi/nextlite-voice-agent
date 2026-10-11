@@ -14,6 +14,26 @@ async def invalidate_worker_cache(
     version_number: Optional[int] = None,
 ) -> None:
     """Notifies all Pipecat worker processes to invalidate local runtime config caches via Redis Pub/Sub and clears Redis snapshots."""
+    # If tenant_id provided without deployment_id, resolve active deployments for that tenant
+    if tenant_id and not deployment_id:
+        try:
+            from ..db import AsyncSessionLocal
+            from ..models import Deployment, DeploymentStatus
+            from sqlalchemy import select
+            async with AsyncSessionLocal() as db_session:
+                stmt = select(Deployment.id).where(
+                    Deployment.tenantId == uuid.UUID(str(tenant_id)),
+                    Deployment.status == DeploymentStatus.ACTIVE
+                )
+                result = await db_session.execute(stmt)
+                active_deps = [str(r[0]) for r in result.fetchall()]
+                for dep_id in active_deps:
+                    await invalidate_worker_cache(deployment_id=dep_id, tenant_id=tenant_id)
+                if active_deps:
+                    return
+        except Exception as e:
+            logger.warning(f"[CacheInvalidation] Error resolving deployments for tenant {tenant_id}: {e}")
+
     # 1. Clear Redis Snapshot Cache if deployment_id provided
     try:
         from ..db import redis_client

@@ -506,3 +506,18 @@ class FollowUp(Base):
     metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
     createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
     updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class ClinicHoliday(Base):
+    __tablename__ = "clinic_holidays"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenantId: Mapped[uuid.UUID] = mapped_column("tenant_id", UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    startDate: Mapped[str] = mapped_column("start_date", String(50), nullable=False)
+    endDate: Mapped[str] = mapped_column("end_date", String(50), nullable=False)
+    isEntireDay: Mapped[bool] = mapped_column("is_entire_day", Boolean, default=True, nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadataJson: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True, default=dict)
+    createdAt: Mapped[datetime] = mapped_column("created_at", DateTime, default=datetime.utcnow, nullable=False)
+    updatedAt: Mapped[datetime] = mapped_column("updated_at", DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

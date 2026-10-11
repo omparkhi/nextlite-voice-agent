@@ -194,7 +194,7 @@ CANONICAL_TOOL_REGISTRY: Dict[str, ToolDefinition] = {
         id="book_appointment",
         name="book_appointment",
         display_name="Appointment Booking",
-        description="Submit a booking or appointment request with customer details (Full Name, Age), date, time, and service type. Never claim success unless the tool returns a successful result.",
+        description="Submit a booking or appointment request with customer details (Full Name), date, time, and service type. Never claim success unless the tool returns a successful result.",
         category="Scheduling",
         parameters={
             "type": "object",
@@ -203,7 +203,7 @@ CANONICAL_TOOL_REGISTRY: Dict[str, ToolDefinition] = {
                 "bookingDate": {"type": "string", "description": "Date of appointment (YYYY-MM-DD or relative like tomorrow)"},
                 "bookingTime": {"type": "string", "description": "Time of appointment (e.g. 10:00 AM, 3:00 PM)"},
                 "title": {"type": "string", "description": "Reason for visit or service type"},
-                "age": {"type": "string", "description": "Age of the person (e.g. '22')"}
+                # "age": {"type": "string", "description": "Age of the person (e.g. '22')"}
                 # "place": {"type": "string", "description": "Place, city, or location (e.g. 'Nagpur')"}
             },
             "required": ["customerName", "bookingDate", "bookingTime"]

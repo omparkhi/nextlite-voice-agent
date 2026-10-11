@@ -36,6 +36,8 @@ Thumbs.db
 # Temp & Artifacts
 tmp/
 scratch/
+certbot/
+deployment/certbot/
 
 # Python
 __pycache__/

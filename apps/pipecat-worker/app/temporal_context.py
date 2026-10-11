@@ -183,8 +183,9 @@ def build_temporal_and_calendar_instructions(
         f"   - 'today' / 'आज' -> strictly {cal_ctx.today.iso_date}",
         f"   - 'tomorrow' / 'कल' / 'उद्या' -> strictly {cal_ctx.tomorrow.iso_date}",
         f"   - 'day after tomorrow' / 'परसों' / 'परवा' -> strictly {cal_ctx.day_after_tomorrow.iso_date}",
-        f"4. APPOINTMENT BOOKING: When invoking `book_appointment`, you MUST provide `bookingDate` formatted as YYYY-MM-DD using the calendar above. Never submit a past date.",
-        f"5. CLARIFICATION: If the user provides an ambiguous date or an invalid weekday/date combination, ask politely for clarification.",
+        f"4. AFTER-HOURS AWARENESS: If the current time is past today's business closing hours, do not offer today for appointments — proactively offer tomorrow or the next open business day.",
+        f"5. APPOINTMENT BOOKING: When invoking `book_appointment`, you MUST provide `bookingDate` formatted as YYYY-MM-DD using the calendar above. Never submit a past date.",
+        f"6. CLARIFICATION: If the user provides an ambiguous date or an invalid weekday/date combination, ask politely for clarification.",
     ])
 
     return "\n".join(lines)
@@ -204,7 +205,60 @@ def build_compact_temporal_anchor(
         f"- Date: {temporal_ctx.current_date} ({temporal_ctx.iso_date}) | Day: {temporal_ctx.current_day}\n"
         f"- Time: {temporal_ctx.current_time} ({temporal_ctx.timezone})\n"
         f"- Grounding: Today is strictly {temporal_ctx.iso_date}. In tool arguments, format bookingDate as YYYY-MM-DD."
+        f"- Operating Hours Rule: If the current time is past today's business closing hours, do not offer today for appointments — proactively offer tomorrow or the next open business day."
     )
+
+
+def build_holiday_instructions(
+    holidays: Optional[List[Any]] = None,
+    now: Optional[datetime] = None,
+    time_zone: Optional[str] = DEFAULT_TIMEZONE,
+) -> str:
+    """Builds universal, business-agnostic scheduled closures and holiday instructions for system prompt."""
+    if not holidays:
+        return ""
+
+    temporal_ctx = get_temporal_context(now, time_zone)
+    current_iso = temporal_ctx.iso_date
+
+    active_items = []
+    for h in holidays:
+        start_d = getattr(h, "start_date", None) or getattr(h, "startDate", "") or (h.get("start_date") or h.get("startDate") if isinstance(h, dict) else "")
+        end_d = getattr(h, "end_date", None) or getattr(h, "endDate", "") or (h.get("end_date") or h.get("endDate") if isinstance(h, dict) else "") or start_d
+        name = getattr(h, "name", None) or (h.get("name") if isinstance(h, dict) else None) or "Scheduled Closure"
+        
+        start_d_str = str(start_d).strip()[:10]
+        end_d_str = str(end_d).strip()[:10]
+
+        if end_d_str >= current_iso:
+            try:
+                dt_end = datetime.strptime(end_d_str, "%Y-%m-%d")
+                dt_reopen = dt_end + timedelta(days=1)
+                reopen_str = dt_reopen.strftime("%A, %Y-%m-%d")
+            except Exception:
+                reopen_str = "the following business day"
+
+            if start_d_str == end_d_str:
+                active_items.append(f"- {start_d_str}: {name} (Closed All Day). Reopens on: {reopen_str}")
+            else:
+                active_items.append(f"- {start_d_str} to {end_d_str}: {name} (Closed All Day). Reopens on: {reopen_str}")
+
+    if not active_items:
+        return ""
+
+    lines = [
+        "\n\n=== SCHEDULED CLOSURES & HOLIDAYS ===",
+        *active_items,
+        "",
+        "CRITICAL RULES FOR SCHEDULED CLOSURES & HOLIDAYS:",
+        "1. FAST-PATH REJECTION: If the caller asks to book or visit on ANY date listed in the scheduled closures above:",
+        "   - NEVER offer time slots or ask what time they want on that closed date.",
+        "   - Do NOT call booking tools for that date.",
+        "   - Immediately inform the caller in the active conversation language that the business is closed for that occasion/holiday, and proactively offer the reopening date.",
+        "2. REOPENING OFFERS: When a requested date is closed, invite the caller to schedule on or after the specified Reopening Date.",
+    ]
+    return "\n".join(lines)
+
 
 
 # Month name to number mapping for natural language parsing

@@ -1,4 +1,13 @@
-import type { ReceptionistUser, Subscription, PlanTemplate, CallRecordingResponse } from '../types';
+import type {
+  ReceptionistUser,
+  Subscription,
+  PlanTemplate,
+  CallRecordingResponse,
+  ClinicHoliday,
+  ClinicHolidayCreatePayload,
+  ClinicHolidayUpdatePayload,
+  ClinicScheduleConfig,
+} from '../types';
 
 const API_URL = import.meta.env.PROD
   ? (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost') ? import.meta.env.VITE_API_URL : '')
@@ -96,8 +105,13 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     const error = await response.json().catch(() => ({ error: 'Request failed' }));
     throw new Error(error.error || error.detail || 'Request failed');
   }
-  
-  return response.json();
+
+  if (response.status === 204) {
+    return { success: true } as T;
+  }
+
+  const text = await response.text();
+  return (text ? JSON.parse(text) : { success: true }) as T;
 }
 
 import type {
@@ -609,6 +623,30 @@ export const api = {
 
   getClientSubscription: () =>
     request<Subscription>(`/api/client/subscription`),
+
+  // Clinic & Business Holidays / Scheduled Closures
+  getClinicHolidays: (upcomingOnly: boolean = false) =>
+    request<ClinicHoliday[]>(`/api/clinic/holidays${upcomingOnly ? '?upcoming_only=true' : ''}`),
+
+  getClinicScheduleConfig: () =>
+    request<ClinicScheduleConfig>(`/api/clinic/holidays/schedule-config`),
+
+  createClinicHoliday: (data: ClinicHolidayCreatePayload) =>
+    request<ClinicHoliday>(`/api/clinic/holidays`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateClinicHoliday: (id: string, data: ClinicHolidayUpdatePayload) =>
+    request<ClinicHoliday>(`/api/clinic/holidays/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteClinicHoliday: (id: string) =>
+    request<{ success: boolean; message: string }>(`/api/clinic/holidays/${id}`, {
+      method: 'DELETE',
+    }),
 };
 
 export interface PhoneTestResult {

@@ -66,6 +66,7 @@ export function ClientLayout() {
     if (pathname.startsWith('/dashboard/analytics')) return 'Operational & AI Analytics';
     if (pathname.startsWith('/dashboard/phone-agents')) return 'Phone Numbers & AI Agents';
     if (pathname.startsWith('/dashboard/receptionists')) return 'Receptionist Staff & Desk Credentials';
+    if (pathname.startsWith('/dashboard/settings')) return 'Settings & Schedule Management';
     if (pathname.startsWith('/dashboard/plan')) return 'My Plan & Voice Usage';
     return 'Client CRM Workspace';
   };

@@ -144,6 +144,15 @@ class RuntimeVariableConfig(BaseContractModel):
     runtime_context: Optional[Dict[str, str]] = Field(default=None, alias="runtimeContext")
 
 
+class RuntimeHolidayDefinition(BaseContractModel):
+    id: Optional[str] = None
+    name: str
+    start_date: str = Field(alias="startDate")
+    end_date: str = Field(alias="endDate")
+    is_entire_day: bool = Field(default=True, alias="isEntireDay")
+    notes: Optional[str] = None
+
+
 class RuntimeAgentConfig(BaseContractModel):
     tenant: RuntimeTenantConfig
     agent: RuntimeAgentMetadata
@@ -155,6 +164,8 @@ class RuntimeAgentConfig(BaseContractModel):
     knowledge: RuntimeKnowledgeConfig
     tools: RuntimeToolConfig
     variables: RuntimeVariableConfig
+    holidays: List[RuntimeHolidayDefinition] = Field(default_factory=list, alias="holidays")
+
 
 
 class KnowledgeRetrieveResultItem(BaseContractModel):
@@ -287,6 +298,14 @@ class RuntimeConfigClient:
     def clear_cache(self, deployment_id: Optional[str] = None):
         """Clears in-memory runtime configuration cache."""
         self._cache.invalidate(deployment_id)
+
+    async def get_runtime_config(
+        self,
+        deployment_id: str,
+        use_cache: bool = True,
+    ) -> RuntimeAgentConfig:
+        """Backward-compatible alias for get_runtime_agent_config."""
+        return await self.get_runtime_agent_config(deployment_id, use_cache=use_cache)
 
     async def get_runtime_agent_config(
         self,

@@ -108,6 +108,14 @@ class RuntimeVariableConfig(CamelModel):
     output_variables: List[RuntimeVariableDefinition] = Field(default_factory=list)
     runtime_context: Optional[Dict[str, str]] = Field(default_factory=dict)
 
+class RuntimeHolidayDefinition(CamelModel):
+    id: Optional[str] = None
+    name: str
+    start_date: str
+    end_date: str
+    is_entire_day: bool = True
+    notes: Optional[str] = None
+
 class RuntimeAgentConfig(CamelModel):
     tenant: RuntimeTenantConfig
     agent: RuntimeAgentMetadata
@@ -119,15 +127,43 @@ class RuntimeAgentConfig(CamelModel):
     knowledge: RuntimeKnowledgeConfig
     tools: RuntimeToolConfig
     variables: RuntimeVariableConfig
+    holidays: List[RuntimeHolidayDefinition] = Field(default_factory=list)
 
 
 # ==========================================
 # 2. REST API REQUEST / RESPONSE SCHEMAS
 # ==========================================
 
+# Clinic Holidays
+class ClinicHolidayCreate(CamelModel):
+    name: str
+    start_date: str
+    end_date: str
+    is_entire_day: bool = True
+    notes: Optional[str] = None
+
+class ClinicHolidayUpdate(CamelModel):
+    name: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_entire_day: Optional[bool] = None
+    notes: Optional[str] = None
+
+class ClinicHolidayResponse(CamelModel):
+    id: str
+    tenant_id: str
+    name: str
+    start_date: str
+    end_date: str
+    is_entire_day: bool
+    notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
 # Auth
 class RegisterRequest(CamelModel):
     email: str
+
     password: str
     name: str
     tenant_name: str

@@ -129,7 +129,7 @@ services:
       PLIVO_CALLER_ID: ${PLIVO_CALLER_ID:-}
       PUBLIC_URL: ${PUBLIC_URL:-}
       STT_MODEL: ${STT_MODEL:-saaras:v3-realtime}
-      STT_MODE: ${STT_MODE:-transcribe}
+      STT_MODE: ${STT_MODE:-codemix}
       LLM_MODEL: ${LLM_MODEL:-sarvam-105b-conversations}
       TTS_MODEL: ${TTS_MODEL:-bulbul:v3}
       ENABLE_LLM_PROMPT_WARMUP: ${ENABLE_LLM_PROMPT_WARMUP:-true}

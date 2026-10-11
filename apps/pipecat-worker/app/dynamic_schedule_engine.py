@@ -5,8 +5,8 @@ closed hours, and slot durations from tenant-configured business variables.
 """
 
 import re
-from datetime import datetime
-from typing import List, Tuple, Optional, Any
+from datetime import datetime, timedelta
+from typing import List, Tuple, Optional, Any, Dict
 import zoneinfo
 
 DEFAULT_TIMEZONE = "Asia/Kolkata"
@@ -150,14 +150,65 @@ def parse_business_shifts(business_hours: Optional[str]) -> List[Tuple[int, int]
     return default_shifts
 
 
-def is_day_closed(date_str: Optional[str], business_hours: Optional[str]) -> bool:
-    """Checks if the target date falls on a closed day based on business hours schedule.
-    
-    Operates strictly via ISO standard dates (YYYY-MM-DD) and standard English weekday names.
-    Zero regional language keywords.
-    """
-    if not date_str or not business_hours:
+def get_holiday_closure_info(
+    date_str: Optional[str],
+    holidays: Optional[List[Any]] = None
+) -> Optional[Dict[str, Any]]:
+    """Checks if a given date falls inside any active holiday/closure range."""
+    if not date_str or not holidays:
+        return None
+    try:
+        clean_date = str(date_str).strip()[:10]
+        # Validate format
+        datetime.strptime(clean_date, "%Y-%m-%d")
+
+        for h in holidays:
+            start_d = getattr(h, "start_date", None) or getattr(h, "startDate", "") or (h.get("start_date") or h.get("startDate") if isinstance(h, dict) else "")
+            end_d = getattr(h, "end_date", None) or getattr(h, "endDate", "") or (h.get("end_date") or h.get("endDate") if isinstance(h, dict) else "") or start_d
+            name = getattr(h, "name", None) or (h.get("name") if isinstance(h, dict) else None) or "Scheduled Closure"
+            
+            start_d_str = str(start_d).strip()[:10]
+            end_d_str = str(end_d).strip()[:10]
+
+            if start_d_str <= clean_date <= end_d_str:
+                try:
+                    dt_end = datetime.strptime(end_d_str, "%Y-%m-%d")
+                    dt_reopen = dt_end + timedelta(days=1)
+                    reopen_str = dt_reopen.strftime("%A, %Y-%m-%d")
+                    reopen_iso = dt_reopen.strftime("%Y-%m-%d")
+                except Exception:
+                    reopen_str = "the following business day"
+                    reopen_iso = ""
+
+                return {
+                    "is_closed": True,
+                    "name": name,
+                    "start_date": start_d_str,
+                    "end_date": end_d_str,
+                    "reopening_date": reopen_str,
+                    "reopening_iso": reopen_iso
+                }
+    except Exception:
+        pass
+    return None
+
+
+def is_day_closed(
+    date_str: Optional[str],
+    business_hours: Optional[str],
+    holidays: Optional[List[Any]] = None
+) -> bool:
+    """Checks if the target date falls on a closed day or scheduled holiday."""
+    if not date_str:
         return False
+
+    # 1. First check scheduled holidays / blackout ranges
+    if holidays and get_holiday_closure_info(date_str, holidays):
+        return True
+
+    if not business_hours:
+        return False
+
     try:
         clean_date = str(date_str).strip()[:10]
         dt = datetime.strptime(clean_date, "%Y-%m-%d")
@@ -182,9 +233,14 @@ def is_day_closed(date_str: Optional[str], business_hours: Optional[str]) -> boo
     return False
 
 
-def is_time_within_shifts(time_str: str, business_hours: Optional[str], booking_date: Optional[str] = None) -> bool:
-    """Checks if a given time slot falls within any of the configured open shift windows and open days."""
-    if booking_date and is_day_closed(booking_date, business_hours):
+def is_time_within_shifts(
+    time_str: str,
+    business_hours: Optional[str],
+    booking_date: Optional[str] = None,
+    holidays: Optional[List[Any]] = None
+) -> bool:
+    """Checks if a given time slot falls within any of the configured open shift windows, open days, and non-holiday dates."""
+    if booking_date and is_day_closed(booking_date, business_hours, holidays=holidays):
         return False
     t_min = parse_time_to_minutes(time_str)
     if t_min is None:
@@ -204,14 +260,15 @@ def generate_dynamic_slots(
     filter_past: bool = True,
     buffer_minutes: int = 0,
     now_override: Optional[datetime] = None,
+    holidays: Optional[List[Any]] = None,
 ) -> List[str]:
     """Generates canonical appointment slot strings on-the-fly from business hours & slot duration.
     
-    - Closed days return empty list.
+    - Closed days and holiday closures return empty list.
     - Break periods and closed hours are NEVER generated.
     - If booking_date is today, elapsed slots are filtered against the local clock.
     """
-    if booking_date and is_day_closed(booking_date, business_hours):
+    if booking_date and is_day_closed(booking_date, business_hours, holidays=holidays):
         return []
 
     shifts = parse_business_shifts(business_hours)

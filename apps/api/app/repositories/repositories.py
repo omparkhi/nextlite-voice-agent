@@ -7,7 +7,7 @@ from .base import BaseRepository
 from ..models import (
     Tenant, User, RefreshToken, Agent, AgentVersion, Deployment,
     CallSession, Lead, Appointment, TenantAppointmentCounter,
-    KnowledgeSource, KnowledgeChunk, PhoneNumber, FollowUp,
+    KnowledgeSource, KnowledgeChunk, PhoneNumber, FollowUp, ClinicHoliday,
     DeploymentStatus, DeploymentEnvironment, CallStatus, LeadStatus, AppointmentStatus
 )
 
@@ -175,3 +175,22 @@ class PhoneNumberRepository(BaseRepository[PhoneNumber]):
         stmt = select(PhoneNumber).where(PhoneNumber.phoneNumber == cleaned)
         res = await self.session.execute(stmt)
         return res.scalar_one_or_none()
+
+
+class ClinicHolidayRepository(BaseRepository[ClinicHoliday]):
+    def __init__(self, session: AsyncSession):
+        super().__init__(ClinicHoliday, session)
+
+    async def list_for_tenant(self, tenant_id: uuid.UUID) -> List[ClinicHoliday]:
+        stmt = select(ClinicHoliday).where(ClinicHoliday.tenantId == tenant_id).order_by(ClinicHoliday.startDate.asc())
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
+
+    async def get_active_holidays_from_date(self, tenant_id: uuid.UUID, from_date: str) -> List[ClinicHoliday]:
+        # Return holidays where endDate >= from_date
+        stmt = select(ClinicHoliday).where(
+            ClinicHoliday.tenantId == tenant_id,
+            ClinicHoliday.endDate >= from_date
+        ).order_by(ClinicHoliday.startDate.asc())
+        res = await self.session.execute(stmt)
+        return list(res.scalars().all())
