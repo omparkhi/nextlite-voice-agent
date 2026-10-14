@@ -59,10 +59,10 @@ class Settings(BaseSettings):
 
     # STT VAD & Endpointer Tuning Flags (Clean Multi-Language & Anti-Noise)
     STT_MODE: str = "codemix"
-    STT_VAD_THRESHOLD: float = 0.48
-    STT_VAD_SILENCE_DURATION_MS: int = 450
-    STT_VAD_MIN_SPEECH_DURATION_MS: int = 200
-    USER_TURN_STOP_TIMEOUT: float = 0.40
+    STT_VAD_THRESHOLD: float = 0.45
+    STT_VAD_SILENCE_DURATION_MS: int = 300
+    STT_VAD_MIN_SPEECH_DURATION_MS: int = 160
+    USER_TURN_STOP_TIMEOUT: float = 0.15
 
     # Optional simple security token for POC endpoint
     POC_SECRET_KEY: str = ""
