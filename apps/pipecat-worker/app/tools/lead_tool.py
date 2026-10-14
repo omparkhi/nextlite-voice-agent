@@ -20,6 +20,7 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.services.llm_service import FunctionCallParams
 
 from app.turn_timing import log_phone_trace
+from app.language_manager import get_language_display_name
 
 if TYPE_CHECKING:
     from app.tools.tool_registry import ToolRuntimeContext
@@ -224,6 +225,9 @@ def create_callback_lead_tool_factory(
                 "error": "CONNECTION_ERROR",
                 "message": "Unable to record the callback request due to a temporary network issue. Please try again later.",
             }
+
+        active_lang_code = getattr(context.workflow_state, "active_language", None) or "en-IN"
+        result["respondInLanguage"] = get_language_display_name(active_lang_code)
 
         # 5. Deliver result to Pipecat LLM callback
         if params.result_callback:

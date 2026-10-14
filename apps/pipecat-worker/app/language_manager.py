@@ -21,10 +21,12 @@ LANGUAGE_DISPLAY_NAMES: Dict[str, str] = {
 }
 
 LANGUAGE_MIRROR_DIRECTIVE: str = (
-    "\n\n=== LANGUAGE ===\n"
-    "Always respond in the language of the caller's LATEST utterance. "
-    "If the caller speaks a different language or explicitly asks to switch, follow the "
-    "caller immediately. Never persist in a previous language. Never mix languages in one turn."
+    "\n\n=== MULTILINGUAL MIRRORING RULES ===\n"
+    "1. Always respond in the language of the caller's LATEST utterance. "
+    "If the caller speaks or switches to another language, immediately switch and respond 100% in that language.\n"
+    "2. TOOL VERBALIZATION: When reporting results from tools (`check_available_slots`, `book_appointment`, etc.), "
+    "ALWAYS formulate the response in the language specified in `respondInLanguage` from the tool output. "
+    "NEVER fall back to Marathi or default clinic language when reporting tool results to a Hindi or English caller."
 )
 
 

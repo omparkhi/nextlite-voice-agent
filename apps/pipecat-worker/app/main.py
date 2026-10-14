@@ -1178,18 +1178,6 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
             or (self._runtime_config.language.primary if self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary else "en-IN")
         )
         msgs = params.get("messages", [])
-        if msgs:
-            lang_display = get_language_display_name(active_lang)
-            reminder = {
-                "role": "system",
-                "content": f"The caller is speaking in {lang_display} ({active_lang}). Respond strictly in {lang_display}."
-            }
-            user_idx = None
-            for idx in range(len(msgs) - 1, -1, -1):
-                if msgs[idx].get("role") == "user":
-                    user_idx = idx
-                    break
-            msgs.insert(user_idx if user_idx is not None else 1, reminder)
 
         # Phase 1: Non-PII Token Metrics Telemetry
         content_chars = sum(len(str(m.get("content", ""))) for m in msgs)
@@ -2765,9 +2753,9 @@ async def websocket_plivo_endpoint(
                 logger.debug(f"[Plivo Transport] Runner cancel notice on disconnect: {cancel_err}")
 
         # 8. Instantiate Sarvam Realtime STT Service
-        startup_tracker.record_stage("stt_service_create_start")
-        supported_langs = (runtime_config.language.supported_languages if runtime_config and runtime_config.language and runtime_config.language.supported_languages else [primary_language])
-        initial_stt_lang = "auto" if len(supported_langs) > 1 else primary_language
+        # Ground STT in tenant's primary language (e.g. 'mr-IN') to prevent streaming LID from misclassifying
+        # Indic speech with English loanwords as 'en-IN' and translating it to English on Turn 1.
+        initial_stt_lang = primary_language
         stt_mode = getattr(settings, "STT_MODE", "transcribe")
         stt_threshold = getattr(settings, "STT_VAD_THRESHOLD", 0.42)
         stt_silence_duration_ms = getattr(settings, "STT_VAD_SILENCE_DURATION_MS", 260)
@@ -3128,7 +3116,7 @@ async def websocket_plivo_endpoint(
             turn_tracker.record_speech_stop()
             last_assistant_speech_end[0] = time.perf_counter()
             content = getattr(message, "content", "") if message else ""
-            cleaned_content = clean_asr_hallucinations(content)
+            cleaned_content = content.strip() if isinstance(content, str) else str(content or "").strip()
             content_str = f" | content='{cleaned_content}'" if cleaned_content else ""
             logger.info(f"[UserTurn] User turn stopped via strategy={strategy.__class__.__name__}{content_str}")
             if cleaned_content and transcript_collector:
@@ -3158,8 +3146,24 @@ async def websocket_plivo_endpoint(
             else:
                 pre_stt_processor.set_greeting_active()
 
-        # Instantiate Language Context Processor with direct Sarvam STT-to-TTS language synchronization
-        language_processor = LanguageContextProcessor(tts_service=tts_service)
+        sarvam_llm_pool: Optional[httpx.AsyncClient] = getattr(
+            websocket.app.state, "sarvam_llm_http_client", None
+        )
+
+        # Instantiate Language Context Processor with Sarvam neural Text-LID and closed-loop sync
+        supported_langs = (
+            runtime_config.language.supported_languages
+            if runtime_config and runtime_config.language and runtime_config.language.supported_languages
+            else [primary_language]
+        )
+        language_processor = LanguageContextProcessor(
+            tts_service=tts_service,
+            stt_service=stt_service,
+            workflow_state=workflow_state,
+            supported_languages=supported_langs,
+            http_client=sarvam_llm_pool,
+            api_key=settings.SARVAM_API_KEY,
+        )
 
         # 10. Instantiate Sarvam LLM Service (Phase 21B: Worker-Lifetime Shared Connection Pool)
         startup_tracker.record_stage("llm_service_create_start")
@@ -3170,10 +3174,6 @@ async def websocket_plivo_endpoint(
         }
         if runtime_config.runtime.temperature is not None:
             llm_settings_kwargs["temperature"] = runtime_config.runtime.temperature
-
-        sarvam_llm_pool: Optional[httpx.AsyncClient] = getattr(
-            websocket.app.state, "sarvam_llm_http_client", None
-        )
 
         llm_service = InstrumentedSarvamLLMService(
             api_key=settings.SARVAM_API_KEY,

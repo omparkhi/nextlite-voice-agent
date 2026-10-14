@@ -17,6 +17,7 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import FunctionCallResultProperties
 from pipecat.services.llm_service import FunctionCallParams
 from app.temporal_context import resolve_relative_or_absolute_date
+from app.language_manager import get_language_display_name
 from app.dynamic_schedule_engine import (
     generate_dynamic_slots,
     is_time_within_shifts,
@@ -150,7 +151,11 @@ def create_check_slots_tool_factory(
                     f"bookedCount={pref_count} | totalOpenSlots={len(open_slots)}"
                 )
 
+                active_lang_code = getattr(context.workflow_state, "active_language", None) or "en-IN"
+                caller_language = get_language_display_name(active_lang_code)
+
                 result_data = {
+                    "respondInLanguage": caller_language,
                     "success": True,
                     "status": "SLOT_AVAILABLE" if is_pref_available else "SLOT_UNAVAILABLE",
                     "available": is_pref_available,
@@ -254,7 +259,11 @@ def create_check_slots_tool_factory(
                     f"bookedCount={pref_count} | totalOpenSlots={len(open_slots)}"
                 )
 
+                active_lang_code = getattr(context.workflow_state, "active_language", None) or "en-IN"
+                caller_language = get_language_display_name(active_lang_code)
+
                 result_data = {
+                    "respondInLanguage": caller_language,
                     "success": True,
                     "status": "SLOT_AVAILABLE" if is_pref_available else "SLOT_UNAVAILABLE",
                     "available": is_pref_available,

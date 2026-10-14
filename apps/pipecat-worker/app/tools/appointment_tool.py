@@ -24,6 +24,7 @@ from app.tools.indic_normalizers import (
     normalize_indic_time,
     sanitize_service_title,
 )
+from app.language_manager import get_language_display_name
 
 if TYPE_CHECKING:
     from app.tools.tool_registry import ToolRuntimeContext
@@ -428,6 +429,9 @@ def create_book_appointment_tool_factory(
                 "message": "Unable to record the appointment request due to a temporary network issue. Please try again later.",
             }
 
+        active_lang_code = getattr(context.workflow_state, "active_language", None) or "en-IN"
+        result["respondInLanguage"] = get_language_display_name(active_lang_code)
+
         # 5. Deliver result to Pipecat. A configured safe direct response
         # avoids a second LLM request; otherwise this preserves the standard
         # tool-result -> LLM response flow.
@@ -556,6 +560,9 @@ def create_reschedule_appointment_tool_factory(
                 "success": False,
                 "message": "Temporary network issue while rescheduling. Please try again.",
             }
+
+        active_lang_code = getattr(context.workflow_state, "active_language", None) or "en-IN"
+        result["respondInLanguage"] = get_language_display_name(active_lang_code)
 
         await params.result_callback(result, properties=FunctionCallResultProperties(run_llm=True))
 
