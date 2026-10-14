@@ -205,8 +205,7 @@ class CallTranscriptCollector:
         created_at_iso: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Records a user speech turn."""
-        from app.language_processor import clean_asr_hallucinations
-        clean_text = clean_asr_hallucinations(transcript or "").strip()
+        clean_text = (transcript or "").strip()
         if not clean_text:
             return {}
 

@@ -1,149 +1,111 @@
-import time
-from typing import Any, Optional, Set
+import httpx
+from typing import Any, Optional, List
 from loguru import logger
 
 try:
     from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
-    from pipecat.frames.frames import (
-        Frame,
-        TranscriptionFrame,
-        LLMMessagesUpdateFrame,
-    )
-    from pipecat.processors.aggregators.llm_response_universal import LLMContext
+    from pipecat.frames.frames import Frame, TranscriptionFrame
 except ImportError:
     FrameProcessor = object
     FrameDirection = None
     Frame = object
     TranscriptionFrame = object
-    LLMMessagesUpdateFrame = object
-    LLMContext = object
 
-from app.config import settings
-from app.language_manager import ConversationLanguageManager, build_full_instructions
-
-# Pure hesitation noise tokens that contain 0 semantic content or intent
-PURE_NOISE_TOKENS: Set[str] = {
-    "हं", "हं.", "अ", "अ.", "...", "..", ".", "hmm", "hm", "uh", "um", "mhm", "ah", "ahh",
-    "ह", "ह.", "आ", "आ.", "ऊ", "ऊ."
-}
-
-
-def clean_asr_hallucinations(text: str) -> str:
-    """
-    Cleans hallucinated repetitive token loops produced by realtime neural ASR models
-    (e.g., 'Hello, hello, hello, hello...' repeating 10-100 times during ambient pauses).
-    
-    Collapses 3+ consecutive repetitions of identical words or phrases down to 1-2 occurrences,
-    while carefully preserving natural human 2-word confirmations like 'हो हो' or '22 22'.
-    """
-    import re
-    if not text or not isinstance(text, str):
-        return ""
-    
-    cleaned = text.strip()
-    if not cleaned:
-        return ""
-
-    # 1. Collapse 3+ single word repetitions (e.g. "hello, hello, hello, hello..." -> "Hello")
-    pattern_word = re.compile(r'\b([^\W\d_]+(?:-[^\W\d_]+)?)\b(?:[\s,।॥!?-]+\b\1\b){2,}', re.IGNORECASE | re.UNICODE)
-    cleaned = pattern_word.sub(r'\1', cleaned)
-
-    # 2. Collapse 3+ repeated 2-word or 3-word n-gram phrases (e.g. "एक मिनिट एक मिनिट एक मिनिट" -> "एक मिनिट")
-    pattern_phrase = re.compile(r'\b(.{2,25}?)\b(?:[\s,।॥!?-]+\b\1\b){2,}', re.IGNORECASE | re.UNICODE)
-    cleaned = pattern_phrase.sub(r'\1', cleaned)
-
-    # 3. Clean any trailing commas or abnormal repeated punctuation left over
-    cleaned = re.sub(r'[,，\s]+$', '', cleaned)
-    cleaned = re.sub(r'\s{2,}', ' ', cleaned)
-    return cleaned.strip()
-
-
-def is_pure_hesitation_noise(text: str) -> bool:
-    """
-    Returns True ONLY for pure single-syllable hesitation tokens, breathing artifacts,
-    or ambient line static punctuation.
-    
-    Explicitly preserves semantic single-word queries, clarifications, and answers:
-    - Questions / Clarifications: "काय", "काय?", "काय म्हटलं", "kya", "kya?", "what", "what?", "sorry", "कळलं नाही"
-    - Confirmations / Negations: "हो", "नाही", "yes", "no", "haan", "nahi", "ok", "okay"
-    - Action verbs: "बोल", "सांग", "करा", "द्या"
-    """
-    if not text:
-        return True
-    cleaned = text.strip().lower()
-    if cleaned in PURE_NOISE_TOKENS:
-        return True
-    stripped = cleaned.strip(".,?!:; \t\r\n")
-    if stripped in PURE_NOISE_TOKENS:
-        return True
-    return False
+from app.language_manager import normalize_language_code
 
 
 class LanguageContextProcessor(FrameProcessor):
     """
-    Observes TranscriptionFrames, cleans ASR hallucination loops,
-    and filters pure hesitation/static line noise tokens before LLM context aggregation.
+    Synchronizes language across Saaras STT, Sarvam-105b LLM, and Bulbul TTS.
+    When STT acoustic LID is bypassed (explicit primary starting language), queries
+    Sarvam's official neural Text-LID API (POST https://api.sarvam.ai/text-lid) to detect
+    cross-lingual shifts without hardcoded keywords, regex, or dictionaries.
     """
 
     def __init__(
         self,
-        language_manager: Optional[ConversationLanguageManager] = None,
-        conversation_context: Optional[LLMContext] = None,
-        base_system_prompt: Optional[str] = None,
         tts_service: Optional[Any] = None,
         stt_service: Optional[Any] = None,
+        workflow_state: Optional[Any] = None,
+        supported_languages: Optional[List[str]] = None,
+        http_client: Optional[Any] = None,
+        api_key: Optional[str] = None,
+        **kwargs,
     ):
         super().__init__()
-        self._language_manager = language_manager
-        self._conversation_context = conversation_context
-        self._base_system_prompt = base_system_prompt
         self._tts_service = tts_service
         self._stt_service = stt_service
+        self._workflow_state = workflow_state
+        self._supported_languages = (
+            [normalize_language_code(l) for l in supported_languages]
+            if supported_languages
+            else None
+        )
+        self._http_client = http_client
+        self._api_key = api_key
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
 
-        if isinstance(frame, TranscriptionFrame):
-            frame.text = clean_asr_hallucinations(frame.text)
-            transcript = frame.text.strip()
+        if isinstance(frame, TranscriptionFrame) and getattr(frame, "finalized", False):
+            transcript_text = getattr(frame, "text", "") or ""
+            target_lang = None
 
-            # Suppress pure line noise / breath hesitation from triggering LLM turns
-            if is_pure_hesitation_noise(transcript):
-                logger.info(
-                    f"[LanguageContextProcessor] Suppressed standalone hesitation noise token: '{transcript}'"
-                )
-                return
+            # 1. Check if STT emitted a language (available when running in 'auto' mode)
+            result = getattr(frame, "result", None) or {}
+            stt_lang = result.get("language")
+            if stt_lang and stt_lang.lower() not in ("unknown", "auto", "none"):
+                target_lang = normalize_language_code(stt_lang)
 
-            # Synchronize STT-identified language code with language_manager
-            stt_lang = getattr(frame, "language", None)
-            if hasattr(stt_lang, "value"):
-                stt_lang = stt_lang.value
-            if not stt_lang and hasattr(frame, "result") and isinstance(frame.result, dict):
-                stt_lang = frame.result.get("language_code") or frame.result.get("language")
+            # 2. When STT acoustic LID is bypassed, query Sarvam's official neural Text-LID API
+            if not target_lang and transcript_text.strip() and self._api_key:
+                try:
+                    client = self._http_client
+                    if client is not None:
+                        resp = await client.post(
+                            "https://api.sarvam.ai/text-lid",
+                            json={"input": transcript_text.strip()},
+                            headers={"API-SUBSCRIPTION-KEY": self._api_key},
+                            timeout=0.8,
+                        )
+                    else:
+                        async with httpx.AsyncClient(timeout=0.8) as fallback_client:
+                            resp = await fallback_client.post(
+                                "https://api.sarvam.ai/text-lid",
+                                json={"input": transcript_text.strip()},
+                                headers={"API-SUBSCRIPTION-KEY": self._api_key},
+                            )
 
-            if self._language_manager:
-                turn_result = self._language_manager.process_user_turn(transcript, stt_lang)
-                if turn_result.switched:
+                    if resp.status_code == 200:
+                        detected = resp.json().get("language_code")
+                        if detected:
+                            target_lang = normalize_language_code(detected)
+                except Exception as lid_err:
+                    logger.debug(f"[LanguageContextProcessor] Sarvam text-lid notice: {lid_err}")
+
+            # 3. Synchronize STT, TTS, and Workflow State if language shifted within allowed languages
+            if target_lang:
+                current_active = getattr(self._tts_service, "_active_language", None) if self._tts_service else None
+                is_allowed = (target_lang in self._supported_languages) if self._supported_languages else True
+                if current_active and target_lang != current_active and is_allowed:
                     logger.info(
-                        f"[LanguageContextProcessor] Language switched {turn_result.previous_language} -> {turn_result.current_language} | reason={turn_result.reason}"
+                        f"[LanguageContextProcessor] Sarvam neural LID detected language shift: {current_active} -> {target_lang}"
                     )
-                    # 1. Update TTS active language
+                    # A. Update Bulbul TTS neural voice
                     if self._tts_service and hasattr(self._tts_service, "update_language_context"):
-                        self._tts_service.update_language_context(turn_result.current_language)
-                    # 2. Update conversation context system prompt
-                    if self._conversation_context and self._base_system_prompt:
-                        updated_prompt = build_full_instructions(
-                            self._base_system_prompt,
-                            turn_result.current_language,
-                            language_style=self._language_manager.language_style,
-                        )
-                        if self._conversation_context.messages:
-                            self._conversation_context.messages[0]["content"] = updated_prompt
-                        await self.push_frame(
-                            LLMMessagesUpdateFrame(messages=self._conversation_context.messages),
-                            direction,
-                        )
+                        self._tts_service.update_language_context(target_lang)
+                    # B. Update Saaras STT in-band via native WebSocket config.update
+                    if self._stt_service and hasattr(self._stt_service, "update_config"):
+                        try:
+                            await self._stt_service.update_config(language_code=target_lang)
+                            logger.info(
+                                f"[LanguageContextProcessor] Sent Sarvam STT config.update with language_code={target_lang}"
+                            )
+                        except Exception as stt_err:
+                            logger.warning(f"[LanguageContextProcessor] Failed to update STT config: {stt_err}")
+                    # C. Update Workflow State
+                    if self._workflow_state and hasattr(self._workflow_state, "active_language"):
+                        self._workflow_state.active_language = target_lang
 
-        # Forward the cleaned frame downstream
         await self.push_frame(frame, direction)
 
