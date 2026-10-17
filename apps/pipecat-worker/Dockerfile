@@ -11,9 +11,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy dependency files
 COPY pyproject.toml /app/
 
-# Install python dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir .
+ENV PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10
+
+# Install python dependencies with resilient network timeout
+RUN pip install --no-cache-dir --default-timeout=120 --retries=10 .
 
 # Copy application source
 COPY app/ /app/app/
