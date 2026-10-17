@@ -111,6 +111,12 @@ try:
     from pipecat.serializers.plivo import PlivoFrameSerializer
     from pipecat.services.sarvam.llm import SarvamLLMService, SarvamLLMSettings
     from pipecat.services.sarvam.stt import SarvamRealtimeSTTService
+    # Allow Sarvam's official saaras:v4 realtime model on the streaming WebSocket
+    _orig_stt_validate_settings = SarvamRealtimeSTTService._validate_settings
+    def _patched_stt_validate_settings(settings):
+        if getattr(settings, "model", None) not in ("saaras:v3-realtime", "saaras:v4"):
+            _orig_stt_validate_settings(settings)
+    SarvamRealtimeSTTService._validate_settings = staticmethod(_patched_stt_validate_settings)
     from pipecat.services.sarvam.tts import SarvamTTSService, traced_tts
     from pipecat.transports.websocket.fastapi import (
         FastAPIWebsocketParams,
@@ -1172,12 +1178,27 @@ class InstrumentedSarvamLLMService(SarvamLLMService):
         )
         params = self.build_chat_completion_params(params_from_context)
 
-        # Dynamic turn-level language reminder for Sarvam LLM
+        # Dynamic turn-level language reminder for Sarvam LLM (KV-Cache safe, zero transcript pollution)
         active_lang = (
             getattr(self._tts_service, "_active_language", None)
             or (self._runtime_config.language.primary if self._runtime_config and self._runtime_config.language and self._runtime_config.language.primary else "en-IN")
         )
-        msgs = params.get("messages", [])
+        raw_msgs = params.get("messages", [])
+        if raw_msgs and active_lang:
+            from app.language_manager import get_language_display_name
+            display_name = get_language_display_name(active_lang)
+            msgs = [dict(m) for m in raw_msgs]
+            last_msg = dict(msgs[-1])
+            content = last_msg.get("content", "")
+            if isinstance(content, str) and display_name:
+                if is_post_tool:
+                    last_msg["content"] = f"{content}\n\n[Language directive: Respond to the caller in {display_name}]"
+                else:
+                    last_msg["content"] = f"{content}\n\n[Language directive: Respond in {display_name}]"
+                msgs[-1] = last_msg
+            params["messages"] = msgs
+        else:
+            msgs = raw_msgs
 
         # Phase 1: Non-PII Token Metrics Telemetry
         content_chars = sum(len(str(m.get("content", ""))) for m in msgs)
@@ -2285,12 +2306,12 @@ async def websocket_plivo_endpoint(
             return
 
         raw_stt_model = (runtime_config.voice.stt_model or settings.STT_MODEL).strip()
-        if raw_stt_model in ("saaras:v3", "saaras:v2", "saaras", "saaras:v4", "saaras:v3-realtime"):
-            stt_model = "saaras:v3-realtime"
-            if raw_stt_model != "saaras:v3-realtime":
-                logger.info(f"[STT Compatibility] Normalized STT model '{raw_stt_model}' to 'saaras:v3-realtime'")
+        target_default_stt = getattr(settings, "STT_MODEL", "saaras:v4").strip()
+        if raw_stt_model in ("saaras:v3", "saaras:v2", "saaras", "saaras:v3-realtime") and target_default_stt == "saaras:v4":
+            stt_model = "saaras:v4"
+            logger.info(f"[STT Compatibility] Upgraded legacy STT model '{raw_stt_model}' to authoritative '{stt_model}'")
         else:
-            stt_model = raw_stt_model
+            stt_model = raw_stt_model or target_default_stt
         
         # TTS Model Compatibility Normalization
         raw_tts_model = (runtime_config.voice.tts_model or settings.TTS_MODEL).strip()
@@ -2753,14 +2774,26 @@ async def websocket_plivo_endpoint(
                 logger.debug(f"[Plivo Transport] Runner cancel notice on disconnect: {cancel_err}")
 
         # 8. Instantiate Sarvam Realtime STT Service
-        # Ground STT in tenant's primary language (e.g. 'mr-IN') to prevent streaming LID from misclassifying
-        # Indic speech with English loanwords as 'en-IN' and translating it to English on Turn 1.
-        initial_stt_lang = primary_language
+        # Ground Turn 1 in primary_language to prevent loanwords ("appointment") from collapsing Turn 1 to English
+        is_lang_switch_enabled = (
+            runtime_config.language.language_switching_enabled
+            if runtime_config and runtime_config.language
+            else True
+        )
+        supported_langs = (
+            runtime_config.language.supported_languages
+            if runtime_config and runtime_config.language and runtime_config.language.supported_languages
+            else [primary_language]
+        )
+        initial_stt_lang = (
+            "auto"
+            if (is_lang_switch_enabled and len(supported_langs) > 1)
+            else primary_language
+        )
         stt_mode = getattr(settings, "STT_MODE", "transcribe")
-        stt_threshold = getattr(settings, "STT_VAD_THRESHOLD", 0.42)
-        stt_silence_duration_ms = getattr(settings, "STT_VAD_SILENCE_DURATION_MS", 260)
-        stt_min_speech_duration_ms = getattr(settings, "STT_VAD_MIN_SPEECH_DURATION_MS", 120)
-
+        stt_threshold = getattr(settings, "STT_VAD_THRESHOLD", 0.45)
+        stt_silence_duration_ms = getattr(settings, "STT_VAD_SILENCE_DURATION_MS", 300)
+        stt_min_speech_duration_ms = getattr(settings, "STT_VAD_MIN_SPEECH_DURATION_MS", 160)
         logger.info(
             f"[SarvamRealtimeSTT Config] Initializing SarvamRealtimeSTTService | model={stt_model} | "
             f"stream_type=fast | mode={stt_mode} | sample_rate={stream_sample_rate} | language={initial_stt_lang} "
@@ -3111,8 +3144,11 @@ async def websocket_plivo_endpoint(
             last_assistant_speech_end[0] = time.perf_counter()
             logger.info(f"[Trace D - UserStartedSpeakingFrame] User turn started via strategy={strategy.__class__.__name__}")
 
+        stt_auto_enabled = (initial_stt_lang == "auto")
+
         @user_aggregator.event_handler("on_user_turn_stopped")
         async def on_user_turn_stopped(aggregator, strategy, message=None):
+            nonlocal stt_auto_enabled
             turn_tracker.record_speech_stop()
             last_assistant_speech_end[0] = time.perf_counter()
             content = getattr(message, "content", "") if message else ""
@@ -3124,6 +3160,15 @@ async def websocket_plivo_endpoint(
                     transcript=cleaned_content,
                     detected_language=runtime_config.language.primary or "en-IN",
                 )
+
+            # After Turn 1 completes, switch STT to 'auto' so subsequent turns adaptively detect Hindi/Marathi/English
+            if is_lang_switch_enabled and len(supported_langs) > 1 and not stt_auto_enabled and stt_service:
+                stt_auto_enabled = True
+                try:
+                    await stt_service.update_config(language_code="auto")
+                    logger.info("[SarvamRealtimeSTT] Switched language_code to 'auto' for subsequent turns")
+                except Exception as e:
+                    logger.warning(f"[SarvamRealtimeSTT] Failed to enable auto language detection: {e}")
 
         @user_aggregator.event_handler("on_user_turn_inference_triggered")
         async def on_user_turn_inference_triggered(aggregator, strategy):
@@ -3150,7 +3195,7 @@ async def websocket_plivo_endpoint(
             websocket.app.state, "sarvam_llm_http_client", None
         )
 
-        # Instantiate Language Context Processor with Sarvam neural Text-LID and closed-loop sync
+        # Instantiate Language Context Processor with in-band zero-latency acoustic sync
         supported_langs = (
             runtime_config.language.supported_languages
             if runtime_config and runtime_config.language and runtime_config.language.supported_languages
@@ -3158,11 +3203,8 @@ async def websocket_plivo_endpoint(
         )
         language_processor = LanguageContextProcessor(
             tts_service=tts_service,
-            stt_service=stt_service,
             workflow_state=workflow_state,
             supported_languages=supported_langs,
-            http_client=sarvam_llm_pool,
-            api_key=settings.SARVAM_API_KEY,
         )
 
         # 10. Instantiate Sarvam LLM Service (Phase 21B: Worker-Lifetime Shared Connection Pool)

@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     PIPECAT_AUDIO_DEBUG: bool = False
 
     # Phase 2 & 4 technical test defaults (temporary pipeline verification only)
-    STT_MODEL: str = "saaras:v3-realtime"
+    STT_MODEL: str = "saaras:v4"
     TTS_MODEL: str = "bulbul:v3"
     LLM_MODEL: str = "sarvam-105b-conversations"
     TOOL_LLM_MODEL: str = "sarvam-105b-conversations"

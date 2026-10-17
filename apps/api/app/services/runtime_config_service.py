@@ -339,7 +339,7 @@ class RuntimeAgentConfigService:
             ),
             voice=RuntimeVoiceConfig(
                 provider=voice_cfg.get("provider", "sarvam"),
-                stt_model=voice_cfg.get("sttModel", "saaras:v3-realtime"),
+                stt_model=voice_cfg.get("sttModel", "saaras:v4"),
                 tts_model=voice_cfg.get("ttsModel", "bulbul:v3"),
                 voice_id=voice_cfg.get("voiceId", "shubh"),
                 gender=voice_cfg.get("gender", "male"),
