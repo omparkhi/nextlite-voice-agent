@@ -65,6 +65,8 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY:-omparkhi/nextlite-voice-agent}/nextlite-api:latest
     container_name: nextlite_api
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -115,6 +117,8 @@ services:
     image: ghcr.io/${GITHUB_REPOSITORY:-omparkhi/nextlite-voice-agent}/nextlite-worker:latest
     container_name: nextlite_worker
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
     environment:
       PORT: 8000
       NEXTLITE_API_URL: http://api:3001
