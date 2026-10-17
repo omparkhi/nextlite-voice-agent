@@ -18,6 +18,8 @@ LANGUAGE_DISPLAY_NAMES: Dict[str, str] = {
     "pa": "Punjabi", "ta": "Tamil", "te": "Telugu", "as": "Assamese", "ur": "Urdu",
     "ne": "Nepali", "sa": "Sanskrit", "sd": "Sindhi", "kok": "Konkani", "ks": "Kashmiri",
     "mai": "Maithili", "doi": "Dogri", "sat": "Santali", "mni": "Manipuri", "brx": "Bodo",
+    "es": "Spanish", "fr": "French", "de": "German", "ar": "Arabic", "zh": "Chinese",
+    "ja": "Japanese", "pt": "Portuguese", "ru": "Russian", "it": "Italian",
 }
 
 LANGUAGE_MIRROR_DIRECTIVE: str = (
@@ -26,7 +28,7 @@ LANGUAGE_MIRROR_DIRECTIVE: str = (
     "If the caller speaks or switches to another language, immediately switch and respond 100% in that language.\n"
     "2. TOOL VERBALIZATION: When reporting results from tools (`check_available_slots`, `book_appointment`, etc.), "
     "ALWAYS formulate the response in the language specified in `respondInLanguage` from the tool output. "
-    "NEVER fall back to Marathi or default clinic language when reporting tool results to a Hindi or English caller."
+    "NEVER fall back to any default clinic language or prior language when reporting tool results."
 )
 
 

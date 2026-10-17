@@ -45,7 +45,8 @@ PLIVO_STREAM_HOST=${PUBLIC_IP}
 SARVAM_API_KEY=${SARVAM_KEY}
 NVIDIA_API_KEY=${NVIDIA_KEY}
 EMBEDDING_PROVIDER=nvidia
-STT_MODEL=saaras:v3-realtime
+STT_MODEL=saaras:v4
+STT_MODE=transcribe
 LLM_MODEL=sarvam-105b-conversations
 TTS_MODEL=bulbul:v3
 
