@@ -228,9 +228,22 @@ export function ClientReceptionists() {
 
         <div className="p-4 bg-white border border-[#e7e5e4] rounded-2xl flex flex-col justify-between shadow-2xs">
           <div>
-            <span className="text-[10px] sm:text-[11px] font-semibold uppercase text-[#777169] block mb-1">
-              Receptionist Portal URL
-            </span>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-[10px] sm:text-[11px] font-semibold uppercase text-[#777169] block">
+                Receptionist Portal URL
+              </span>
+              <a
+                href={portalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-[#4f46e5]/10 text-[#4f46e5] hover:bg-[#4f46e5]/20 text-[11px] font-semibold rounded-lg transition shrink-0 cursor-pointer"
+              >
+                <span>Open Desk Portal</span>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+            </div>
             <div className="text-xs font-mono font-medium text-[#4f46e5] truncate">
               {portalUrl}
             </div>

@@ -13,13 +13,34 @@ const API_URL = import.meta.env.PROD
   ? (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost') ? import.meta.env.VITE_API_URL : '')
   : (import.meta.env.VITE_API_URL || '');
 
-let accessToken: string | null = null;
+// Persist access token in sessionStorage to survive tab reloads and new tab navigation
+let accessToken: string | null = (typeof window !== 'undefined' && window.sessionStorage)
+  ? sessionStorage.getItem('vanify_access_token')
+  : null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      if (token) {
+        sessionStorage.setItem('vanify_access_token', token);
+      } else {
+        sessionStorage.removeItem('vanify_access_token');
+      }
+    } catch {
+      // ignore storage access errors
+    }
+  }
 }
 
-export function getAccessToken() {
+export function getAccessToken(): string | null {
+  if (!accessToken && typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      accessToken = sessionStorage.getItem('vanify_access_token');
+    } catch {
+      // ignore storage access errors
+    }
+  }
   return accessToken;
 }
 
@@ -27,9 +48,23 @@ interface RequestOptions extends RequestInit {
   params?: Record<string, string>;
 }
 
-let refreshPromise: Promise<string | null> | null = null;
+export interface RefreshAuthResponse {
+  accessToken: string;
+  expiresIn?: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    tenantId: string | null;
+    tenantName: string;
+    tenantSlug: string;
+  };
+}
 
-async function refreshAccessToken(): Promise<string | null> {
+let refreshPromise: Promise<RefreshAuthResponse | null> | null = null;
+
+export async function refreshAuth(): Promise<RefreshAuthResponse | null> {
   if (refreshPromise) {
     return refreshPromise;
   }
@@ -45,7 +80,7 @@ async function refreshAccessToken(): Promise<string | null> {
         const data = await res.json();
         const newToken = data.accessToken || null;
         setAccessToken(newToken);
-        return newToken;
+        return data as RefreshAuthResponse;
       }
       setAccessToken(null);
       return null;
@@ -77,17 +112,17 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   
   let response = await fetch(url, {
     ...fetchOptions,
-    headers: buildHeaders(accessToken),
+    headers: buildHeaders(getAccessToken()),
     credentials: 'include',
   });
   
   // If 401 Unauthorized and not on an auth endpoint, transparently refresh and retry
   if (response.status === 401 && !endpoint.startsWith('/api/auth/login') && !endpoint.startsWith('/api/auth/refresh')) {
-    const refreshedToken = await refreshAccessToken();
-    if (refreshedToken) {
+    const refreshData = await refreshAuth();
+    if (refreshData?.accessToken) {
       response = await fetch(url, {
         ...fetchOptions,
-        headers: buildHeaders(refreshedToken),
+        headers: buildHeaders(refreshData.accessToken),
         credentials: 'include',
       });
     } else {
@@ -148,10 +183,13 @@ export const api = {
   logout: () =>
     request<{ message: string }>('/api/auth/logout', { method: 'POST' }),
   
-  refresh: () =>
-    request<{ accessToken: string; expiresIn: string; user?: { id: string; name: string; email: string; role: string; tenantId: string | null; tenantName: string; tenantSlug: string } }>('/api/auth/refresh', {
-      method: 'POST',
-    }),
+  refresh: async () => {
+    const res = await refreshAuth();
+    if (!res || !res.accessToken) {
+      throw new Error('Failed to refresh session');
+    }
+    return res;
+  },
   
   verifyEmail: (token: string) =>
     request<{ valid: boolean; userId: string }>(`/api/auth/verify-email/${token}`),

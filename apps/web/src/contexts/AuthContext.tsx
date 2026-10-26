@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api, setAccessToken } from '../services/api';
+import { api, setAccessToken, getAccessToken } from '../services/api';
 
 interface AuthContextType {
   user: any | null;
@@ -34,6 +34,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        const storedToken = getAccessToken();
+        if (storedToken) {
+          try {
+            const jwtPayload = JSON.parse(atob(storedToken.split('.')[1]));
+            const exp = jwtPayload.exp ? jwtPayload.exp * 1000 : 0;
+            if (exp > Date.now()) {
+              setUser(jwtPayload);
+            }
+          } catch {
+            // invalid token structure
+          }
+        }
         await refreshUser();
       } catch {
         // Not authenticated

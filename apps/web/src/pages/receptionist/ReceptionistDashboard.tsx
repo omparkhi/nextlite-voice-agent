@@ -24,7 +24,7 @@ function formatSlugToName(slug?: string): string {
 
 export function ReceptionistDashboard() {
   const { clinicSlug } = useParams<{ clinicSlug?: string }>();
-  const { user, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -103,6 +103,10 @@ export function ReceptionistDashboard() {
 
   // Load appointments for selected date
   const loadAppointments = useCallback(async (silent = false) => {
+    if (!user) {
+      if (!silent) setLoading(false);
+      return;
+    }
     if (!silent) setLoading(true);
     setErrorMsg(null);
 
@@ -133,22 +137,25 @@ export function ReceptionistDashboard() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [selectedDate, user?.tenantId]);
+  }, [selectedDate, user]);
 
-  // Initial & Date-change load
+  // Initial & Date-change load (wait until auth initialization completes!)
   useEffect(() => {
-    loadAppointments();
-  }, [loadAppointments]);
+    if (!authLoading && user) {
+      loadAppointments();
+    }
+  }, [loadAppointments, authLoading, user]);
 
   // Real-time background sync polling every 5 seconds (silent diffing prevents flickering)
   useEffect(() => {
+    if (authLoading || !user) return;
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible') {
         loadAppointments(true);
       }
     }, 5000);
     return () => clearInterval(timer);
-  }, [loadAppointments]);
+  }, [loadAppointments, authLoading, user]);
 
   // Handle Quick Add Entry
   const handleQuickAdd = async (e: React.FormEvent) => {
@@ -237,6 +244,41 @@ export function ReceptionistDashboard() {
       completedCount: appointments.filter((a) => a.status === 'COMPLETED').length,
     };
   }, [appointments]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-white text-[#0c0a09] font-sans flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-sm text-[#777169]">
+          <div className="w-8 h-8 rounded-full border-2 border-[#ea580c] border-t-transparent animate-spin" />
+          <p className="text-xs font-medium">Connecting to Receptionist Portal...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex flex-col items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-md p-8 bg-white rounded-2xl border border-[#e7e5e4] shadow-xs text-center space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#ea580c] mx-auto flex items-center justify-center">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-[#0c0a09]">Receptionist Desk Authentication Required</h2>
+            <p className="text-xs text-[#777169] mt-1">Please sign in with your clinic desk or owner credentials to access the receptionist portal.</p>
+          </div>
+          <Link
+            to="/login"
+            className="w-full py-2.5 px-4 bg-[#0c0a09] hover:bg-[#27272a] text-white text-xs font-semibold rounded-xl inline-block transition shadow-xs"
+          >
+            Sign In to Desk
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-[#0c0a09] font-sans flex flex-col">

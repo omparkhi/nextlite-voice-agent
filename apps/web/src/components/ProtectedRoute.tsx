@@ -1,13 +1,16 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
+type UserRole = 'ADMIN' | 'CLIENT_OWNER' | 'CLIENT_VIEWER' | 'CLIENT_RECEPTIONIST';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'ADMIN' | 'CLIENT_OWNER' | 'CLIENT_VIEWER' | Array<'ADMIN' | 'CLIENT_OWNER' | 'CLIENT_VIEWER'>;
+  requiredRole?: UserRole | UserRole[];
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   
   if (loading) {
     return (
@@ -24,7 +27,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   }
   
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
   if (requiredRole) {
@@ -32,6 +35,10 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     if (!roles.includes(user.role)) {
       if (user.role === 'ADMIN') {
         return <Navigate to="/admin" replace />;
+      }
+      if (user.role === 'CLIENT_RECEPTIONIST') {
+        const slug = user.tenantSlug || '';
+        return <Navigate to={slug ? `/${slug}/receptionist` : '/receptionist'} replace />;
       }
       return <Navigate to="/dashboard" replace />;
     }

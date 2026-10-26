@@ -33,10 +33,39 @@ function App() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Home />} />
-        <Route path="/receptionist" element={<ReceptionistDashboard />} />
-        <Route path="/receptionist/schedule" element={<ReceptionistDashboard />} />
-        <Route path="/:clinicSlug/receptionist" element={<ReceptionistDashboard />} />
-        <Route path="/:clinicSlug/receptionist/schedule" element={<ReceptionistDashboard />} />
+        {/* Receptionist Desk Routes */}
+        <Route
+          path="/receptionist"
+          element={
+            <ProtectedRoute requiredRole={['ADMIN', 'CLIENT_OWNER', 'CLIENT_VIEWER', 'CLIENT_RECEPTIONIST']}>
+              <ReceptionistDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/receptionist/schedule"
+          element={
+            <ProtectedRoute requiredRole={['ADMIN', 'CLIENT_OWNER', 'CLIENT_VIEWER', 'CLIENT_RECEPTIONIST']}>
+              <ReceptionistDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/:clinicSlug/receptionist"
+          element={
+            <ProtectedRoute requiredRole={['ADMIN', 'CLIENT_OWNER', 'CLIENT_VIEWER', 'CLIENT_RECEPTIONIST']}>
+              <ReceptionistDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/:clinicSlug/receptionist/schedule"
+          element={
+            <ProtectedRoute requiredRole={['ADMIN', 'CLIENT_OWNER', 'CLIENT_VIEWER', 'CLIENT_RECEPTIONIST']}>
+              <ReceptionistDashboard />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<Login />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

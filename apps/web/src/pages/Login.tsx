@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export function Login() {
@@ -9,6 +9,7 @@ export function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,8 +18,11 @@ export function Login() {
 
     try {
       const userPayload = await login(email, password);
+      const fromPath = (location.state as any)?.from?.pathname;
 
-      if (userPayload?.role === 'ADMIN') {
+      if (fromPath && fromPath !== '/login') {
+        navigate(fromPath, { replace: true });
+      } else if (userPayload?.role === 'ADMIN') {
         navigate('/admin');
       } else if (userPayload?.role === 'CLIENT_RECEPTIONIST') {
         const slug = userPayload.tenantSlug || '';
