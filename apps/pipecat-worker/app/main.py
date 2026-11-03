@@ -3068,17 +3068,38 @@ async def websocket_plivo_endpoint(
 
         is_lean_compression = getattr(settings, "ENABLE_LEAN_PROMPT_COMPRESSION", True)
 
-        # Single authoritative prompt assembly: avoid injecting duplicate 1.8KB 7-day calendar table
-        # if the compiled prompt already contains authoritative temporal grounding.
-        if (
-            "=== TEMPORAL CONTEXT ===" not in compiled_system_prompt
-            and "=== RUNTIME TEMPORAL CONTEXT ===" not in compiled_system_prompt
-            and "=== TIME CONTEXT ===" not in compiled_system_prompt
-        ):
-            if is_lean_compression:
+        # Authoritative prompt assembly & calendar grounding:
+        # Determine whether runtime calendar grid is required based on appointment tools or scheduling intents.
+        has_appointment_tools = any(
+            t.name in ("check_available_slots", "book_appointment", "reschedule_appointment", "cancel_appointment")
+            for t in resolved_tools
+        )
+        prompt_upper = compiled_system_prompt.upper()
+        requires_calendar = (
+            has_appointment_tools
+            or "CALENDAR" in prompt_upper
+            or "APPOINTMENT" in prompt_upper
+            or "BOOKING" in prompt_upper
+            or "SCHEDULE" in prompt_upper
+        )
+
+        has_calendar_table = bool(
+            re.search(r"^\s*===\s*RUNTIME\s+CALENDAR\s+REFERENCE\b", compiled_system_prompt, re.MULTILINE)
+            or "Monthly Calendar Grid" in compiled_system_prompt
+        )
+
+        has_temporal_grounding = bool(
+            re.search(r"^\s*===\s*(RUNTIME\s+TEMPORAL\s+CONTEXT|TEMPORAL\s+CONTEXT|TIME\s+CONTEXT|RUNTIME\s+CLOCK|TEMPORAL\s+CLOCK)\b", compiled_system_prompt, re.MULTILINE)
+        )
+
+        if not has_temporal_grounding:
+            if is_lean_compression and not requires_calendar:
                 temporal_instructions = build_compact_temporal_anchor(time_zone=tz_name)
             else:
                 temporal_instructions = build_temporal_and_calendar_instructions(time_zone=tz_name)
+            base_system_prompt_with_temporal = f"{compiled_system_prompt}\n\n{temporal_instructions}"
+        elif requires_calendar and not has_calendar_table:
+            temporal_instructions = build_temporal_and_calendar_instructions(time_zone=tz_name)
             base_system_prompt_with_temporal = f"{compiled_system_prompt}\n\n{temporal_instructions}"
         else:
             base_system_prompt_with_temporal = compiled_system_prompt

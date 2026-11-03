@@ -304,3 +304,88 @@ async def test_appointment_tool_same_day_past_slot_rejection():
         assert result["error"] == "PAST_SLOT_NOT_ALLOWED"
         assert "has already passed" in result["message"]
 
+
+# 7. Multi-Week Monthly Calendar Grid & Tuesday Nov 3 Grounding Tests
+def test_calendar_grid_november_3_2026():
+    # Tuesday, November 3, 2026 11:39:00 IST (UTC: 2026-11-03 06:09:00)
+    fixed_utc = datetime(2026, 11, 3, 6, 9, 0, tzinfo=timezone.utc)
+    tz = "Asia/Kolkata"
+
+    instructions = build_temporal_and_calendar_instructions(now=fixed_utc, time_zone=tz)
+
+    # 1. Authoritative temporal headers
+    assert "Current Date: Tuesday, November 3, 2026 (YYYY-MM-DD: 2026-11-03)" in instructions
+    assert "Current Day of Week: Tuesday" in instructions
+
+    # 2. Relative day references
+    assert "Today / आज: Tuesday, November 3, 2026 (Date: 2026-11-03)" in instructions
+    assert "Tomorrow / कल / उद्या: Wednesday, November 4, 2026 (Date: 2026-11-04)" in instructions
+    assert "Day After Tomorrow / परसों / परवा: Thursday, November 5, 2026 (Date: 2026-11-05)" in instructions
+
+    # 3. Monthly Calendar Grid header
+    assert "Monthly Calendar Grid (YYYY-MM-DD Weekday):" in instructions
+
+    # 4. Check Week 1 layout: Nov 01 Sun -> Nov 07 Sat
+    assert "2026-11-01 Sun" in instructions
+    assert "2026-11-02 Mon" in instructions
+    assert "2026-11-03 Tue [TODAY]" in instructions
+    assert "2026-11-04 Wed [TOMORROW]" in instructions
+    assert "2026-11-05 Thu" in instructions
+    assert "2026-11-06 Fri" in instructions
+    assert "2026-11-07 Sat" in instructions
+
+    # 5. Verify the 1st Wednesday of the month is explicitly 2026-11-04 Wed
+    # and Thursday is 2026-11-05 Thu (proves agent cannot confuse Wednesday with 5th)
+    assert "2026-11-04 Wed" in instructions
+    assert "2026-11-05 Thu" in instructions
+    assert "2026-11-05 Wed" not in instructions
+
+    # 6. Verify calendar grounding rule is present
+    assert "4. CALENDAR TABLE GROUNDING: When checking or stating any weekday" in instructions
+
+
+def test_production_client_prompt_calendar_injection():
+    # The real production prompt reported by the client
+    client_prompt = """
+=== IDENTITY & PERSONA ===
+You are Sumita, the official phone representative for Glaze Dental Clinic.
+=== LANGUAGE & CONVERSATIONAL STYLE ===
+- MULTILINGUAL MIRRORING: You MUST strictly speak the same language as the caller's latest message.
+=== APPOINTMENT BOOKING INTENT DETECTION ===
+- Specialists: Clips specialist visits on 1st Wednesday of every month.
+1. CALENDAR TABLE GROUNDING (NEVER GUESS DATES): Look directly at the '=== RUNTIME CALENDAR REFERENCE ===' table at the top of your instructions. Find the earliest upcoming Wednesday or Thursday listed in that table.
+"""
+    prompt_upper = client_prompt.upper()
+    has_appointment_tools = True
+    requires_calendar = (
+        has_appointment_tools
+        or "CALENDAR" in prompt_upper
+        or "APPOINTMENT" in prompt_upper
+        or "BOOKING" in prompt_upper
+        or "SCHEDULE" in prompt_upper
+    )
+    import re
+    has_calendar_table = bool(
+        re.search(r"^\s*===\s*RUNTIME\s+CALENDAR\s+REFERENCE\b", client_prompt, re.MULTILINE)
+        or "Monthly Calendar Grid" in client_prompt
+    )
+    has_temporal_grounding = bool(
+        re.search(r"^\s*===\s*(RUNTIME\s+TEMPORAL\s+CONTEXT|TEMPORAL\s+CONTEXT|TIME\s+CONTEXT|RUNTIME\s+CLOCK|TEMPORAL\s+CLOCK)\b", client_prompt, re.MULTILINE)
+    )
+
+    # In the reported bug, the table was missing despite being mentioned in rules
+    assert has_calendar_table is False
+    assert has_temporal_grounding is False
+    assert requires_calendar is True
+
+    # Build instructions for Tuesday Nov 3, 2026
+    fixed_utc = datetime(2026, 11, 3, 6, 9, 0, tzinfo=timezone.utc)
+    temporal_instructions = build_temporal_and_calendar_instructions(now=fixed_utc, time_zone="Asia/Kolkata")
+    assembled_prompt = f"{client_prompt}\n\n{temporal_instructions}"
+
+    # Assembled prompt now contains authoritative calendar table and grid
+    assert "=== RUNTIME CALENDAR REFERENCE (Asia/Kolkata) ===" in assembled_prompt
+    assert "Monthly Calendar Grid (YYYY-MM-DD Weekday):" in assembled_prompt
+    assert "2026-11-03 Tue [TODAY]" in assembled_prompt
+    assert "2026-11-04 Wed [TOMORROW]" in assembled_prompt
+    assert "2026-11-05 Thu" in assembled_prompt

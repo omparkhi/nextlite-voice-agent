@@ -147,6 +147,38 @@ def get_calendar_context(
     )
 
 
+def generate_monthly_calendar_grid(
+    local_dt: datetime,
+) -> List[str]:
+    """Generates an unambiguous, compact 5-6 week calendar grid starting from the Sunday
+    on or before the 1st of the current month.
+    
+    Language-agnostic ISO dates (YYYY-MM-DD) and standard weekday abbreviations (Sun..Sat)
+    allow any LLM to accurately ground any relative weekday (e.g. '1st Wednesday of the month',
+    'next Thursday', 'बुधवार', 'गुरुवार') without mental arithmetic hallucinations.
+    """
+    base_date = local_dt.date()
+    first_of_month = base_date.replace(day=1)
+    days_since_sunday = (first_of_month.weekday() + 1) % 7
+    start_cal = first_of_month - timedelta(days=days_since_sunday)
+
+    num_weeks = 7 if base_date.day > 20 else 6
+    grid_lines = []
+    curr = start_cal
+    for _ in range(num_weeks):
+        week_cells = []
+        for _ in range(7):
+            tag = ""
+            if curr == base_date:
+                tag = " [TODAY]"
+            elif curr == base_date + timedelta(days=1):
+                tag = " [TOMORROW]"
+            week_cells.append(f"{curr.strftime('%Y-%m-%d %a')}{tag}")
+            curr += timedelta(days=1)
+        grid_lines.append(" | ".join(week_cells))
+    return grid_lines
+
+
 def build_temporal_and_calendar_instructions(
     now: Optional[datetime] = None,
     time_zone: Optional[str] = DEFAULT_TIMEZONE,
@@ -154,6 +186,18 @@ def build_temporal_and_calendar_instructions(
     """Builds authoritative temporal and calendar instructions to inject into LLM system prompt."""
     temporal_ctx = get_temporal_context(now, time_zone)
     cal_ctx = get_calendar_context(now, time_zone)
+
+    resolved_tz_name = time_zone.strip() if (time_zone and is_valid_timezone(time_zone)) else DEFAULT_TIMEZONE
+    tz = ZoneInfo(resolved_tz_name)
+    if now is None:
+        local_dt = datetime.now(tz)
+    else:
+        if now.tzinfo is None:
+            local_dt = now.replace(tzinfo=timezone.utc).astimezone(tz)
+        else:
+            local_dt = now.astimezone(tz)
+
+    grid_lines = generate_monthly_calendar_grid(local_dt)
 
     lines = [
         f"\n\n=== RUNTIME TEMPORAL CONTEXT ===",
@@ -167,8 +211,12 @@ def build_temporal_and_calendar_instructions(
         f"- Today / आज: {cal_ctx.today.full_date} (Date: {cal_ctx.today.iso_date})",
         f"- Tomorrow / कल / उद्या: {cal_ctx.tomorrow.full_date} (Date: {cal_ctx.tomorrow.iso_date})",
         f"- Day After Tomorrow / परसों / परवा: {cal_ctx.day_after_tomorrow.full_date} (Date: {cal_ctx.day_after_tomorrow.iso_date})",
-        f"- Next 7 Days Reference Table:",
+        f"",
+        f"Monthly Calendar Grid (YYYY-MM-DD Weekday):",
     ]
+    lines.extend(grid_lines)
+    lines.append("")
+    lines.append("- Next 7 Days Reference Table:")
 
     for day in cal_ctx.upcoming_days:
         tag = " (Today / आज)" if day.day_offset == 0 else " (Tomorrow / कल)" if day.day_offset == 1 else " (Day After Tomorrow / परसों)" if day.day_offset == 2 else ""
@@ -183,9 +231,10 @@ def build_temporal_and_calendar_instructions(
         f"   - 'today' / 'आज' -> strictly {cal_ctx.today.iso_date}",
         f"   - 'tomorrow' / 'कल' / 'उद्या' -> strictly {cal_ctx.tomorrow.iso_date}",
         f"   - 'day after tomorrow' / 'परसों' / 'परवा' -> strictly {cal_ctx.day_after_tomorrow.iso_date}",
-        f"4. AFTER-HOURS AWARENESS: If the current time is past today's business closing hours, do not offer today for appointments — proactively offer tomorrow or the next open business day.",
-        f"5. APPOINTMENT BOOKING: When invoking `book_appointment`, you MUST provide `bookingDate` formatted as YYYY-MM-DD using the calendar above. Never submit a past date.",
-        f"6. CLARIFICATION: If the user provides an ambiguous date or an invalid weekday/date combination, ask politely for clarification.",
+        f"4. CALENDAR TABLE GROUNDING: When checking or stating any weekday (e.g. Wednesday, गुरुवार, etc.) or recurring occurrence (e.g. '1st Wednesday of the month'), look DIRECTLY at the Monthly Calendar Grid above. NEVER guess or calculate weekdays mentally.",
+        f"5. AFTER-HOURS AWARENESS: If the current time is past today's business closing hours, do not offer today for appointments — proactively offer tomorrow or the next open business day.",
+        f"6. APPOINTMENT BOOKING: When invoking `book_appointment`, you MUST provide `bookingDate` formatted as YYYY-MM-DD using the calendar above. Never submit a past date.",
+        f"7. CLARIFICATION: If the user provides an ambiguous date or an invalid weekday/date combination, ask politely for clarification.",
     ])
 
     return "\n".join(lines)
